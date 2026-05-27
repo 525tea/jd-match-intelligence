@@ -1,0 +1,17 @@
+# Local planning and personal notes
+docs/
+
+# macOS
+.DS_Store
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+*.iml
+
+# Logs
+*.log
