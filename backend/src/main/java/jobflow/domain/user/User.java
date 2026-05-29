@@ -42,4 +42,15 @@ public class User extends BaseTimeEntity {
 
     @Column(length = 100)
     private String providerId;
+
+    public static User signup(String email, String passwordHash, String name) {
+        User user = new User();
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.name = name;
+        user.role = UserRole.USER;
+        user.authProvider = AuthProvider.LOCAL;
+        user.providerId = null;
+        return user;
+    }
 }
