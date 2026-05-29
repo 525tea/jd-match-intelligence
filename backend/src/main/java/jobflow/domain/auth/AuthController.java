@@ -1,18 +1,14 @@
 package jobflow.domain.auth;
 
 import jakarta.validation.Valid;
-import jobflow.domain.auth.dto.LoginRequest;
-import jobflow.domain.auth.dto.LoginResponse;
-import jobflow.domain.auth.dto.SignupRequest;
-import jobflow.domain.auth.dto.SignupResponse;
+import jobflow.domain.auth.dto.*;
 import jobflow.global.response.ApiResponse;
+import jobflow.global.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -37,6 +33,20 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request
     ) {
         LoginResponse response = authService.login(request);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<MeResponse>> me(
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        MeResponse response = new MeResponse(
+                principal.id(),
+                principal.email(),
+                principal.name(),
+                principal.role()
+        );
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
