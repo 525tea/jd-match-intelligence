@@ -1,4 +1,8 @@
 package jobflow.domain.job;
 
-public class RemoteType {
+public enum RemoteType {
+    ONSITE,
+    REMOTE,
+    HYBRID,
+    FLEXIBLE
 }

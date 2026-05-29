@@ -1,4 +1,7 @@
 package jobflow.domain.user;
 
-public class AuthProvider {
+public enum AuthProvider {
+    LOCAL,
+    GITHUB,
+    GOOGLE
 }

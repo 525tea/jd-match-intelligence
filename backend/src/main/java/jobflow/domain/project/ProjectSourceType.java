@@ -1,4 +1,8 @@
 package jobflow.domain.project;
 
-public class ProjectSourceType {
+public enum ProjectSourceType {
+    GITHUB,
+    RESUME,
+    PORTFOLIO,
+    MANUAL
 }

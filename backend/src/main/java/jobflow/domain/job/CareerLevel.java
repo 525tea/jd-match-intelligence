@@ -1,4 +1,10 @@
 package jobflow.domain.job;
 
-public class CareerLevel {
+public enum CareerLevel {
+    ANY,
+    NEWCOMER,
+    JUNIOR,
+    MID,
+    SENIOR,
+    LEAD
 }

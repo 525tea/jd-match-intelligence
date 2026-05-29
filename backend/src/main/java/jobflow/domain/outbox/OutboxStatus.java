@@ -1,4 +1,7 @@
 package jobflow.domain.outbox;
 
-public class OutboxStatus {
+public enum OutboxStatus {
+    PENDING,
+    PUBLISHED,
+    FAILED
 }

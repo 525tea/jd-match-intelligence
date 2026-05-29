@@ -1,4 +1,8 @@
 package jobflow.domain.job;
 
-public class JobStatus {
+public enum JobStatus {
+    OPEN,
+    CLOSED,
+    EXPIRED,
+    HIDDEN
 }

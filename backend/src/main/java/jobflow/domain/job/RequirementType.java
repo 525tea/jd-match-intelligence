@@ -1,4 +1,6 @@
 package jobflow.domain.job;
 
-public class RequirementType {
+public enum RequirementType {
+    REQUIRED,
+    PREFERRED
 }

@@ -1,4 +1,11 @@
 package jobflow.domain.job;
 
-public class EmploymentType {
+public enum EmploymentType {
+    FULL_TIME,
+    CONTRACT,
+    INTERN,
+    PART_TIME,
+    FREELANCE,
+    MILITARY_SERVICE,
+    ETC
 }

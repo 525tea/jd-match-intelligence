@@ -1,4 +1,12 @@
 package jobflow.domain.skill;
 
-public class SkillCategory {
+public enum SkillCategory {
+    LANGUAGE,
+    FRAMEWORK,
+    DATABASE,
+    INFRA,
+    CLOUD,
+    TOOL,
+    METHODOLOGY,
+    ETC
 }

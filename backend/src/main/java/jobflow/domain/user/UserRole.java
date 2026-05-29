@@ -1,4 +1,6 @@
 package jobflow.domain.user;
 
-public class UserRole {
+public enum UserRole {
+    USER,
+    ADMIN
 }
