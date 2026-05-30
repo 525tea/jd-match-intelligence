@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import jobflow.domain.auth.dto.OAuth2TokenRequest;
 
 @RestController
 @RequestMapping("/auth")
@@ -33,6 +34,15 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request
     ) {
         LoginResponse response = authService.login(request);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/oauth2/token")
+    public ResponseEntity<ApiResponse<LoginResponse>> exchangeOAuth2Code(
+            @Valid @RequestBody OAuth2TokenRequest request
+    ) {
+        LoginResponse response = authService.exchangeOAuth2Code(request);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
