@@ -14,6 +14,10 @@ public enum ErrorCode {
 
     AUTH_INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다."),
     AUTH_INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_TOKEN", "유효하지 않은 인증 토큰입니다."),
+    AUTH_EMAIL_ALREADY_USED(HttpStatus.CONFLICT, "AUTH_EMAIL_ALREADY_USED", "이미 다른 로그인 방식으로 가입된 이메일입니다."),
+    AUTH_OAUTH2_PROVIDER_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "AUTH_OAUTH2_PROVIDER_NOT_SUPPORTED", "지원하지 않는 소셜 로그인 제공자입니다."),
+    AUTH_OAUTH2_EMAIL_NOT_FOUND(HttpStatus.BAD_REQUEST, "AUTH_OAUTH2_EMAIL_NOT_FOUND", "소셜 계정에서 이메일 정보를 찾을 수 없습니다."),
+    AUTH_OAUTH2_CODE_INVALID(HttpStatus.UNAUTHORIZED, "AUTH_OAUTH2_CODE_INVALID", "유효하지 않은 OAuth2 인증 코드입니다."),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),
     JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "JOB_NOT_FOUND", "공고를 찾을 수 없습니다."),
