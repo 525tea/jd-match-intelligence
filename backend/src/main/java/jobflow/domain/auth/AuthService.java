@@ -14,6 +14,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jobflow.domain.auth.dto.OAuth2TokenRequest;
+import jobflow.domain.auth.oauth.code.OAuth2AuthorizationCode;
+import jobflow.domain.auth.oauth.code.OAuth2AuthorizationCodeStore;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +26,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final OAuth2AuthorizationCodeStore authorizationCodeStore;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -48,6 +52,20 @@ public class AuthService {
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS);
         }
+
+        String accessToken = jwtTokenProvider.createAccessToken(user);
+
+        return LoginResponse.bearer(
+                accessToken,
+                jwtTokenProvider.getAccessTokenExpirationMillis()
+        );
+    }
+
+    public LoginResponse exchangeOAuth2Code(OAuth2TokenRequest request) {
+        OAuth2AuthorizationCode authorizationCode = authorizationCodeStore.consume(request.code());
+
+        User user = userRepository.findById(authorizationCode.userId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_OAUTH2_CODE_INVALID));
 
         String accessToken = jwtTokenProvider.createAccessToken(user);
 

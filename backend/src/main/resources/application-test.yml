@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:jobflow-test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  flyway:
+    enabled: false
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: test-github-client-id
+            client-secret: test-github-client-secret
+            scope:
+              - read:user
+              - user:email
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+            scope:
+              - profile
+              - email

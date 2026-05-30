@@ -12,3 +12,7 @@ app:
   jwt:
     secret: ${JWT_SECRET:jobflow-local-development-secret-key-must-be-at-least-32-bytes}
     access-token-expiration-millis: 3600000
+
+  oauth2:
+    success-redirect-uri: ${OAUTH2_SUCCESS_REDIRECT_URI:http://localhost:3000/oauth2/success}
+    failure-redirect-uri: ${OAUTH2_FAILURE_REDIRECT_URI:http://localhost:3000/oauth2/failure}

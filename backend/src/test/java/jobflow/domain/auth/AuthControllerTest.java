@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import jobflow.global.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import jobflow.domain.auth.dto.LoginResponse;
 
 
 @WebMvcTest(
@@ -181,5 +182,69 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("AUTH_INVALID_CREDENTIALS"))
                 .andExpect(jsonPath("$.error.message").value("이메일 또는 비밀번호가 올바르지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("OAuth2 인증 코드 교환 성공 시 200 ApiResponse와 access token을 반환한다")
+    void exchangeOAuth2Code() throws Exception {
+        String requestBody = """
+            {
+              "code": "oauth2-code"
+            }
+            """;
+
+        given(authService.exchangeOAuth2Code(any()))
+                .willReturn(LoginResponse.bearer("oauth-access-token", 3600000L));
+
+        mockMvc.perform(post("/auth/oauth2/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.data.accessToken").value("oauth-access-token"))
+                .andExpect(jsonPath("$.data.expiresIn").value(3600000));
+    }
+
+    @Test
+    @DisplayName("OAuth2 인증 코드 교환 요청 validation 실패 시 400 ErrorResponse를 반환한다")
+    void exchangeOAuth2CodeValidationFail() throws Exception {
+        String requestBody = """
+            {
+              "code": ""
+            }
+            """;
+
+        mockMvc.perform(post("/auth/oauth2/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON_INVALID_INPUT"))
+                .andExpect(jsonPath("$.error.fields", hasSize(1)));
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    @DisplayName("OAuth2 인증 코드가 유효하지 않으면 401 ErrorResponse를 반환한다")
+    void exchangeOAuth2CodeInvalidCode() throws Exception {
+        String requestBody = """
+            {
+              "code": "invalid-code"
+            }
+            """;
+
+        willThrow(new BusinessException(ErrorCode.AUTH_OAUTH2_CODE_INVALID))
+                .given(authService)
+                .exchangeOAuth2Code(any());
+
+        mockMvc.perform(post("/auth/oauth2/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("AUTH_OAUTH2_CODE_INVALID"))
+                .andExpect(jsonPath("$.error.message").value("유효하지 않은 OAuth2 인증 코드입니다."));
     }
 }

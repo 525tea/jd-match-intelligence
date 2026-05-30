@@ -53,4 +53,20 @@ public class User extends BaseTimeEntity {
         user.providerId = null;
         return user;
     }
+
+    public static User oauth2(
+            String email,
+            String name,
+            AuthProvider authProvider,
+            String providerId
+    ) {
+        User user = new User();
+        user.email = email;
+        user.passwordHash = null;
+        user.name = name;
+        user.role = UserRole.USER;
+        user.authProvider = authProvider;
+        user.providerId = providerId;
+        return user;
+    }
 }
