@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -35,4 +36,23 @@ public class Skill {
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    public static Skill create(String name, String normalizedName, SkillCategory category) {
+        Skill skill = new Skill();
+        skill.name = name;
+        skill.normalizedName = normalizedName;
+        skill.category = category;
+        return skill;
+    }
+
+    public void update(String name, String normalizedName, SkillCategory category) {
+        this.name = name;
+        this.normalizedName = normalizedName;
+        this.category = category;
+    }
+
+    @PrePersist
+    void prePersist() {
+        this.createdAt = LocalDateTime.now();
+    }
 }
