@@ -5,6 +5,9 @@ spring:
     username: sa
     password:
 
+  flyway:
+    enabled: false
+
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -17,5 +20,24 @@ spring:
     init:
       mode: never
 
-  flyway:
-    enabled: false
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            client-id: test-github-client-id
+            client-secret: test-github-client-secret
+            scope:
+              - read:user
+              - user:email
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+            scope:
+              - profile
+              - email
+
+app:
+  jwt:
+    secret: jobflow-test-secret-key-must-be-at-least-32-bytes-long
+    access-token-expiration-millis: 3600000

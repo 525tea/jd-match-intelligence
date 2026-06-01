@@ -1,5 +1,24 @@
 package jobflow.domain.auth;
 
+import jobflow.domain.auth.dto.LoginResponse;
+import jobflow.domain.auth.dto.SignupResponse;
+import jobflow.global.error.ErrorCode;
+import jobflow.global.error.GlobalExceptionHandler;
+import jobflow.global.error.exception.BusinessException;
+import jobflow.global.error.exception.ConflictException;
+import jobflow.global.security.JwtAuthenticationFilter;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
@@ -8,26 +27,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-import jobflow.domain.auth.dto.LoginResponse;
-import jobflow.domain.auth.dto.SignupResponse;
-import jobflow.global.error.ErrorCode;
-import jobflow.global.error.GlobalExceptionHandler;
-import jobflow.global.error.exception.BusinessException;
-import jobflow.global.error.exception.ConflictException;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import jobflow.global.security.JwtAuthenticationFilter;
-import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.FilterType;
-import jobflow.domain.auth.dto.LoginResponse;
 
 
 @WebMvcTest(
