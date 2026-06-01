@@ -22,6 +22,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),
     JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "JOB_NOT_FOUND", "공고를 찾을 수 없습니다."),
     SKILL_NOT_FOUND(HttpStatus.NOT_FOUND, "SKILL_NOT_FOUND", "스킬을 찾을 수 없습니다."),
+    SKILL_ALREADY_EXISTS(HttpStatus.CONFLICT, "SKILL_ALREADY_EXISTS", "이미 등록된 스킬입니다."),
 
     USER_EMAIL_DUPLICATED(HttpStatus.CONFLICT, "USER_EMAIL_DUPLICATED", "이미 사용 중인 이메일입니다."),
     APPLICATION_ALREADY_EXISTS(HttpStatus.CONFLICT, "APPLICATION_ALREADY_EXISTS", "이미 지원한 공고입니다."),
