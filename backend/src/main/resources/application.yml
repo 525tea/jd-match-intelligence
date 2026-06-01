@@ -10,7 +10,7 @@ management:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:jobflow-local-development-secret-key-must-be-at-least-32-bytes}
+    secret: ${JWT_SECRET:}
     access-token-expiration-millis: 3600000
 
   oauth2:

@@ -1,6 +1,5 @@
 package jobflow.global.security;
 
-import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,8 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
-import jobflow.global.error.ErrorCode;
-import jobflow.global.error.exception.BusinessException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -50,12 +47,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private void authenticate(String token) {
         if (!jwtTokenProvider.isValidToken(token)) {
-            throw new BusinessException(ErrorCode.AUTH_INVALID_TOKEN);
+            SecurityContextHolder.clearContext();
+            return;
         }
 
         Long userId = jwtTokenProvider.getUserId(token);
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_INVALID_TOKEN));
+                .orElse(null);
+
+        if (user == null) {
+            SecurityContextHolder.clearContext();
+            return;
+        }
 
         UserPrincipal principal = UserPrincipal.from(user);
 

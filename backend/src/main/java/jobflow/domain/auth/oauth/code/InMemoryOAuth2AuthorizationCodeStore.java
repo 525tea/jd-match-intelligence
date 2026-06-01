@@ -1,13 +1,15 @@
 package jobflow.domain.auth.oauth.code;
 
+import jobflow.global.error.ErrorCode;
+import jobflow.global.error.exception.BusinessException;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import jobflow.global.error.ErrorCode;
-import jobflow.global.error.exception.BusinessException;
-import org.springframework.stereotype.Component;
 
 @Component
 public class InMemoryOAuth2AuthorizationCodeStore implements OAuth2AuthorizationCodeStore {
@@ -32,12 +34,24 @@ public class InMemoryOAuth2AuthorizationCodeStore implements OAuth2Authorization
 
     @Override
     public OAuth2AuthorizationCode consume(String code) {
-        OAuth2AuthorizationCode authorizationCode = store.remove(code);
+        OAuth2AuthorizationCode authorizationCode = store.get(code);
 
-        if (authorizationCode == null || authorizationCode.isExpired()) {
+        if (authorizationCode == null) {
             throw new BusinessException(ErrorCode.AUTH_OAUTH2_CODE_INVALID);
         }
 
+        if (authorizationCode.isExpired()) {
+            store.remove(code);
+            throw new BusinessException(ErrorCode.AUTH_OAUTH2_CODE_INVALID);
+        }
+
+        store.remove(code);
+
         return authorizationCode;
+    }
+
+    @Scheduled(fixedDelay = 60_000)
+    public void evictExpiredCodes() {
+        store.entrySet().removeIf(entry -> entry.getValue().isExpired());
     }
 }
