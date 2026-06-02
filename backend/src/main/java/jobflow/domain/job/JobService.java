@@ -1,12 +1,10 @@
 package jobflow.domain.job;
 
-import java.util.List;
-import jobflow.domain.job.dto.JobCreateRequest;
-import jobflow.domain.job.dto.JobExperienceTagRequest;
-import jobflow.domain.job.dto.JobResponse;
-import jobflow.domain.job.dto.JobSkillRequest;
-import jobflow.domain.job.dto.JobSummaryResponse;
-import jobflow.domain.job.dto.JobUpdateRequest;
+import jobflow.domain.job.dto.*;
+import jobflow.domain.outbox.OutboxEvent;
+import jobflow.domain.outbox.OutboxEventService;
+import jobflow.domain.outbox.OutboxEventTypes;
+import jobflow.domain.outbox.payload.JobOutboxPayload;
 import jobflow.domain.skill.ExperienceTagCode;
 import jobflow.domain.skill.ExperienceTagCodeRepository;
 import jobflow.domain.skill.Skill;
@@ -16,6 +14,8 @@ import jobflow.global.error.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +27,7 @@ public class JobService {
     private final JobExperienceTagRepository jobExperienceTagRepository;
     private final SkillRepository skillRepository;
     private final ExperienceTagCodeRepository experienceTagCodeRepository;
+    private final OutboxEventService outboxEventService;
 
     @Transactional
     public JobResponse createJob(JobCreateRequest request) {
@@ -62,6 +63,14 @@ public class JobService {
         Job savedJob = jobRepository.save(job);
         List<JobSkill> jobSkills = saveJobSkills(savedJob, request.skills());
         List<JobExperienceTag> jobExperienceTags = saveJobExperienceTags(savedJob, request.experienceTags());
+
+        outboxEventService.save(
+                "JOB",
+                savedJob.getId(),
+                OutboxEventTypes.JOB_CREATED,
+                JobOutboxPayload.from(savedJob),
+                OutboxEvent.TOPIC_JOB_EVENTS
+        );
 
         return JobResponse.of(savedJob, jobSkills, jobExperienceTags);
     }
@@ -112,6 +121,14 @@ public class JobService {
                 request.deadlineAt()
         );
 
+        outboxEventService.save(
+                "JOB",
+                job.getId(),
+                OutboxEventTypes.JOB_UPDATED,
+                JobOutboxPayload.from(job),
+                OutboxEvent.TOPIC_JOB_EVENTS
+        );
+
         List<JobSkill> jobSkills = jobSkillRepository.findByJobId(jobId);
         List<JobExperienceTag> jobExperienceTags = jobExperienceTagRepository.findByJobId(jobId);
 
@@ -123,6 +140,14 @@ public class JobService {
         Job job = findJob(jobId);
         job.close();
 
+        outboxEventService.save(
+                "JOB",
+                job.getId(),
+                OutboxEventTypes.JOB_CLOSED,
+                JobOutboxPayload.from(job),
+                OutboxEvent.TOPIC_JOB_EVENTS
+        );
+
         List<JobSkill> jobSkills = jobSkillRepository.findByJobId(jobId);
         List<JobExperienceTag> jobExperienceTags = jobExperienceTagRepository.findByJobId(jobId);
 
@@ -133,6 +158,14 @@ public class JobService {
     public JobResponse expireJob(Long jobId) {
         Job job = findJob(jobId);
         job.expire();
+
+        outboxEventService.save(
+                "JOB",
+                job.getId(),
+                OutboxEventTypes.JOB_EXPIRED,
+                JobOutboxPayload.from(job),
+                OutboxEvent.TOPIC_JOB_EVENTS
+        );
 
         List<JobSkill> jobSkills = jobSkillRepository.findByJobId(jobId);
         List<JobExperienceTag> jobExperienceTags = jobExperienceTagRepository.findByJobId(jobId);

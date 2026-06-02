@@ -5,6 +5,7 @@ import jobflow.domain.application.dto.ApplicationResponse;
 import jobflow.domain.application.dto.ApplicationStatusUpdateRequest;
 import jobflow.domain.application.dto.ApplicationSummaryResponse;
 import jobflow.domain.job.*;
+import jobflow.domain.outbox.OutboxEventService;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
 import jobflow.global.error.ErrorCode;
@@ -27,8 +28,10 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -42,6 +45,9 @@ class ApplicationServiceTest {
 
     @Mock
     private JobRepository jobRepository;
+
+    @Mock
+    private OutboxEventService outboxEventService;
 
     @InjectMocks
     private ApplicationService applicationService;
@@ -72,6 +78,13 @@ class ApplicationServiceTest {
         assertThat(response.status()).isEqualTo(ApplicationStatus.APPLIED);
 
         verify(applicationRepository).saveAndFlush(any(Application.class));
+        verify(outboxEventService).save(
+                eq("APPLICATION"),
+                eq(100L),
+                eq("APPLICATION_CREATED"),
+                any(),
+                eq("application.events")
+        );
     }
 
     @Test
@@ -248,6 +261,13 @@ class ApplicationServiceTest {
         assertThat(response.status()).isEqualTo(ApplicationStatus.INTERVIEW);
 
         verify(applicationRepository).flush();
+        verify(outboxEventService).save(
+                eq("APPLICATION"),
+                eq(applicationId),
+                eq("APPLICATION_STATUS_CHANGED"),
+                any(),
+                eq("application.events")
+        );
     }
 
     @Test
@@ -296,6 +316,7 @@ class ApplicationServiceTest {
                 .isInstanceOf(ConflictException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.APPLICATION_STATUS_CONFLICT);
+        verify(outboxEventService, never()).save(any(), any(), any(), any(), any());
     }
 
     private User createUser(Long id) {
