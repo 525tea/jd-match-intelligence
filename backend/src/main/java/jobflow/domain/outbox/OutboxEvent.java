@@ -77,6 +77,21 @@ public class OutboxEvent {
         return event;
     }
 
+    public void markPublished() {
+        this.status = OutboxStatus.PUBLISHED;
+        this.publishedAt = LocalDateTime.now();
+        this.lastError = null;
+    }
+
+    public void markFailed(String lastError, int maxRetryCount) {
+        this.retryCount++;
+        this.lastError = lastError;
+
+        if (this.retryCount >= maxRetryCount) {
+            this.status = OutboxStatus.FAILED;
+        }
+    }
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();
