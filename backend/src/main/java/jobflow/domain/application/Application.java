@@ -16,6 +16,8 @@ import java.time.LocalDateTime;
 import jobflow.domain.common.BaseTimeEntity;
 import jobflow.domain.job.Job;
 import jobflow.domain.user.User;
+import jobflow.global.error.ErrorCode;
+import jobflow.global.error.exception.ConflictException;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -47,4 +49,26 @@ public class Application extends BaseTimeEntity {
     private Long version;
 
     private LocalDateTime appliedAt;
+
+    public static Application create(User user, Job job) {
+        Application application = new Application();
+        application.user = user;
+        application.job = job;
+        application.status = ApplicationStatus.APPLIED;
+        application.appliedAt = LocalDateTime.now();
+        return application;
+    }
+
+    public void changeStatus(ApplicationStatus nextStatus) {
+        if (isTerminalStatus() && status != nextStatus) {
+            throw new ConflictException(ErrorCode.APPLICATION_STATUS_CONFLICT);
+        }
+
+        this.status = nextStatus;
+    }
+
+    private boolean isTerminalStatus() {
+        return status == ApplicationStatus.REJECTED
+                || status == ApplicationStatus.WITHDRAWN;
+    }
 }
