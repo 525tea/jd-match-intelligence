@@ -37,4 +37,12 @@ public class JobSkill {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private RequirementType requirementType = RequirementType.REQUIRED;
+
+    public static JobSkill create(Job job, Skill skill, RequirementType requirementType) {
+        JobSkill jobSkill = new JobSkill();
+        jobSkill.job = job;
+        jobSkill.skill = skill;
+        jobSkill.requirementType = requirementType;
+        return jobSkill;
+    }
 }
