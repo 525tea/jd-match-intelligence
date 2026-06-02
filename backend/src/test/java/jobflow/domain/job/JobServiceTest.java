@@ -1,28 +1,9 @@
 package jobflow.domain.job;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
-
-import java.lang.reflect.Constructor;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import jobflow.domain.job.dto.JobCreateRequest;
-import jobflow.domain.job.dto.JobExperienceTagRequest;
-import jobflow.domain.job.dto.JobResponse;
-import jobflow.domain.job.dto.JobSkillRequest;
-import jobflow.domain.job.dto.JobSummaryResponse;
-import jobflow.domain.job.dto.JobUpdateRequest;
-import jobflow.domain.skill.ExperienceTagCode;
-import jobflow.domain.skill.ExperienceTagCodeRepository;
-import jobflow.domain.skill.Skill;
-import jobflow.domain.skill.SkillCategory;
-import jobflow.domain.skill.SkillRepository;
+import jobflow.domain.job.dto.*;
+import jobflow.domain.outbox.OutboxEventService;
+import jobflow.domain.skill.*;
 import jobflow.global.error.ErrorCode;
-import jobflow.global.error.exception.BusinessException;
 import jobflow.global.error.exception.ConflictException;
 import jobflow.global.error.exception.EntityNotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -32,6 +13,18 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.lang.reflect.Constructor;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class JobServiceTest {
@@ -53,6 +46,9 @@ class JobServiceTest {
 
     @InjectMocks
     private JobService jobService;
+
+    @Mock
+    private OutboxEventService outboxEventService;
 
     @Test
     @DisplayName("공고를 생성하고 스킬과 경험 태그를 함께 저장한다")
@@ -90,6 +86,13 @@ class JobServiceTest {
         verify(jobRepository).save(any(Job.class));
         verify(jobSkillRepository).saveAll(any());
         verify(jobExperienceTagRepository).saveAll(any());
+        verify(outboxEventService).save(
+                eq("JOB"),
+                eq(1L),
+                eq("JOB_CREATED"),
+                any(),
+                eq("job.events")
+        );
     }
 
     @Test
@@ -197,6 +200,14 @@ class JobServiceTest {
         assertThat(response.title()).isEqualTo("수정된 백엔드 개발자");
         assertThat(response.companyName()).isEqualTo("Updated JobFlow");
         assertThat(response.role()).isEqualTo(JobRole.BACKEND);
+
+        verify(outboxEventService).save(
+                eq("JOB"),
+                eq(jobId),
+                eq("JOB_UPDATED"),
+                any(),
+                eq("job.events")
+        );
     }
 
     @Test
@@ -212,6 +223,14 @@ class JobServiceTest {
         JobResponse response = jobService.closeJob(jobId);
 
         assertThat(response.status()).isEqualTo(JobStatus.CLOSED);
+
+        verify(outboxEventService).save(
+                eq("JOB"),
+                eq(jobId),
+                eq("JOB_CLOSED"),
+                any(),
+                eq("job.events")
+        );
     }
 
     @Test
@@ -227,6 +246,14 @@ class JobServiceTest {
         JobResponse response = jobService.expireJob(jobId);
 
         assertThat(response.status()).isEqualTo(JobStatus.EXPIRED);
+
+        verify(outboxEventService).save(
+                eq("JOB"),
+                eq(jobId),
+                eq("JOB_EXPIRED"),
+                any(),
+                eq("job.events")
+        );
     }
 
     @Test
