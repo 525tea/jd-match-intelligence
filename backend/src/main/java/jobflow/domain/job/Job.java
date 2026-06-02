@@ -11,6 +11,8 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import jobflow.domain.common.BaseTimeEntity;
+import jobflow.global.error.ErrorCode;
+import jobflow.global.error.exception.ConflictException;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -104,4 +106,131 @@ public class Job extends BaseTimeEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private JobStatus status = JobStatus.OPEN;
+
+    public static Job create(
+            String source,
+            String externalId,
+            String title,
+            String companyName,
+            String description,
+            String url,
+            JobRole role,
+            String roleDetail,
+            CareerLevel careerLevel,
+            Integer minExperienceYears,
+            Integer maxExperienceYears,
+            String educationLevel,
+            EmploymentType employmentType,
+            String companySize,
+            String industry,
+            String locationCountry,
+            String locationRegion,
+            String locationCity,
+            RemoteType remoteType,
+            Integer salaryMin,
+            Integer salaryMax,
+            String salaryCurrency,
+            boolean salaryVisible,
+            Integer hiringCount,
+            LocalDateTime openedAt,
+            LocalDateTime deadlineAt
+    ) {
+        Job job = new Job();
+        job.source = source;
+        job.externalId = externalId;
+        job.title = title;
+        job.companyName = companyName;
+        job.description = description;
+        job.url = url;
+        job.role = role;
+        job.roleDetail = roleDetail;
+        job.careerLevel = careerLevel;
+        job.minExperienceYears = minExperienceYears;
+        job.maxExperienceYears = maxExperienceYears;
+        job.educationLevel = educationLevel;
+        job.employmentType = employmentType;
+        job.companySize = companySize;
+        job.industry = industry;
+        job.locationCountry = locationCountry;
+        job.locationRegion = locationRegion;
+        job.locationCity = locationCity;
+        job.remoteType = remoteType;
+        job.salaryMin = salaryMin;
+        job.salaryMax = salaryMax;
+        job.salaryCurrency = salaryCurrency;
+        job.salaryVisible = salaryVisible;
+        job.hiringCount = hiringCount;
+        job.openedAt = openedAt;
+        job.deadlineAt = deadlineAt;
+        job.status = JobStatus.OPEN;
+        return job;
+    }
+
+    public void update(
+            String title,
+            String companyName,
+            String description,
+            String url,
+            JobRole role,
+            String roleDetail,
+            CareerLevel careerLevel,
+            Integer minExperienceYears,
+            Integer maxExperienceYears,
+            String educationLevel,
+            EmploymentType employmentType,
+            String companySize,
+            String industry,
+            String locationCountry,
+            String locationRegion,
+            String locationCity,
+            RemoteType remoteType,
+            Integer salaryMin,
+            Integer salaryMax,
+            String salaryCurrency,
+            boolean salaryVisible,
+            Integer hiringCount,
+            LocalDateTime openedAt,
+            LocalDateTime deadlineAt
+    ) {
+        this.title = title;
+        this.companyName = companyName;
+        this.description = description;
+        this.url = url;
+        this.role = role;
+        this.roleDetail = roleDetail;
+        this.careerLevel = careerLevel;
+        this.minExperienceYears = minExperienceYears;
+        this.maxExperienceYears = maxExperienceYears;
+        this.educationLevel = educationLevel;
+        this.employmentType = employmentType;
+        this.companySize = companySize;
+        this.industry = industry;
+        this.locationCountry = locationCountry;
+        this.locationRegion = locationRegion;
+        this.locationCity = locationCity;
+        this.remoteType = remoteType;
+        this.salaryMin = salaryMin;
+        this.salaryMax = salaryMax;
+        this.salaryCurrency = salaryCurrency;
+        this.salaryVisible = salaryVisible;
+        this.hiringCount = hiringCount;
+        this.openedAt = openedAt;
+        this.deadlineAt = deadlineAt;
+    }
+
+    public void close() {
+        validateOpenStatus();
+        this.status = JobStatus.CLOSED;
+    }
+
+    public void expire() {
+        validateOpenStatus();
+        this.status = JobStatus.EXPIRED;
+    }
+
+    private void validateOpenStatus() {
+        if (status != JobStatus.OPEN) {
+            throw new ConflictException(ErrorCode.JOB_STATUS_CONFLICT);
+        }
+    }
 }

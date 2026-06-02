@@ -34,4 +34,16 @@ public class JobExperienceTag {
 
     @Column(length = 500)
     private String sourcePhrase;
+
+    public static JobExperienceTag create(
+            Job job,
+            ExperienceTagCode tagCode,
+            String sourcePhrase
+    ) {
+        JobExperienceTag jobExperienceTag = new JobExperienceTag();
+        jobExperienceTag.job = job;
+        jobExperienceTag.tagCode = tagCode;
+        jobExperienceTag.sourcePhrase = sourcePhrase;
+        return jobExperienceTag;
+    }
 }
