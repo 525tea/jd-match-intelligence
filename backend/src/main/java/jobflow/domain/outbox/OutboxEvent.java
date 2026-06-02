@@ -1,17 +1,28 @@
 package jobflow.domain.outbox;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Lob;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 
 @Getter
 @Entity
 @Table(name = "outbox_events")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OutboxEvent {
+
+    public static final String TOPIC_JOB_EVENTS = "job.events";
+    public static final String TOPIC_APPLICATION_EVENTS = "application.events";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,6 +58,24 @@ public class OutboxEvent {
     private LocalDateTime createdAt;
 
     private LocalDateTime publishedAt;
+
+    public static OutboxEvent create(
+            String aggregateType,
+            Long aggregateId,
+            String eventType,
+            String payload,
+            String topic
+    ) {
+        OutboxEvent event = new OutboxEvent();
+        event.aggregateType = aggregateType;
+        event.aggregateId = aggregateId;
+        event.eventType = eventType;
+        event.payload = payload;
+        event.topic = topic;
+        event.status = OutboxStatus.PENDING;
+        event.retryCount = 0;
+        return event;
+    }
 
     @PrePersist
     void prePersist() {
