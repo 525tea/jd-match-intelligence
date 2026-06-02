@@ -18,6 +18,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jobflow.domain.outbox.OutboxEvent;
+import jobflow.domain.outbox.OutboxEventService;
+import jobflow.domain.outbox.OutboxEventTypes;
+import jobflow.domain.outbox.payload.ApplicationOutboxPayload;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +31,7 @@ public class ApplicationService {
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     private final JobRepository jobRepository;
+    private final OutboxEventService outboxEventService;
 
     @Transactional
     public ApplicationResponse createApplication(
@@ -43,6 +48,15 @@ public class ApplicationService {
 
         try {
             Application savedApplication = applicationRepository.saveAndFlush(application);
+
+            outboxEventService.save(
+                    "APPLICATION",
+                    savedApplication.getId(),
+                    OutboxEventTypes.APPLICATION_CREATED,
+                    ApplicationOutboxPayload.from(savedApplication),
+                    OutboxEvent.TOPIC_APPLICATION_EVENTS
+            );
+
             return ApplicationResponse.from(savedApplication);
         } catch (DataIntegrityViolationException exception) {
             throw new ConflictException(ErrorCode.APPLICATION_ALREADY_EXISTS);
@@ -76,6 +90,14 @@ public class ApplicationService {
         try {
             application.changeStatus(request.status());
             applicationRepository.flush();
+
+            outboxEventService.save(
+                    "APPLICATION",
+                    application.getId(),
+                    OutboxEventTypes.APPLICATION_STATUS_CHANGED,
+                    ApplicationOutboxPayload.from(application),
+                    OutboxEvent.TOPIC_APPLICATION_EVENTS
+            );
 
             return ApplicationResponse.from(application);
         } catch (ObjectOptimisticLockingFailureException exception) {
