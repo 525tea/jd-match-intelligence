@@ -44,6 +44,16 @@ public class UserJobController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/{jobId}")
+    public ResponseEntity<ApiResponse<UserJobResponse>> getMyJob(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long jobId
+    ) {
+        UserJobResponse response = userJobService.getMyJob(principal.id(), jobId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @PostMapping("/{jobId}/view")
     public ResponseEntity<ApiResponse<UserJobResponse>> markViewed(
             @AuthenticationPrincipal UserPrincipal principal,

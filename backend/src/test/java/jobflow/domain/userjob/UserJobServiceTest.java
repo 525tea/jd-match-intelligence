@@ -279,4 +279,38 @@ class UserJobServiceTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.getFirst().status()).isEqualTo(UserJobStatus.VIEWED);
     }
+
+    @Test
+    @DisplayName("내 특정 공고 행동 상태를 조회한다")
+    void getMyJob() {
+        Long userId = 1L;
+        Long jobId = 10L;
+        UserJob userJob = createUserJob(100L, userId, jobId);
+        userJob.save(LocalDateTime.of(2026, 6, 4, 11, 0));
+
+        given(userJobRepository.findByUserIdAndJobId(userId, jobId))
+                .willReturn(Optional.of(userJob));
+
+        UserJobResponse response = userJobService.getMyJob(userId, jobId);
+
+        assertThat(response.id()).isEqualTo(100L);
+        assertThat(response.userId()).isEqualTo(userId);
+        assertThat(response.jobId()).isEqualTo(jobId);
+        assertThat(response.status()).isEqualTo(UserJobStatus.SAVED);
+    }
+
+    @Test
+    @DisplayName("내 특정 공고 행동 상태가 없으면 예외가 발생한다")
+    void failWhenMyJobNotFound() {
+        Long userId = 1L;
+        Long jobId = 999L;
+
+        given(userJobRepository.findByUserIdAndJobId(userId, jobId))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userJobService.getMyJob(userId, jobId))
+                .isInstanceOf(EntityNotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.USER_JOB_NOT_FOUND);
+    }
 }

@@ -194,4 +194,35 @@ class UserJobControllerTest {
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].status").value("VIEWED"));
     }
+
+    @Test
+    @DisplayName("내 특정 공고 행동 상태 조회 성공 시 200 ApiResponse를 반환한다")
+    void getMyJob() throws Exception {
+        setAuthentication();
+
+        given(userJobService.getMyJob(1L, 10L))
+                .willReturn(response(UserJobStatus.SAVED));
+
+        mockMvc.perform(get("/user/jobs/{jobId}", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(100))
+                .andExpect(jsonPath("$.data.jobId").value(10))
+                .andExpect(jsonPath("$.data.status").value("SAVED"));
+    }
+
+    @Test
+    @DisplayName("내 특정 공고 행동 상태가 없으면 404 ErrorResponse를 반환한다")
+    void getMissingMyJob() throws Exception {
+        setAuthentication();
+
+        willThrow(new EntityNotFoundException(ErrorCode.USER_JOB_NOT_FOUND))
+                .given(userJobService)
+                .getMyJob(1L, 999L);
+
+        mockMvc.perform(get("/user/jobs/{jobId}", 999L))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("USER_JOB_NOT_FOUND"));
+    }
 }

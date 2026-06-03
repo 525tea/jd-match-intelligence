@@ -20,6 +20,7 @@ public enum ErrorCode {
     AUTH_OAUTH2_CODE_INVALID(HttpStatus.UNAUTHORIZED, "AUTH_OAUTH2_CODE_INVALID", "유효하지 않은 OAuth2 인증 코드입니다."),
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),
+    USER_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_JOB_NOT_FOUND", "사용자 공고 상태를 찾을 수 없습니다."),
     JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "JOB_NOT_FOUND", "공고를 찾을 수 없습니다."),
     JOB_STATUS_CONFLICT(HttpStatus.CONFLICT, "JOB_STATUS_CONFLICT", "공고 상태를 변경할 수 없습니다."),
     SKILL_NOT_FOUND(HttpStatus.NOT_FOUND, "SKILL_NOT_FOUND", "스킬을 찾을 수 없습니다."),

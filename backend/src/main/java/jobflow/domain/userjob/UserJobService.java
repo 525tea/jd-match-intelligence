@@ -55,6 +55,13 @@ public class UserJobService {
         return UserJobResponse.from(userJob);
     }
 
+    public UserJobResponse getMyJob(Long userId, Long jobId) {
+        UserJob userJob = userJobRepository.findByUserIdAndJobId(userId, jobId)
+                .orElseThrow(() -> new EntityNotFoundException(ErrorCode.USER_JOB_NOT_FOUND));
+
+        return UserJobResponse.from(userJob);
+    }
+
     public List<UserJobResponse> getMyViewedJobs(Long userId) {
         return getMyJobsByStatus(userId, UserJobStatus.VIEWED);
     }
