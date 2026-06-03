@@ -1,16 +1,19 @@
 package jobflow.domain.job;
 
 import jobflow.domain.outbox.OutboxEventService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -29,8 +32,21 @@ class JobExpirationServiceTest {
     @Mock
     private OutboxEventService outboxEventService;
 
-    @InjectMocks
+    private final Clock clock = Clock.fixed(
+            Instant.parse("2026-06-04T03:00:00Z"),
+            ZoneId.of("Asia/Seoul")
+    );
+
     private JobExpirationService jobExpirationService;
+
+    @BeforeEach
+    void setUp() {
+        jobExpirationService = new JobExpirationService(
+                jobRepository,
+                outboxEventService,
+                clock
+        );
+    }
 
     @Test
     @DisplayName("마감 시간이 지난 OPEN 공고를 EXPIRED로 변경하고 outbox event를 저장한다")
@@ -67,7 +83,7 @@ class JobExpirationServiceTest {
     }
 
     @Test
-    @DisplayName("OPEN 상태 공고만 만료 조회 대상으로 요청한다")
+    @DisplayName("OPEN 상태 공고만 현재 시간 기준으로 만료 조회 대상으로 요청한다")
     void findOnlyOpenJobs() {
         given(jobRepository.findByStatusAndDeadlineAtBefore(eq(JobStatus.OPEN), any(LocalDateTime.class)))
                 .willReturn(List.of());
@@ -75,9 +91,15 @@ class JobExpirationServiceTest {
         jobExpirationService.expireOverdueJobs();
 
         ArgumentCaptor<JobStatus> statusCaptor = ArgumentCaptor.forClass(JobStatus.class);
-        verify(jobRepository).findByStatusAndDeadlineAtBefore(statusCaptor.capture(), any(LocalDateTime.class));
+        ArgumentCaptor<LocalDateTime> deadlineCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+
+        verify(jobRepository).findByStatusAndDeadlineAtBefore(
+                statusCaptor.capture(),
+                deadlineCaptor.capture()
+        );
 
         assertThat(statusCaptor.getValue()).isEqualTo(JobStatus.OPEN);
+        assertThat(deadlineCaptor.getValue()).isEqualTo("2026-06-04T12:00:00");
     }
 
     private Job createJob(Long id, LocalDateTime deadlineAt) {

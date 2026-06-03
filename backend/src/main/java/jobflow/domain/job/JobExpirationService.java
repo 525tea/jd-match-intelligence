@@ -19,7 +19,7 @@ public class JobExpirationService {
 
     private final JobRepository jobRepository;
     private final OutboxEventService outboxEventService;
-    private final Clock clock = Clock.systemDefaultZone();
+    private final Clock clock;
 
     @Transactional
     public int expireOverdueJobs() {
