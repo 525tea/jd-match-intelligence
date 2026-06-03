@@ -1,11 +1,6 @@
 package jobflow.domain.userjob;
 
-import jobflow.domain.job.CareerLevel;
-import jobflow.domain.job.EmploymentType;
-import jobflow.domain.job.Job;
-import jobflow.domain.job.JobRepository;
-import jobflow.domain.job.JobRole;
-import jobflow.domain.job.RemoteType;
+import jobflow.domain.job.*;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
 import jobflow.domain.userjob.dto.UserJobResponse;
@@ -20,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -234,5 +230,53 @@ class UserJobServiceTest {
         ReflectionTestUtils.setField(job, "id", id);
 
         return job;
+    }
+
+    @Test
+    @DisplayName("내 저장 공고 목록을 조회한다")
+    void getMySavedJobs() {
+        Long userId = 1L;
+        UserJob userJob = createUserJob(100L, userId, 10L);
+        userJob.save(LocalDateTime.of(2026, 6, 4, 11, 0));
+
+        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(userId, UserJobStatus.SAVED))
+                .willReturn(List.of(userJob));
+
+        List<UserJobResponse> responses = userJobService.getMySavedJobs(userId);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.getFirst().id()).isEqualTo(100L);
+        assertThat(responses.getFirst().status()).isEqualTo(UserJobStatus.SAVED);
+    }
+
+    @Test
+    @DisplayName("내 무시 공고 목록을 조회한다")
+    void getMyIgnoredJobs() {
+        Long userId = 1L;
+        UserJob userJob = createUserJob(100L, userId, 10L);
+        userJob.ignore(LocalDateTime.of(2026, 6, 4, 11, 0));
+
+        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(userId, UserJobStatus.IGNORED))
+                .willReturn(List.of(userJob));
+
+        List<UserJobResponse> responses = userJobService.getMyIgnoredJobs(userId);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.getFirst().status()).isEqualTo(UserJobStatus.IGNORED);
+    }
+
+    @Test
+    @DisplayName("내 조회 공고 목록을 조회한다")
+    void getMyViewedJobs() {
+        Long userId = 1L;
+        UserJob userJob = createUserJob(100L, userId, 10L);
+
+        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(userId, UserJobStatus.VIEWED))
+                .willReturn(List.of(userJob));
+
+        List<UserJobResponse> responses = userJobService.getMyViewedJobs(userId);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.getFirst().status()).isEqualTo(UserJobStatus.VIEWED);
     }
 }

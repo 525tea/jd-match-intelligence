@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +53,25 @@ public class UserJobService {
         userJob.ignore(LocalDateTime.now());
 
         return UserJobResponse.from(userJob);
+    }
+
+    public List<UserJobResponse> getMyViewedJobs(Long userId) {
+        return getMyJobsByStatus(userId, UserJobStatus.VIEWED);
+    }
+
+    public List<UserJobResponse> getMySavedJobs(Long userId) {
+        return getMyJobsByStatus(userId, UserJobStatus.SAVED);
+    }
+
+    public List<UserJobResponse> getMyIgnoredJobs(Long userId) {
+        return getMyJobsByStatus(userId, UserJobStatus.IGNORED);
+    }
+
+    private List<UserJobResponse> getMyJobsByStatus(Long userId, UserJobStatus status) {
+        return userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(userId, status)
+                .stream()
+                .map(UserJobResponse::from)
+                .toList();
     }
 
     private UserJob findOrCreateViewedUserJob(Long userId, Long jobId) {

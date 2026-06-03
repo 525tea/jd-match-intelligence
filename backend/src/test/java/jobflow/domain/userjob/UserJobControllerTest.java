@@ -22,9 +22,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -144,5 +147,51 @@ class UserJobControllerTest {
                 null,
                 principal.authorities()
         );
+    }
+
+    @Test
+    @DisplayName("내 저장 공고 목록 조회 성공 시 200 ApiResponse를 반환한다")
+    void getMySavedJobs() throws Exception {
+        setAuthentication();
+
+        given(userJobService.getMySavedJobs(1L))
+                .willReturn(List.of(response(UserJobStatus.SAVED)));
+
+        mockMvc.perform(get("/user/jobs/saved"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].id").value(100))
+                .andExpect(jsonPath("$.data[0].status").value("SAVED"));
+    }
+
+    @Test
+    @DisplayName("내 무시 공고 목록 조회 성공 시 200 ApiResponse를 반환한다")
+    void getMyIgnoredJobs() throws Exception {
+        setAuthentication();
+
+        given(userJobService.getMyIgnoredJobs(1L))
+                .willReturn(List.of(response(UserJobStatus.IGNORED)));
+
+        mockMvc.perform(get("/user/jobs/ignored"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].status").value("IGNORED"));
+    }
+
+    @Test
+    @DisplayName("내 조회 공고 목록 조회 성공 시 200 ApiResponse를 반환한다")
+    void getMyViewedJobs() throws Exception {
+        setAuthentication();
+
+        given(userJobService.getMyViewedJobs(1L))
+                .willReturn(List.of(response(UserJobStatus.VIEWED)));
+
+        mockMvc.perform(get("/user/jobs/viewed"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].status").value("VIEWED"));
     }
 }
