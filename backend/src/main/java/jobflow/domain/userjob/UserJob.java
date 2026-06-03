@@ -1,16 +1,6 @@
 package jobflow.domain.userjob;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jobflow.domain.common.BaseTimeEntity;
 import jobflow.domain.job.Job;
 import jobflow.domain.user.User;
@@ -22,7 +12,17 @@ import java.time.LocalDateTime;
 
 @Getter
 @Entity
-@Table(name = "user_jobs")
+@Table(
+        name = "user_jobs",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_user_jobs_user_job",
+                columnNames = {"user_id", "job_id"}
+        ),
+        indexes = {
+                @Index(name = "idx_user_jobs_user_status", columnList = "user_id,status"),
+                @Index(name = "idx_user_jobs_job_status", columnList = "job_id,status")
+        }
+)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class UserJob extends BaseTimeEntity {
 
