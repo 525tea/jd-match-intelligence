@@ -103,6 +103,21 @@ public class Job extends BaseTimeEntity {
 
     private LocalDateTime deadlineAt;
 
+    @Column(length = 1000)
+    private String originalUrl;
+
+    private LocalDateTime collectedAt;
+
+    private LocalDateTime lastSeenAt;
+
+    private LocalDateTime sourceUpdatedAt;
+
+    @Column(columnDefinition = "json")
+    private String rawData;
+
+    @Column(length = 50)
+    private String crawlerVersion;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private JobStatus status = JobStatus.OPEN;
@@ -221,6 +236,22 @@ public class Job extends BaseTimeEntity {
     public void close() {
         validateOpenStatus();
         this.status = JobStatus.CLOSED;
+    }
+
+    public void updateCrawlingMetadata(
+            String originalUrl,
+            LocalDateTime collectedAt,
+            LocalDateTime lastSeenAt,
+            LocalDateTime sourceUpdatedAt,
+            String rawData,
+            String crawlerVersion
+    ) {
+        this.originalUrl = originalUrl;
+        this.collectedAt = collectedAt;
+        this.lastSeenAt = lastSeenAt;
+        this.sourceUpdatedAt = sourceUpdatedAt;
+        this.rawData = rawData;
+        this.crawlerVersion = crawlerVersion;
     }
 
     public void expire() {
