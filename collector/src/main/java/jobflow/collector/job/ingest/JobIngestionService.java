@@ -1,5 +1,6 @@
 package jobflow.collector.job.ingest;
 
+import java.util.List;
 import java.time.LocalDateTime;
 import jobflow.collector.job.Job;
 import jobflow.collector.job.JobRepository;
@@ -40,7 +41,9 @@ public class JobIngestionService {
                 OutboxEvent.TOPIC_JOB_EVENTS
         );
 
-        return new JobIngestionResult(JobIngestionResultType.CREATED, savedJob);
+        List<Job> duplicateCandidates = findDuplicateCandidates(savedJob);
+
+        return new JobIngestionResult(JobIngestionResultType.CREATED, savedJob, duplicateCandidates);
     }
 
     private JobIngestionResult update(Job existingJob, IngestedJobPosting posting) {
@@ -91,7 +94,9 @@ public class JobIngestionService {
                 OutboxEvent.TOPIC_JOB_EVENTS
         );
 
-        return new JobIngestionResult(JobIngestionResultType.UPDATED, existingJob);
+        List<Job> duplicateCandidates = findDuplicateCandidates(existingJob);
+
+        return new JobIngestionResult(JobIngestionResultType.UPDATED, existingJob, duplicateCandidates);
     }
 
     private LocalDateTime preserveCollectedAt(Job existingJob, Job crawledJob) {
@@ -100,5 +105,12 @@ public class JobIngestionService {
         }
 
         return crawledJob.getCollectedAt();
+    }
+
+    private List<Job> findDuplicateCandidates(Job job) {
+        return jobRepository.findByCanonicalFingerprintAndSourceNot(
+                job.getCanonicalFingerprint(),
+                job.getSource()
+        );
     }
 }
