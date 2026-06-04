@@ -24,6 +24,9 @@ public class Job extends BaseTimeEntity {
     @Column(length = 100)
     private String externalId;
 
+    @Column(length = 128)
+    private String canonicalFingerprint;
+
     @Column(nullable = false, length = 255)
     private String title;
 
@@ -230,6 +233,7 @@ public class Job extends BaseTimeEntity {
     }
 
     public void updateCrawlingMetadata(
+            String canonicalFingerprint,
             String originalUrl,
             LocalDateTime collectedAt,
             LocalDateTime lastSeenAt,
@@ -237,6 +241,7 @@ public class Job extends BaseTimeEntity {
             String rawData,
             String crawlerVersion
     ) {
+        this.canonicalFingerprint = canonicalFingerprint;
         this.originalUrl = originalUrl;
         this.collectedAt = collectedAt;
         this.lastSeenAt = lastSeenAt;

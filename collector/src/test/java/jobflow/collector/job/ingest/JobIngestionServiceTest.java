@@ -78,6 +78,7 @@ class JobIngestionServiceTest {
 
         LocalDateTime originalCollectedAt = LocalDateTime.of(2026, 6, 4, 9, 0);
         existingJob.updateCrawlingMetadata(
+                null,
                 "https://zighang.com/jobs/zighang-123",
                 originalCollectedAt,
                 LocalDateTime.of(2026, 6, 4, 9, 5),

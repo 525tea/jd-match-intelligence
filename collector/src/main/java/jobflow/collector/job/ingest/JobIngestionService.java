@@ -74,6 +74,7 @@ public class JobIngestionService {
         );
 
         existingJob.updateCrawlingMetadata(
+                null,
                 crawledJob.getOriginalUrl(),
                 preserveCollectedAt(existingJob, crawledJob),
                 crawledJob.getLastSeenAt(),

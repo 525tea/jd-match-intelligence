@@ -37,6 +37,7 @@ public class IngestedJobMapper {
         );
 
         job.updateCrawlingMetadata(
+                null,
                 posting.sourceUrl(),
                 posting.collectedAt(),
                 posting.lastSeenAt(),
