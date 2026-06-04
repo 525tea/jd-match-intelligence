@@ -2,6 +2,8 @@ package jobflow.collector.job.collect;
 
 import jobflow.collector.job.ingest.CrawlerUrlCandidate;
 import jobflow.collector.job.ingest.JobIngestionSource;
+import jobflow.collector.job.ingest.JobPostingCollectionResult;
+import jobflow.collector.job.ingest.JobPostingCollectionService;
 import jobflow.collector.job.ingest.SitemapCrawlResult;
 import jobflow.collector.job.ingest.SitemapCrawlService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class CollectorRunner implements ApplicationRunner {
 
     private final CollectorRunnerProperties collectorRunnerProperties;
     private final SitemapCrawlService sitemapCrawlService;
+    private final JobPostingCollectionService jobPostingCollectionService;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -35,6 +38,11 @@ public class CollectorRunner implements ApplicationRunner {
         result.jobUrls().stream()
                 .limit(collectorRunnerProperties.previewLimitOrDefault())
                 .forEach(this::logDiscoveredJobUrl);
+
+        result.jobUrls().stream()
+                .limit(collectorRunnerProperties.collectLimitOrDefault())
+                .map(jobPostingCollectionService::collect)
+                .forEach(this::logCollectionResult);
     }
 
     private void logDiscoveredJobUrl(CrawlerUrlCandidate candidate) {
@@ -44,6 +52,15 @@ public class CollectorRunner implements ApplicationRunner {
                 candidate.externalId(),
                 candidate.detailUrl(),
                 candidate.sourceUrl()
+        );
+    }
+
+    private void logCollectionResult(JobPostingCollectionResult result) {
+        log.info(
+                "Collector job posting collected. source={}, externalId={}, resultType={}",
+                result.candidate().source(),
+                result.candidate().externalId(),
+                result.ingestionResultType()
         );
     }
 }

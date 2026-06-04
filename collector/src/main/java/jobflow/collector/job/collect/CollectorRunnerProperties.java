@@ -7,11 +7,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record CollectorRunnerProperties(
         boolean enabled,
         JobIngestionSource source,
-        int previewLimit
+        int previewLimit,
+        int collectLimit
 ) {
 
     private static final JobIngestionSource DEFAULT_SOURCE = JobIngestionSource.ZIGHANG;
     private static final int DEFAULT_PREVIEW_LIMIT = 5;
+    private static final int DEFAULT_COLLECT_LIMIT = 10;
 
     public JobIngestionSource sourceOrDefault() {
         if (source == null) {
@@ -27,5 +29,13 @@ public record CollectorRunnerProperties(
         }
 
         return previewLimit;
+    }
+
+    public int collectLimitOrDefault() {
+        if (collectLimit <= 0) {
+            return DEFAULT_COLLECT_LIMIT;
+        }
+
+        return collectLimit;
     }
 }
