@@ -3,6 +3,7 @@ package jobflow.collector.job.ingest;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.LocalDateTime;
+
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
 import jobflow.collector.job.Job;
@@ -14,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 class IngestedJobMapperTest {
 
-    private final IngestedJobMapper mapper = new IngestedJobMapper();
+    private final IngestedJobMapper mapper = new IngestedJobMapper(new CanonicalFingerprintGenerator());
 
     @Test
     @DisplayName("수집된 공고를 Job entity로 변환하고 수집 metadata를 기록한다")
@@ -25,6 +26,7 @@ class IngestedJobMapperTest {
 
         assertThat(job.getSource()).isEqualTo("ZIGHANG");
         assertThat(job.getExternalId()).isEqualTo("zighang-123");
+        assertThat(job.getCanonicalFingerprint()).hasSize(64);
         assertThat(job.getTitle()).isEqualTo("백엔드 개발자");
         assertThat(job.getCompanyName()).isEqualTo("JobFlow");
         assertThat(job.getDescription()).isEqualTo("Spring Boot 기반 백엔드 개발자를 채용합니다.");

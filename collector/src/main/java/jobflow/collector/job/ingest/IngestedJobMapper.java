@@ -1,10 +1,14 @@
 package jobflow.collector.job.ingest;
 
 import jobflow.collector.job.Job;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class IngestedJobMapper {
+
+    private final CanonicalFingerprintGenerator canonicalFingerprintGenerator;
 
     public Job toJob(IngestedJobPosting posting) {
         Job job = Job.create(
@@ -37,7 +41,7 @@ public class IngestedJobMapper {
         );
 
         job.updateCrawlingMetadata(
-                null,
+                canonicalFingerprintGenerator.generate(posting),
                 posting.sourceUrl(),
                 posting.collectedAt(),
                 posting.lastSeenAt(),

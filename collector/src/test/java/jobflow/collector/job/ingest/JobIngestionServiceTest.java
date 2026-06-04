@@ -33,7 +33,7 @@ class JobIngestionServiceTest {
     @Mock
     private OutboxEventService outboxEventService;
 
-    private final IngestedJobMapper mapper = new IngestedJobMapper();
+    private final IngestedJobMapper mapper = new IngestedJobMapper(new CanonicalFingerprintGenerator());
 
     @Test
     @DisplayName("신규 수집 공고를 저장하고 JOB_CREATED outbox event를 기록한다")
@@ -58,6 +58,7 @@ class JobIngestionServiceTest {
         assertThat(result.job().getExternalId()).isEqualTo("zighang-123");
         assertThat(result.job().getTitle()).isEqualTo("백엔드 개발자");
         assertThat(result.job().getOriginalUrl()).isEqualTo("https://zighang.com/jobs/zighang-123?utm=test");
+        assertThat(result.job().getCanonicalFingerprint()).hasSize(64);
 
         verify(jobRepository).save(any(Job.class));
         verify(outboxEventService).save(
@@ -102,6 +103,7 @@ class JobIngestionServiceTest {
         assertThat(existingJob.getCollectedAt()).isEqualTo(originalCollectedAt);
         assertThat(existingJob.getLastSeenAt()).isEqualTo(posting.lastSeenAt());
         assertThat(existingJob.getRawData()).contains("백엔드 개발자 수정");
+        assertThat(existingJob.getCanonicalFingerprint()).hasSize(64);
 
         verify(outboxEventService).save(
                 eq("JOB"),
