@@ -13,15 +13,19 @@ public class JobPostingCollectionService {
     private final JobIngestionService jobIngestionService;
 
     public JobPostingCollectionResult collect(CrawlerUrlCandidate candidate) {
-        FetchedJobPosting fetchedJobPosting = jobPostingFetchService.fetch(candidate);
-        IngestedJobPosting ingestedJobPosting = findParser(candidate.source())
-                .parse(fetchedJobPosting);
-        JobIngestionResult ingestionResult = jobIngestionService.ingest(ingestedJobPosting);
+        try {
+            FetchedJobPosting fetchedJobPosting = jobPostingFetchService.fetch(candidate);
+            IngestedJobPosting ingestedJobPosting = findParser(candidate.source())
+                    .parse(fetchedJobPosting);
+            JobIngestionResult ingestionResult = jobIngestionService.ingest(ingestedJobPosting);
 
-        return new JobPostingCollectionResult(
-                candidate,
-                ingestionResult.type()
-        );
+            return JobPostingCollectionResult.success(
+                    candidate,
+                    ingestionResult.type()
+            );
+        } catch (Exception exception) {
+            return JobPostingCollectionResult.failure(candidate, exception);
+        }
     }
 
     private JobPostingParser findParser(JobIngestionSource source) {

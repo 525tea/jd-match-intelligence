@@ -58,7 +58,9 @@ class JobPostingCollectionServiceTest {
         JobPostingCollectionResult result = service.collect(candidate);
 
         assertThat(result.candidate()).isEqualTo(candidate);
+        assertThat(result.success()).isTrue();
         assertThat(result.ingestionResultType()).isEqualTo(JobIngestionResultType.CREATED);
+        assertThat(result.errorMessage()).isNull();
 
         verify(jobPostingFetchService).fetch(candidate);
         verify(jobPostingParser).parse(fetched);
@@ -66,7 +68,7 @@ class JobPostingCollectionServiceTest {
     }
 
     @Test
-    @DisplayName("지원하는 parser가 없으면 예외를 던진다")
+    @DisplayName("지원하는 parser가 없으면 실패 결과를 반환한다")
     void parserNotFound() {
         CrawlerUrlCandidate candidate = createCandidate();
         FetchedJobPosting fetched = new FetchedJobPosting(
@@ -85,9 +87,12 @@ class JobPostingCollectionServiceTest {
         given(jobPostingFetchService.fetch(candidate)).willReturn(fetched);
         given(jobPostingParser.supports(JobIngestionSource.ZIGHANG)).willReturn(false);
 
-        assertThatThrownBy(() -> service.collect(candidate))
-                .isInstanceOf(JobPostingParserNotFoundException.class)
-                .hasMessageContaining("Job posting parser not found");
+        JobPostingCollectionResult result = service.collect(candidate);
+
+        assertThat(result.candidate()).isEqualTo(candidate);
+        assertThat(result.success()).isFalse();
+        assertThat(result.ingestionResultType()).isNull();
+        assertThat(result.errorMessage()).contains("Job posting parser not found");
     }
 
     private CrawlerUrlCandidate createCandidate() {

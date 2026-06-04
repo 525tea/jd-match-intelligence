@@ -56,11 +56,21 @@ public class CollectorRunner implements ApplicationRunner {
     }
 
     private void logCollectionResult(JobPostingCollectionResult result) {
-        log.info(
-                "Collector job posting collected. source={}, externalId={}, resultType={}",
+        if (result.success()) {
+            log.info(
+                    "Collector job posting collected. source={}, externalId={}, resultType={}",
+                    result.candidate().source(),
+                    result.candidate().externalId(),
+                    result.ingestionResultType()
+            );
+            return;
+        }
+
+        log.warn(
+                "Collector job posting skipped. source={}, externalId={}, error={}",
                 result.candidate().source(),
                 result.candidate().externalId(),
-                result.ingestionResultType()
+                result.errorMessage()
         );
     }
 }

@@ -56,7 +56,7 @@ class CollectorRunnerTest {
                         List.of(candidate)
                 ));
         given(jobPostingCollectionService.collect(candidate))
-                .willReturn(new JobPostingCollectionResult(
+                .willReturn(JobPostingCollectionResult.success(
                         candidate,
                         JobIngestionResultType.CREATED
                 ));
