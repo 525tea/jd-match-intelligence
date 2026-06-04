@@ -1,0 +1,18 @@
+tasks.register('backendTest') {
+    group = 'verification'
+    description = 'Runs backend tests.'
+    dependsOn gradle.includedBuild('backend').task(':test')
+}
+
+tasks.register('collectorTest') {
+    group = 'verification'
+    description = 'Runs collector tests.'
+    dependsOn gradle.includedBuild('collector').task(':test')
+}
+
+tasks.register('testAll') {
+    group = 'verification'
+    description = 'Runs backend and collector tests.'
+    dependsOn tasks.named('backendTest')
+    dependsOn tasks.named('collectorTest')
+}
