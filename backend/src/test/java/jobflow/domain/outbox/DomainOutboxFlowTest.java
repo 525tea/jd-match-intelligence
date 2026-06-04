@@ -1,9 +1,5 @@
 package jobflow.domain.outbox;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.time.LocalDateTime;
-import java.util.List;
 import jobflow.domain.application.ApplicationRepository;
 import jobflow.domain.application.ApplicationService;
 import jobflow.domain.application.ApplicationStatus;
@@ -21,16 +17,23 @@ import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
 import jobflow.global.config.JpaAuditingConfig;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -39,7 +42,9 @@ import tools.jackson.databind.json.JsonMapper;
         JobService.class,
         ApplicationService.class,
         OutboxEventService.class,
-        DomainOutboxFlowTest.JsonMapperTestConfig.class
+        OutboxRelayService.class,
+        DomainOutboxFlowTest.JsonMapperTestConfig.class,
+        DomainOutboxFlowTest.TestHandlerConfig.class
 })
 class DomainOutboxFlowTest {
 
@@ -60,6 +65,17 @@ class DomainOutboxFlowTest {
 
     @Autowired
     private OutboxEventRepository outboxEventRepository;
+
+    @Autowired
+    private OutboxRelayService outboxRelayService;
+
+    @Autowired
+    private RecordingOutboxEventHandler outboxEventHandler;
+
+    @BeforeEach
+    void setUp() {
+        outboxEventHandler.clear();
+    }
 
     @Test
     @DisplayName("공고 생성 시 JOB_CREATED outbox event를 저장한다")
@@ -161,12 +177,78 @@ class DomainOutboxFlowTest {
         );
     }
 
+    @Test
+    @DisplayName("도메인 서비스가 저장한 outbox event를 relay로 처리한다")
+    void relayDomainOutboxEvents() {
+        User user = userRepository.save(User.signup("relay-user@example.com", "encoded-password", "사용자"));
+        JobResponse job = jobService.createJob(createJobRequest("job-relay"));
+        ApplicationResponse application = applicationService.createApplication(
+                user.getId(),
+                new ApplicationCreateRequest(job.id())
+        );
+        applicationService.updateApplicationStatus(
+                user.getId(),
+                application.id(),
+                new ApplicationStatusUpdateRequest(ApplicationStatus.INTERVIEW)
+        );
+
+        List<Long> pendingEventIds = outboxEventRepository.findAll()
+                .stream()
+                .map(OutboxEvent::getId)
+                .toList();
+
+        int relayedCount = outboxRelayService.relayPendingEvents();
+
+        List<OutboxEvent> events = outboxEventRepository.findAll();
+
+        assertThat(pendingEventIds).hasSize(3);
+        assertThat(relayedCount).isEqualTo(3);
+        assertThat(outboxEventHandler.handledEventIds()).containsExactlyElementsOf(pendingEventIds);
+        assertThat(events)
+                .extracting(OutboxEvent::getStatus)
+                .containsOnly(OutboxStatus.PUBLISHED);
+        assertThat(events)
+                .allSatisfy(event -> assertThat(event.getPublishedAt()).isNotNull());
+    }
+
     @TestConfiguration
     static class JsonMapperTestConfig {
 
         @Bean
         ObjectMapper objectMapper() {
             return JsonMapper.builder().build();
+        }
+    }
+
+    @TestConfiguration
+    static class TestHandlerConfig {
+
+        @Bean
+        RecordingOutboxEventHandler recordingOutboxEventHandler() {
+            return new RecordingOutboxEventHandler();
+        }
+    }
+
+    static class RecordingOutboxEventHandler implements OutboxEventHandler {
+
+        private final List<Long> handledEventIds = new ArrayList<>();
+
+        @Override
+        public boolean supports(OutboxEvent event) {
+            return true;
+        }
+
+        @Override
+        public void handle(OutboxEvent event) {
+            handledEventIds.add(event.getId());
+        }
+
+        List<Long> handledEventIds() {
+            return handledEventIds;
+        }
+
+        void clear() {
+            handledEventIds.clear();
         }
     }
 }
