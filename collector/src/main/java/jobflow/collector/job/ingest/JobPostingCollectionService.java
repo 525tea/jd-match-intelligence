@@ -21,7 +21,7 @@ public class JobPostingCollectionService {
 
             return JobPostingCollectionResult.success(
                     candidate,
-                    ingestionResult.type()
+                    ingestionResult
             );
         } catch (Exception exception) {
             return JobPostingCollectionResult.failure(candidate, exception);

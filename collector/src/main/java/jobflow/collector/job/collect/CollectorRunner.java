@@ -58,10 +58,11 @@ public class CollectorRunner implements ApplicationRunner {
     private void logCollectionResult(JobPostingCollectionResult result) {
         if (result.success()) {
             log.info(
-                    "Collector job posting collected. source={}, externalId={}, resultType={}",
+                    "Collector job posting collected. source={}, externalId={}, resultType={}, duplicateCandidateCount={}",
                     result.candidate().source(),
                     result.candidate().externalId(),
-                    result.ingestionResultType()
+                    result.ingestionResultType(),
+                    result.duplicateCandidateCount()
             );
             return;
         }
