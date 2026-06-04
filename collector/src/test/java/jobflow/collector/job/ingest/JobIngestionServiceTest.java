@@ -1,5 +1,6 @@
 package jobflow.collector.job.ingest;
 
+import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -33,7 +34,7 @@ class JobIngestionServiceTest {
     @Mock
     private OutboxEventService outboxEventService;
 
-    private final IngestedJobMapper mapper = new IngestedJobMapper();
+    private final IngestedJobMapper mapper = new IngestedJobMapper(new CanonicalFingerprintGenerator());
 
     @Test
     @DisplayName("신규 수집 공고를 저장하고 JOB_CREATED outbox event를 기록한다")
@@ -58,6 +59,7 @@ class JobIngestionServiceTest {
         assertThat(result.job().getExternalId()).isEqualTo("zighang-123");
         assertThat(result.job().getTitle()).isEqualTo("백엔드 개발자");
         assertThat(result.job().getOriginalUrl()).isEqualTo("https://zighang.com/jobs/zighang-123?utm=test");
+        assertThat(result.job().getCanonicalFingerprint()).hasSize(64);
 
         verify(jobRepository).save(any(Job.class));
         verify(outboxEventService).save(
@@ -78,6 +80,7 @@ class JobIngestionServiceTest {
 
         LocalDateTime originalCollectedAt = LocalDateTime.of(2026, 6, 4, 9, 0);
         existingJob.updateCrawlingMetadata(
+                null,
                 "https://zighang.com/jobs/zighang-123",
                 originalCollectedAt,
                 LocalDateTime.of(2026, 6, 4, 9, 5),
@@ -101,6 +104,7 @@ class JobIngestionServiceTest {
         assertThat(existingJob.getCollectedAt()).isEqualTo(originalCollectedAt);
         assertThat(existingJob.getLastSeenAt()).isEqualTo(posting.lastSeenAt());
         assertThat(existingJob.getRawData()).contains("백엔드 개발자 수정");
+        assertThat(existingJob.getCanonicalFingerprint()).hasSize(64);
 
         verify(outboxEventService).save(
                 eq("JOB"),
@@ -109,6 +113,33 @@ class JobIngestionServiceTest {
                 any(),
                 eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
+    }
+
+    @Test
+    @DisplayName("같은 canonical fingerprint를 가진 다른 source 공고 후보를 탐지한다")
+    void detectDuplicateCandidatesAcrossSources() {
+        IngestedJobPosting posting = createPosting("zighang-123", "백엔드 개발자");
+        Job duplicateCandidate = createJob("JUMPIT", "jumpit-999", "백엔드 개발자");
+        ReflectionTestUtils.setField(duplicateCandidate, "id", 2L);
+
+        JobIngestionService service = new JobIngestionService(jobRepository, mapper, outboxEventService);
+
+        given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))
+                .willReturn(Optional.empty());
+        given(jobRepository.save(any(Job.class)))
+                .willAnswer(invocation -> {
+                    Job savedJob = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(savedJob, "id", 1L);
+                    return savedJob;
+                });
+        given(jobRepository.findByCanonicalFingerprintAndSourceNot(any(), eq("ZIGHANG")))
+                .willReturn(List.of(duplicateCandidate));
+
+        JobIngestionResult result = service.ingest(posting);
+
+        assertThat(result.type()).isEqualTo(JobIngestionResultType.CREATED);
+        assertThat(result.hasDuplicateCandidates()).isTrue();
+        assertThat(result.duplicateCandidates()).containsExactly(duplicateCandidate);
     }
 
     private Job createJob(String source, String externalId, String title) {

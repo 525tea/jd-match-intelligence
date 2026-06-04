@@ -15,4 +15,6 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     boolean existsBySourceAndExternalId(String source, String externalId);
 
     Optional<Job> findBySourceAndExternalId(String source, String externalId);
+
+    List<Job> findByCanonicalFingerprintAndSourceNot(String canonicalFingerprint, String source);
 }

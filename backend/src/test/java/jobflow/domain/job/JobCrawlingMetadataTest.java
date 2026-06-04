@@ -45,6 +45,7 @@ class JobCrawlingMetadataTest {
         LocalDateTime sourceUpdatedAt = LocalDateTime.of(2026, 6, 2, 9, 0);
 
         job.updateCrawlingMetadata(
+                "jobflow|backend developer|seoul",
                 "https://zighang.com/jobs/job-1?utm_source=jobflow",
                 collectedAt,
                 lastSeenAt,
@@ -59,5 +60,6 @@ class JobCrawlingMetadataTest {
         assertThat(job.getSourceUpdatedAt()).isEqualTo(sourceUpdatedAt);
         assertThat(job.getRawData()).isEqualTo("{\"title\":\"백엔드 개발자\"}");
         assertThat(job.getCrawlerVersion()).isEqualTo("JobFlowCrawler/0.1");
+        assertThat(job.getCanonicalFingerprint()).isEqualTo("jobflow|backend developer|seoul");
     }
 }

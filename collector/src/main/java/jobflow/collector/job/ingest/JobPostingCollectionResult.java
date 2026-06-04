@@ -4,14 +4,37 @@ public record JobPostingCollectionResult(
         CrawlerUrlCandidate candidate,
         JobIngestionResultType ingestionResultType,
         boolean success,
+        boolean hasDuplicateCandidates,
+        int duplicateCandidateCount,
         String errorMessage
 ) {
 
     public static JobPostingCollectionResult success(
             CrawlerUrlCandidate candidate,
+            JobIngestionResult ingestionResult
+    ) {
+        return new JobPostingCollectionResult(
+                candidate,
+                ingestionResult.type(),
+                true,
+                ingestionResult.hasDuplicateCandidates(),
+                ingestionResult.duplicateCandidates().size(),
+                null
+        );
+    }
+
+    public static JobPostingCollectionResult success(
+            CrawlerUrlCandidate candidate,
             JobIngestionResultType ingestionResultType
     ) {
-        return new JobPostingCollectionResult(candidate, ingestionResultType, true, null);
+        return new JobPostingCollectionResult(
+                candidate,
+                ingestionResultType,
+                true,
+                false,
+                0,
+                null
+        );
     }
 
     public static JobPostingCollectionResult failure(
@@ -22,6 +45,8 @@ public record JobPostingCollectionResult(
                 candidate,
                 null,
                 false,
+                false,
+                0,
                 toErrorMessage(exception)
         );
     }

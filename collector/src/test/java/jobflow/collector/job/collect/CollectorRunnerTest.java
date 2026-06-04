@@ -68,6 +68,46 @@ class CollectorRunnerTest {
     }
 
     @Test
+    @DisplayName("JUMPIT source로 sitemap crawl과 공고 수집을 실행한다")
+    void runWithJumpitSource() {
+        CollectorRunnerProperties properties = new CollectorRunnerProperties(
+                true,
+                JobIngestionSource.JUMPIT,
+                5,
+                10
+        );
+        CollectorRunner runner = new CollectorRunner(
+                properties,
+                sitemapCrawlService,
+                jobPostingCollectionService
+        );
+        CrawlerUrlCandidate candidate = new CrawlerUrlCandidate(
+                JobIngestionSource.JUMPIT,
+                "https://jumpit.saramin.co.kr/position/jumpit-example-1?utm=test",
+                "https://jumpit.saramin.co.kr/position/jumpit-example-1",
+                "jumpit-example-1"
+        );
+
+        given(sitemapCrawlService.crawl(JobIngestionSource.JUMPIT))
+                .willReturn(new SitemapCrawlResult(
+                        JobIngestionSource.JUMPIT,
+                        1,
+                        List.of("https://jumpit.saramin.co.kr/sitemap.xml"),
+                        List.of(candidate)
+                ));
+        given(jobPostingCollectionService.collect(candidate))
+                .willReturn(JobPostingCollectionResult.success(
+                        candidate,
+                        JobIngestionResultType.CREATED
+                ));
+
+        runner.run(new DefaultApplicationArguments());
+
+        verify(sitemapCrawlService).crawl(JobIngestionSource.JUMPIT);
+        verify(jobPostingCollectionService).collect(candidate);
+    }
+
+    @Test
     @DisplayName("source 설정이 없으면 ZIGHANG을 기본값으로 사용한다")
     void runWithDefaultSource() {
         CollectorRunnerProperties properties = new CollectorRunnerProperties(true, null, 0, 0);

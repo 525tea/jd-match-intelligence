@@ -53,7 +53,11 @@ class JobPostingCollectionServiceTest {
         given(jobPostingParser.supports(JobIngestionSource.ZIGHANG)).willReturn(true);
         given(jobPostingParser.parse(fetched)).willReturn(posting);
         given(jobIngestionService.ingest(posting))
-                .willReturn(new JobIngestionResult(JobIngestionResultType.CREATED, job));
+                .willReturn(new JobIngestionResult(
+                        JobIngestionResultType.CREATED,
+                        job,
+                        List.of(createDuplicateCandidateJob())
+                ));
 
         JobPostingCollectionResult result = service.collect(candidate);
 
@@ -61,6 +65,8 @@ class JobPostingCollectionServiceTest {
         assertThat(result.success()).isTrue();
         assertThat(result.ingestionResultType()).isEqualTo(JobIngestionResultType.CREATED);
         assertThat(result.errorMessage()).isNull();
+        assertThat(result.hasDuplicateCandidates()).isTrue();
+        assertThat(result.duplicateCandidateCount()).isEqualTo(1);
 
         verify(jobPostingFetchService).fetch(candidate);
         verify(jobPostingParser).parse(fetched);
@@ -93,6 +99,8 @@ class JobPostingCollectionServiceTest {
         assertThat(result.success()).isFalse();
         assertThat(result.ingestionResultType()).isNull();
         assertThat(result.errorMessage()).contains("Job posting parser not found");
+        assertThat(result.hasDuplicateCandidates()).isFalse();
+        assertThat(result.duplicateCandidateCount()).isZero();
     }
 
     private CrawlerUrlCandidate createCandidate() {
@@ -172,5 +180,50 @@ class JobPostingCollectionServiceTest {
                 null,
                 null
         );
+    }
+
+    private Job createDuplicateCandidateJob() {
+        Job job = Job.create(
+                "JUMPIT",
+                "jumpit-example-1",
+                "Backend Engineer",
+                "JobFlow Labs",
+                "Spring Boot 기반 백엔드 개발자를 채용합니다.",
+                "https://jumpit.saramin.co.kr/position/jumpit-example-1",
+                JobRole.BACKEND,
+                "Java/Spring",
+                CareerLevel.JUNIOR,
+                0,
+                3,
+                "학력무관",
+                EmploymentType.FULL_TIME,
+                "STARTUP",
+                "IT",
+                "KR",
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                null,
+                null,
+                "KRW",
+                false,
+                null,
+                null,
+                null
+        );
+
+        job.updateCrawlingMetadata(
+                "duplicate-fingerprint",
+                "https://jumpit.saramin.co.kr/position/jumpit-example-1",
+                LocalDateTime.of(2026, 6, 4, 10, 0),
+                LocalDateTime.of(2026, 6, 4, 10, 0),
+                null,
+                """
+                        {"source":"JUMPIT","externalId":"jumpit-example-1"}
+                        """,
+                "jumpit-parser-0.1"
+        );
+
+        return job;
     }
 }
