@@ -90,6 +90,19 @@ public class JobService {
                 .toList();
     }
 
+    public List<JobSummaryResponse> searchJobs(String keyword, int limit) {
+        if (keyword == null || keyword.isBlank()) {
+            return List.of();
+        }
+
+        int safeLimit = Math.clamp(limit, 1, 100);
+
+        return jobRepository.searchOpenJobsByFullText(keyword.strip(), safeLimit)
+                .stream()
+                .map(JobSummaryResponse::from)
+                .toList();
+    }
+
     @Transactional
     public JobResponse updateJob(Long jobId, JobUpdateRequest request) {
         Job job = findJob(jobId);

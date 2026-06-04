@@ -197,6 +197,23 @@ class JobControllerTest {
     }
 
     @Test
+    @DisplayName("공고 검색 성공 시 200 ApiResponse를 반환한다")
+    void searchJobs() throws Exception {
+        given(jobService.searchJobs("백엔드", 10))
+                .willReturn(List.of(jobSummaryResponse()));
+
+        mockMvc.perform(get("/jobs/search")
+                        .param("keyword", "백엔드")
+                        .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].id").value(1))
+                .andExpect(jsonPath("$.data[0].title").value("백엔드 개발자"))
+                .andExpect(jsonPath("$.data[0].status").value("OPEN"));
+    }
+
+    @Test
     @DisplayName("공고 수정 성공 시 200 ApiResponse를 반환한다")
     void updateJob() throws Exception {
         Long jobId = 1L;

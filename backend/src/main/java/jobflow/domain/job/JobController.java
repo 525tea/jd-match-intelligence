@@ -1,7 +1,6 @@
 package jobflow.domain.job;
 
 import jakarta.validation.Valid;
-import java.util.List;
 import jobflow.domain.job.dto.JobCreateRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSummaryResponse;
@@ -16,7 +15,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/jobs")
@@ -36,18 +38,28 @@ public class JobController {
                 .body(ApiResponse.success(response));
     }
 
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<JobSummaryResponse>>> getJobs() {
+        List<JobSummaryResponse> response = jobService.getJobs();
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<List<JobSummaryResponse>>> searchJobs(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        List<JobSummaryResponse> response = jobService.searchJobs(keyword, limit);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @GetMapping("/{jobId}")
     public ResponseEntity<ApiResponse<JobResponse>> getJob(
             @PathVariable Long jobId
     ) {
         JobResponse response = jobService.getJob(jobId);
-
-        return ResponseEntity.ok(ApiResponse.success(response));
-    }
-
-    @GetMapping
-    public ResponseEntity<ApiResponse<List<JobSummaryResponse>>> getJobs() {
-        List<JobSummaryResponse> response = jobService.getJobs();
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

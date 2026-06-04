@@ -184,6 +184,46 @@ class JobServiceTest {
     }
 
     @Test
+    @DisplayName("FULLTEXT 검색 결과를 요약 응답으로 변환한다")
+    void searchJobs() {
+        Job job = createJobEntity(1L);
+
+        given(jobRepository.searchOpenJobsByFullText("백엔드", 20))
+                .willReturn(List.of(job));
+
+        List<JobSummaryResponse> responses = jobService.searchJobs(" 백엔드 ", 20);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.getFirst().id()).isEqualTo(1L);
+        assertThat(responses.getFirst().title()).isEqualTo("백엔드 개발자");
+
+        verify(jobRepository).searchOpenJobsByFullText("백엔드", 20);
+    }
+
+    @Test
+    @DisplayName("검색어가 비어 있으면 빈 목록을 반환한다")
+    void searchJobsWithBlankKeyword() {
+        List<JobSummaryResponse> responses = jobService.searchJobs(" ", 20);
+
+        assertThat(responses).isEmpty();
+    }
+
+    @Test
+    @DisplayName("검색 limit은 1 이상 100 이하로 보정한다")
+    void searchJobsClampLimit() {
+        Job job = createJobEntity(1L);
+
+        given(jobRepository.searchOpenJobsByFullText("백엔드", 100))
+                .willReturn(List.of(job));
+
+        List<JobSummaryResponse> responses = jobService.searchJobs("백엔드", 999);
+
+        assertThat(responses).hasSize(1);
+
+        verify(jobRepository).searchOpenJobsByFullText("백엔드", 100);
+    }
+
+    @Test
     @DisplayName("공고 기본 정보를 수정한다")
     void updateJob() {
         Long jobId = 1L;
