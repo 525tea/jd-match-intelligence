@@ -1,4 +1,4 @@
-package jobflow.domain.job;
+package jobflow.collector.job;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

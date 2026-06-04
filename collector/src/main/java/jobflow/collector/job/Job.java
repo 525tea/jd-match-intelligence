@@ -1,21 +1,12 @@
-package jobflow.domain.job;
+package jobflow.collector.job;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
-import jakarta.persistence.Table;
-import java.time.LocalDateTime;
-import jobflow.domain.common.BaseTimeEntity;
-import jobflow.global.error.ErrorCode;
-import jobflow.global.error.exception.ConflictException;
+import jakarta.persistence.*;
+import jobflow.collector.common.BaseTimeEntity;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -261,7 +252,7 @@ public class Job extends BaseTimeEntity {
 
     private void validateOpenStatus() {
         if (status != JobStatus.OPEN) {
-            throw new ConflictException(ErrorCode.JOB_STATUS_CONFLICT);
+            throw new IllegalStateException("Job status must be OPEN. status=" + status);
         }
     }
 }
