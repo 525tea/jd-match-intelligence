@@ -1,4 +1,3 @@
-```markdown
 # k6 Performance Scripts
 
 ## MySQL FULLTEXT Search Baseline
@@ -21,6 +20,19 @@ DURATION=30s \
 k6 run performance/k6/mysql-fulltext-search-baseline.js
 ```
 
+k6가 로컬에 설치되어 있지 않으면 Docker로 실행할 수 있다.
+
+```bash
+docker run --rm \
+  -e BASE_URL=http://host.docker.internal:8080 \
+  -e KEYWORDS='백엔드,Spring,k8s,Kubernetes' \
+  -e LIMIT=10 \
+  -e VUS=5 \
+  -e DURATION=30s \
+  -v "$PWD/performance/k6:/scripts" \
+  grafana/k6 run /scripts/mysql-fulltext-search-baseline.js
+```
+
 확인할 지표:
 
 - `http_req_duration p(50)`
@@ -30,4 +42,3 @@ k6 run performance/k6/mysql-fulltext-search-baseline.js
 - keyword별 검색 결과 유무
 
 `k8s`와 `Kubernetes`는 MySQL FULLTEXT의 동의어 미처리 한계를 확인하기 위한 비교 키워드다.
-```
