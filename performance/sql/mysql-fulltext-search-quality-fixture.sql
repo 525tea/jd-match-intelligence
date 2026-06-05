@@ -76,7 +76,59 @@ INSERT INTO jobs (
     'KRW',
     false,
     'OPEN'
+),
+(
+    'SEARCH_BASELINE',
+    'deadline-urgent-backend',
+    '백엔드 플랫폼 개발자',
+    'Example Deadline A',
+    'Spring Boot 백엔드 플랫폼 API 개발을 담당합니다.',
+    'https://example.com/jobs/deadline-urgent-backend',
+    'BACKEND',
+    'Java/Spring',
+    'ANY',
+    'FULL_TIME',
+    'KR',
+    'Seoul',
+    'Yeongdeungpo',
+    'ONSITE',
+    'KRW',
+    false,
+    'OPEN'
+),
+(
+    'SEARCH_BASELINE',
+    'deadline-later-backend',
+    '백엔드 플랫폼 개발자',
+    'Example Deadline B',
+    'Spring Boot 백엔드 플랫폼 API 개발을 담당합니다.',
+    'https://example.com/jobs/deadline-later-backend',
+    'BACKEND',
+    'Java/Spring',
+    'ANY',
+    'FULL_TIME',
+    'KR',
+    'Seoul',
+    'Yeongdeungpo',
+    'ONSITE',
+    'KRW',
+    false,
+    'OPEN'
 );
+
+UPDATE jobs
+SET deadline_at = '2026-06-06 23:59:00',
+    created_at = '2026-06-01 00:00:00',
+    updated_at = '2026-06-01 00:00:00'
+WHERE source = 'SEARCH_BASELINE'
+  AND external_id = 'deadline-urgent-backend';
+
+UPDATE jobs
+SET deadline_at = '2026-07-31 23:59:00',
+    created_at = '2026-06-05 00:00:00',
+    updated_at = '2026-06-05 00:00:00'
+WHERE source = 'SEARCH_BASELINE'
+  AND external_id = 'deadline-later-backend';
 
 SELECT
     id,
