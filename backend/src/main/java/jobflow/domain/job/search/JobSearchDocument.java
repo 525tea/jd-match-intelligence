@@ -1,9 +1,10 @@
 package jobflow.domain.job.search;
 
 import java.time.LocalDateTime;
+import org.springframework.data.annotation.Id;
 
 public record JobSearchDocument(
-        String id,
+        @Id String id,
         String source,
         String externalId,
         String canonicalFingerprint,
