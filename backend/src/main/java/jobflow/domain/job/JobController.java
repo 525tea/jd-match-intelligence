@@ -3,6 +3,7 @@ package jobflow.domain.job;
 import jakarta.validation.Valid;
 import jobflow.domain.job.dto.JobCreateRequest;
 import jobflow.domain.job.dto.JobResponse;
+import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSummaryResponse;
 import jobflow.domain.job.dto.JobUpdateRequest;
 import jobflow.global.response.ApiResponse;
@@ -46,11 +47,11 @@ public class JobController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<List<JobSummaryResponse>>> searchJobs(
+    public ResponseEntity<ApiResponse<List<JobSearchResponse>>> searchJobs(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "20") int limit
     ) {
-        List<JobSummaryResponse> response = jobService.searchJobs(keyword, limit);
+        List<JobSearchResponse> response = jobService.searchJobs(keyword, limit);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

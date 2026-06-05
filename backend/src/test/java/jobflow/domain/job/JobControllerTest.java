@@ -33,6 +33,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import jobflow.domain.job.dto.JobSearchResponse;
 
 @WebMvcTest(
         controllers = JobController.class,
@@ -197,10 +198,10 @@ class JobControllerTest {
     }
 
     @Test
-    @DisplayName("공고 검색 성공 시 200 ApiResponse를 반환한다")
+    @DisplayName("공고 검색 성공 시 score를 포함한 200 ApiResponse를 반환한다")
     void searchJobs() throws Exception {
         given(jobService.searchJobs("백엔드", 10))
-                .willReturn(List.of(jobSummaryResponse()));
+                .willReturn(List.of(jobSearchResponse()));
 
         mockMvc.perform(get("/jobs/search")
                         .param("keyword", "백엔드")
@@ -210,7 +211,8 @@ class JobControllerTest {
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].id").value(1))
                 .andExpect(jsonPath("$.data[0].title").value("백엔드 개발자"))
-                .andExpect(jsonPath("$.data[0].status").value("OPEN"));
+                .andExpect(jsonPath("$.data[0].status").value("OPEN"))
+                .andExpect(jsonPath("$.data[0].score").value(0.42));
     }
 
     @Test
@@ -409,6 +411,23 @@ class JobControllerTest {
                 RemoteType.HYBRID,
                 LocalDateTime.of(2026, 7, 1, 23, 59),
                 JobStatus.OPEN
+        );
+    }
+
+    private JobSearchResponse jobSearchResponse() {
+        return new JobSearchResponse(
+                1L,
+                "백엔드 개발자",
+                "JobFlow",
+                JobRole.BACKEND,
+                CareerLevel.JUNIOR,
+                EmploymentType.FULL_TIME,
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                LocalDateTime.of(2026, 7, 1, 23, 59),
+                JobStatus.OPEN,
+                0.42
         );
     }
 }

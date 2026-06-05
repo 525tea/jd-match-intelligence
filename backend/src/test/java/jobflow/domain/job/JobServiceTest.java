@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import jobflow.domain.job.dto.JobSearchResponse;
 
 @ExtendWith(MockitoExtension.class)
 class JobServiceTest {
@@ -184,18 +185,19 @@ class JobServiceTest {
     }
 
     @Test
-    @DisplayName("FULLTEXT 검색 결과를 요약 응답으로 변환한다")
+    @DisplayName("FULLTEXT 검색 결과와 score를 요약 응답으로 변환한다")
     void searchJobs() {
-        Job job = createJobEntity(1L);
+        JobSearchProjection projection = jobSearchProjection();
 
         given(jobRepository.searchOpenJobsByFullText("백엔드", 20))
-                .willReturn(List.of(job));
+                .willReturn(List.of(projection));
 
-        List<JobSummaryResponse> responses = jobService.searchJobs(" 백엔드 ", 20);
+        List<JobSearchResponse> responses = jobService.searchJobs(" 백엔드 ", 20);
 
         assertThat(responses).hasSize(1);
         assertThat(responses.getFirst().id()).isEqualTo(1L);
         assertThat(responses.getFirst().title()).isEqualTo("백엔드 개발자");
+        assertThat(responses.getFirst().score()).isEqualTo(0.42);
 
         verify(jobRepository).searchOpenJobsByFullText("백엔드", 20);
     }
@@ -203,7 +205,7 @@ class JobServiceTest {
     @Test
     @DisplayName("검색어가 비어 있으면 빈 목록을 반환한다")
     void searchJobsWithBlankKeyword() {
-        List<JobSummaryResponse> responses = jobService.searchJobs(" ", 20);
+        List<JobSearchResponse> responses = jobService.searchJobs(" ", 20);
 
         assertThat(responses).isEmpty();
     }
@@ -211,12 +213,12 @@ class JobServiceTest {
     @Test
     @DisplayName("검색 limit은 1 이상 100 이하로 보정한다")
     void searchJobsClampLimit() {
-        Job job = createJobEntity(1L);
+        JobSearchProjection projection = jobSearchProjection();
 
         given(jobRepository.searchOpenJobsByFullText("백엔드", 100))
-                .willReturn(List.of(job));
+                .willReturn(List.of(projection));
 
-        List<JobSummaryResponse> responses = jobService.searchJobs("백엔드", 999);
+        List<JobSearchResponse> responses = jobService.searchJobs("백엔드", 999);
 
         assertThat(responses).hasSize(1);
 
@@ -404,6 +406,70 @@ class JobServiceTest {
         );
         ReflectionTestUtils.setField(job, "id", id);
         return job;
+    }
+
+    private JobSearchProjection jobSearchProjection() {
+        return new JobSearchProjection() {
+            @Override
+            public Long getId() {
+                return 1L;
+            }
+
+            @Override
+            public String getTitle() {
+                return "백엔드 개발자";
+            }
+
+            @Override
+            public String getCompanyName() {
+                return "JobFlow";
+            }
+
+            @Override
+            public String getRole() {
+                return "BACKEND";
+            }
+
+            @Override
+            public String getCareerLevel() {
+                return "JUNIOR";
+            }
+
+            @Override
+            public String getEmploymentType() {
+                return "FULL_TIME";
+            }
+
+            @Override
+            public String getLocationRegion() {
+                return "Seoul";
+            }
+
+            @Override
+            public String getLocationCity() {
+                return "Gangnam";
+            }
+
+            @Override
+            public String getRemoteType() {
+                return "HYBRID";
+            }
+
+            @Override
+            public LocalDateTime getDeadlineAt() {
+                return LocalDateTime.of(2026, 7, 1, 23, 59);
+            }
+
+            @Override
+            public String getStatus() {
+                return "OPEN";
+            }
+
+            @Override
+            public Double getScore() {
+                return 0.42;
+            }
+        };
     }
 
     private Skill createSkill(Long id) {

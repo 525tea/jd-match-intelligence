@@ -19,19 +19,30 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
     @Query(
             value = """
-                    SELECT *
-                    FROM jobs
-                    WHERE status = 'OPEN'
-                      AND MATCH(title, company_name, description, role_detail, industry, location_region, location_city)
-                          AGAINST (:keyword IN NATURAL LANGUAGE MODE)
-                    ORDER BY MATCH(title, company_name, description, role_detail, industry, location_region, location_city)
-                          AGAINST (:keyword IN NATURAL LANGUAGE MODE) DESC,
-                          created_at DESC
-                    LIMIT :limit
-                    """,
+                SELECT
+                    id AS id,
+                    title AS title,
+                    company_name AS companyName,
+                    role AS role,
+                    career_level AS careerLevel,
+                    employment_type AS employmentType,
+                    location_region AS locationRegion,
+                    location_city AS locationCity,
+                    remote_type AS remoteType,
+                    deadline_at AS deadlineAt,
+                    status AS status,
+                    MATCH(title, company_name, description, role_detail, industry, location_region, location_city)
+                        AGAINST (:keyword IN NATURAL LANGUAGE MODE) AS score
+                FROM jobs
+                WHERE status = 'OPEN'
+                  AND MATCH(title, company_name, description, role_detail, industry, location_region, location_city)
+                      AGAINST (:keyword IN NATURAL LANGUAGE MODE)
+                ORDER BY score DESC, created_at DESC
+                LIMIT :limit
+                """,
             nativeQuery = true
     )
-    List<Job> searchOpenJobsByFullText(
+    List<JobSearchProjection> searchOpenJobsByFullText(
             @Param("keyword") String keyword,
             @Param("limit") int limit
     );
