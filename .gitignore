@@ -15,3 +15,7 @@ docs/
 
 # Logs
 *.log
+
+# Gradle
+.gradle/
+build/

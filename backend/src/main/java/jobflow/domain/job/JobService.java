@@ -1,6 +1,12 @@
 package jobflow.domain.job;
 
-import jobflow.domain.job.dto.*;
+import jobflow.domain.job.dto.JobCreateRequest;
+import jobflow.domain.job.dto.JobExperienceTagRequest;
+import jobflow.domain.job.dto.JobResponse;
+import jobflow.domain.job.dto.JobSearchResponse;
+import jobflow.domain.job.dto.JobSkillRequest;
+import jobflow.domain.job.dto.JobSummaryResponse;
+import jobflow.domain.job.dto.JobUpdateRequest;
 import jobflow.domain.outbox.OutboxEvent;
 import jobflow.domain.outbox.OutboxEventService;
 import jobflow.domain.outbox.OutboxEventTypes;
@@ -87,6 +93,19 @@ public class JobService {
         return jobRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
                 .map(JobSummaryResponse::from)
+                .toList();
+    }
+
+    public List<JobSearchResponse> searchJobs(String keyword, int limit) {
+        if (keyword == null || keyword.isBlank()) {
+            return List.of();
+        }
+
+        int safeLimit = Math.clamp(limit, 1, 100);
+
+        return jobRepository.searchOpenJobsByFullText(keyword.strip(), safeLimit)
+                .stream()
+                .map(JobSearchResponse::from)
                 .toList();
     }
 
