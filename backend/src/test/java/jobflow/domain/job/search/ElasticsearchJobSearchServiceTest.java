@@ -56,9 +56,14 @@ class ElasticsearchJobSearchServiceTest {
         given(searchHits.stream()).willReturn(Stream.of(searchHit));
         given(searchHit.getContent()).willReturn(document);
 
-        List<JobSearchDocument> documents = service.search(" 백엔드 ", 10);
+        given(searchHit.getScore()).willReturn(3.5f);
 
-        assertThat(documents).containsExactly(document);
+        List<JobSearchResult> results = service.search(" 백엔드 ", 10);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().id()).isEqualTo(1L);
+        assertThat(results.getFirst().title()).isEqualTo("백엔드 개발자");
+        assertThat(results.getFirst().score()).isEqualTo(3.5);
 
         verify(elasticsearchOperations).search(
                 any(NativeQuery.class),
@@ -75,9 +80,9 @@ class ElasticsearchJobSearchServiceTest {
                 jobSearchProperties
         );
 
-        List<JobSearchDocument> documents = service.search(" ", 10);
+        List<JobSearchResult> results = service.search(" ", 10);
 
-        assertThat(documents).isEmpty();
+        assertThat(results).isEmpty();
 
         verify(elasticsearchOperations, never()).search(
                 any(NativeQuery.class),

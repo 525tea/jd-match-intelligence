@@ -18,7 +18,7 @@ public class ElasticsearchJobSearchService {
     private final ElasticsearchOperations elasticsearchOperations;
     private final JobSearchProperties jobSearchProperties;
 
-    public List<JobSearchDocument> search(String keyword, int limit) {
+    public List<JobSearchResult> search(String keyword, int limit) {
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
         if (normalizedKeyword.isBlank()) {
             return List.of();
@@ -46,7 +46,10 @@ public class ElasticsearchJobSearchService {
                         IndexCoordinates.of(jobSearchProperties.indexName())
                 )
                 .stream()
-                .map(searchHit -> searchHit.getContent())
+                .map(searchHit -> JobSearchResult.fromDocument(
+                        searchHit.getContent(),
+                        (double) searchHit.getScore()
+                ))
                 .toList();
     }
 
