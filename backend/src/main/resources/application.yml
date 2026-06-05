@@ -2,6 +2,9 @@ spring:
   application:
     name: jobflow
 
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URL:http://localhost:9200}
+
 management:
   endpoints:
     web:
@@ -13,6 +16,7 @@ app:
     elasticsearch:
       url: ${ELASTICSEARCH_URL:http://localhost:9200}
       index-name: jobflow-jobs
+      initialize-on-startup: false
 
   jwt:
     secret: ${JWT_SECRET:}

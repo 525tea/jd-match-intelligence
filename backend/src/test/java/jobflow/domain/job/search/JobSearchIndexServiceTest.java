@@ -26,7 +26,8 @@ class JobSearchIndexServiceTest {
 
     private final JobSearchProperties jobSearchProperties = new JobSearchProperties(
             "http://localhost:9200",
-            "jobflow-jobs"
+            "jobflow-jobs",
+            false
     );
 
     private final JobSearchIndexDefinition jobSearchIndexDefinition = new JobSearchIndexDefinition();

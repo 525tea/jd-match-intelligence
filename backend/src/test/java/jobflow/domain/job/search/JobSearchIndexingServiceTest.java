@@ -31,7 +31,8 @@ class JobSearchIndexingServiceTest {
 
     private final JobSearchProperties jobSearchProperties = new JobSearchProperties(
             "http://localhost:9200",
-            "jobflow-jobs"
+            "jobflow-jobs",
+            false
     );
 
     @Test
