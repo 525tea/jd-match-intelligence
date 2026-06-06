@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 
 class JumpitJobPostingParserTest {
 
-    private final JumpitJobPostingParser parser = new JumpitJobPostingParser();
+    private final JumpitJobPostingParser parser = new JumpitJobPostingParser(
+            new JdJobRoleClassificationService()
+    );
 
     @Test
     @DisplayName("점핏 상세 HTML을 수집 공고로 변환한다")

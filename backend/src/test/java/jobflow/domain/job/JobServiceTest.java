@@ -72,6 +72,9 @@ class JobServiceTest {
     @Mock
     private JobSkillNormalizationService jobSkillNormalizationService;
 
+    @Mock
+    private JdJobRoleClassificationService jdJobRoleClassificationService;
+
     @Test
     @DisplayName("공고를 생성하고 스킬과 경험 태그를 함께 저장한다")
     void createJob() {
@@ -87,6 +90,7 @@ class JobServiceTest {
                 "대용량 트래픽 처리 경험"
         );
 
+        givenRoleResolution(request, JobRole.BACKEND);
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
         given(experienceTagCodeRepository.findById("HIGH_TRAFFIC")).willReturn(Optional.of(tagCode));
@@ -120,6 +124,33 @@ class JobServiceTest {
     }
 
     @Test
+    @DisplayName("공고 생성 시 ETC role은 JD 텍스트 기반으로 보정한다")
+    void createJobWithClassifiedRole() {
+        JobCreateRequest request = createRequestWithEtcRole();
+        Job savedJob = createJobEntity(1L, JobRole.BACKEND);
+        Skill skill = createSkill(1L);
+        ExperienceTagCode tagCode = createExperienceTagCode("HIGH_TRAFFIC");
+
+        JobSkill jobSkill = JobSkill.create(savedJob, skill, RequirementType.REQUIRED);
+        JobExperienceTag jobExperienceTag = JobExperienceTag.create(
+                savedJob,
+                tagCode,
+                "대용량 트래픽 처리 경험"
+        );
+
+        givenRoleResolution(request, JobRole.BACKEND);
+        given(jobRepository.save(any(Job.class))).willReturn(savedJob);
+        given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
+        given(experienceTagCodeRepository.findById("HIGH_TRAFFIC")).willReturn(Optional.of(tagCode));
+        given(jobSkillRepository.saveAll(any())).willReturn(List.of(jobSkill));
+        given(jobExperienceTagRepository.saveAll(any())).willReturn(List.of(jobExperienceTag));
+
+        JobResponse response = jobService.createJob(request);
+
+        assertThat(response.role()).isEqualTo(JobRole.BACKEND);
+    }
+
+    @Test
     @DisplayName("경험 태그 요청이 없으면 JD 텍스트에서 experience tag를 정규화해 저장한다")
     void createJobWithNormalizedExperienceTags() {
         JobCreateRequest request = createRequestWithoutExperienceTags();
@@ -133,6 +164,7 @@ class JobServiceTest {
                 "대용량 트래픽"
         );
 
+        givenRoleResolution(request, JobRole.BACKEND);
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
         given(jobSkillRepository.saveAll(any())).willReturn(List.of(jobSkill));
@@ -164,6 +196,7 @@ class JobServiceTest {
         JobCreateRequest request = createRequest();
         Job savedJob = createJobEntity(1L);
 
+        givenRoleResolution(request, JobRole.BACKEND);
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.empty());
 
@@ -181,6 +214,7 @@ class JobServiceTest {
         Skill skill = createSkill(1L);
         JobSkill jobSkill = JobSkill.create(savedJob, skill, RequirementType.REQUIRED);
 
+        givenRoleResolution(request, JobRole.BACKEND);
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
         given(jobSkillRepository.saveAll(any())).willReturn(List.of(jobSkill));
@@ -200,6 +234,7 @@ class JobServiceTest {
         Skill springBoot = createSkill(1L);
         JobSkill jobSkill = JobSkill.create(savedJob, springBoot, RequirementType.REQUIRED);
 
+        givenRoleResolution(request, JobRole.BACKEND);
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(jobSkillNormalizationService.saveNormalizedSkills(
                 savedJob,
@@ -333,6 +368,7 @@ class JobServiceTest {
         JobUpdateRequest request = updateRequest();
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        givenRoleResolution(request, JobRole.BACKEND);
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
 
@@ -350,6 +386,23 @@ class JobServiceTest {
                 any(),
                 eq("job.events")
         );
+    }
+
+    @Test
+    @DisplayName("공고 수정 시 ETC role은 JD 텍스트 기반으로 보정한다")
+    void updateJobWithClassifiedRole() {
+        Long jobId = 1L;
+        Job job = createJobEntity(jobId, JobRole.ETC);
+        JobUpdateRequest request = updateRequestWithEtcRole();
+
+        given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        givenRoleResolution(request, JobRole.BACKEND);
+        given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
+        given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
+
+        JobResponse response = jobService.updateJob(jobId, request);
+
+        assertThat(response.role()).isEqualTo(JobRole.BACKEND);
     }
 
     @Test
@@ -446,6 +499,39 @@ class JobServiceTest {
         );
     }
 
+    private JobCreateRequest createRequestWithEtcRole() {
+        return new JobCreateRequest(
+                "SARAMIN",
+                "external-etc-role",
+                "백엔드 개발자",
+                "JobFlow",
+                "Spring Boot 기반 백엔드 API 개발",
+                "https://example.com/jobs/etc-role",
+                JobRole.ETC,
+                "Java/Spring",
+                CareerLevel.JUNIOR,
+                1,
+                3,
+                "BACHELOR",
+                EmploymentType.FULL_TIME,
+                "STARTUP",
+                "IT",
+                "KR",
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                3000,
+                5000,
+                "KRW",
+                true,
+                2,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 1, 23, 59),
+                List.of(new JobSkillRequest(1L, RequirementType.REQUIRED)),
+                List.of(new JobExperienceTagRequest("HIGH_TRAFFIC", "대용량 트래픽 처리 경험"))
+        );
+    }
+
     private JobCreateRequest createRequestWithoutSkills() {
         return new JobCreateRequest(
                 "SARAMIN",
@@ -479,6 +565,39 @@ class JobServiceTest {
         );
     }
 
+    private JobCreateRequest createRequestWithoutExperienceTags() {
+        return new JobCreateRequest(
+                "SARAMIN",
+                "external-1",
+                "백엔드 개발자",
+                "JobFlow",
+                "대용량 트래픽 환경의 Spring Boot 기반 백엔드 개발자 채용",
+                "https://example.com/jobs/1",
+                JobRole.BACKEND,
+                "Java/Spring",
+                CareerLevel.JUNIOR,
+                1,
+                3,
+                "BACHELOR",
+                EmploymentType.FULL_TIME,
+                "STARTUP",
+                "IT",
+                "KR",
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                3000,
+                5000,
+                "KRW",
+                true,
+                2,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 1, 23, 59),
+                List.of(new JobSkillRequest(1L, RequirementType.REQUIRED)),
+                List.of()
+        );
+    }
+
     private JobUpdateRequest updateRequest() {
         return new JobUpdateRequest(
                 "수정된 백엔드 개발자",
@@ -486,6 +605,35 @@ class JobServiceTest {
                 "수정된 공고 설명",
                 "https://example.com/jobs/1-updated",
                 JobRole.BACKEND,
+                "Java/Spring/JPA",
+                CareerLevel.MID,
+                3,
+                5,
+                "BACHELOR",
+                EmploymentType.FULL_TIME,
+                "STARTUP",
+                "IT",
+                "KR",
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                4000,
+                7000,
+                "KRW",
+                true,
+                1,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 1, 23, 59)
+        );
+    }
+
+    private JobUpdateRequest updateRequestWithEtcRole() {
+        return new JobUpdateRequest(
+                "백엔드 개발자",
+                "Updated JobFlow",
+                "Spring Boot 기반 백엔드 API 개발",
+                "https://example.com/jobs/1-updated",
+                JobRole.ETC,
                 "Java/Spring/JPA",
                 CareerLevel.MID,
                 3,
@@ -541,6 +689,40 @@ class JobServiceTest {
         return job;
     }
 
+    private Job createJobEntity(Long id, JobRole role) {
+        Job job = Job.create(
+                "SARAMIN",
+                "external-1",
+                "백엔드 개발자",
+                "JobFlow",
+                "Spring Boot 기반 백엔드 개발자 채용",
+                "https://example.com/jobs/1",
+                role,
+                "Java/Spring",
+                CareerLevel.JUNIOR,
+                1,
+                3,
+                "BACHELOR",
+                EmploymentType.FULL_TIME,
+                "STARTUP",
+                "IT",
+                "KR",
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                3000,
+                5000,
+                "KRW",
+                true,
+                2,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 1, 23, 59)
+        );
+
+        ReflectionTestUtils.setField(job, "id", id);
+        return job;
+    }
+
     private JobSearchResult jobSearchResult() {
         return new JobSearchResult(
                 1L,
@@ -584,36 +766,21 @@ class JobServiceTest {
         }
     }
 
-    private JobCreateRequest createRequestWithoutExperienceTags() {
-        return new JobCreateRequest(
-                "SARAMIN",
-                "external-1",
-                "백엔드 개발자",
-                "JobFlow",
-                "대용량 트래픽 환경의 Spring Boot 기반 백엔드 개발자 채용",
-                "https://example.com/jobs/1",
-                JobRole.BACKEND,
-                "Java/Spring",
-                CareerLevel.JUNIOR,
-                1,
-                3,
-                "BACHELOR",
-                EmploymentType.FULL_TIME,
-                "STARTUP",
-                "IT",
-                "KR",
-                "Seoul",
-                "Gangnam",
-                RemoteType.HYBRID,
-                3000,
-                5000,
-                "KRW",
-                true,
-                2,
-                LocalDateTime.of(2026, 6, 1, 9, 0),
-                LocalDateTime.of(2026, 7, 1, 23, 59),
-                List.of(new JobSkillRequest(1L, RequirementType.REQUIRED)),
-                List.of()
-        );
+    private void givenRoleResolution(JobCreateRequest request, JobRole resolvedRole) {
+        given(jdJobRoleClassificationService.resolve(
+                request.role(),
+                request.title(),
+                request.description(),
+                request.roleDetail()
+        )).willReturn(resolvedRole);
+    }
+
+    private void givenRoleResolution(JobUpdateRequest request, JobRole resolvedRole) {
+        given(jdJobRoleClassificationService.resolve(
+                request.role(),
+                request.title(),
+                request.description(),
+                request.roleDetail()
+        )).willReturn(resolvedRole);
     }
 }
