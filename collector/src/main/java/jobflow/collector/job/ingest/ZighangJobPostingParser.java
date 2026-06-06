@@ -3,7 +3,6 @@ package jobflow.collector.job.ingest;
 import java.time.LocalDateTime;
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
-import jobflow.collector.job.JobRole;
 import jobflow.collector.job.RemoteType;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -13,6 +12,11 @@ import org.springframework.stereotype.Component;
 public class ZighangJobPostingParser implements JobPostingParser {
 
     private static final String CRAWLER_VERSION = "zighang-parser-0.1";
+    private final JdJobRoleClassificationService jdJobRoleClassificationService;
+
+    public ZighangJobPostingParser(JdJobRoleClassificationService jdJobRoleClassificationService) {
+        this.jdJobRoleClassificationService = jdJobRoleClassificationService;
+    }
 
     @Override
     public boolean supports(JobIngestionSource source) {
@@ -62,7 +66,7 @@ public class ZighangJobPostingParser implements JobPostingParser {
                 description,
                 fetchedJobPosting.sourceUrl(),
                 fetchedJobPosting.detailUrl(),
-                inferRole(pageText),
+                jdJobRoleClassificationService.classify(title, description, pageText),
                 null,
                 inferCareerLevel(pageText),
                 null,
@@ -127,32 +131,6 @@ public class ZighangJobPostingParser implements JobPostingParser {
                             + fetchedJobPosting.externalId()
             );
         }
-    }
-
-    private JobRole inferRole(String pageText) {
-        String lower = pageText.toLowerCase();
-
-        if (containsAny(lower, "backend", "back-end", "server", "spring", "java", "백엔드", "서버")) {
-            return JobRole.BACKEND;
-        }
-
-        if (containsAny(lower, "frontend", "front-end", "react", "vue", "프론트엔드")) {
-            return JobRole.FRONTEND;
-        }
-
-        if (containsAny(lower, "fullstack", "full-stack", "풀스택")) {
-            return JobRole.FULLSTACK;
-        }
-
-        if (containsAny(lower, "devops", "sre", "kubernetes", "infra", "인프라")) {
-            return JobRole.DEVOPS;
-        }
-
-        if (containsAny(lower, "data engineer", "데이터 엔지니어")) {
-            return JobRole.DATA_ENGINEER;
-        }
-
-        return JobRole.ETC;
     }
 
     private CareerLevel inferCareerLevel(String pageText) {

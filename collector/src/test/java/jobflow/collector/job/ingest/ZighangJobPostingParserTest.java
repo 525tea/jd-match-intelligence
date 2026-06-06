@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 
 class ZighangJobPostingParserTest {
 
-    private final ZighangJobPostingParser parser = new ZighangJobPostingParser();
+    private final ZighangJobPostingParser parser = new ZighangJobPostingParser(
+            new JdJobRoleClassificationService()
+    );
 
     @Test
     @DisplayName("직행 상세 HTML을 수집 공고로 변환한다")
