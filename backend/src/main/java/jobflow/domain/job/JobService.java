@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import jobflow.domain.job.search.JobSearchService;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +35,7 @@ public class JobService {
     private final SkillRepository skillRepository;
     private final ExperienceTagCodeRepository experienceTagCodeRepository;
     private final OutboxEventService outboxEventService;
+    private final JobSearchService jobSearchService;
 
     @Transactional
     public JobResponse createJob(JobCreateRequest request) {
@@ -97,15 +99,9 @@ public class JobService {
     }
 
     public List<JobSearchResponse> searchJobs(String keyword, int limit) {
-        if (keyword == null || keyword.isBlank()) {
-            return List.of();
-        }
-
-        int safeLimit = Math.clamp(limit, 1, 100);
-
-        return jobRepository.searchOpenJobsByFullText(keyword.strip(), safeLimit)
+        return jobSearchService.search(keyword, limit)
                 .stream()
-                .map(JobSearchResponse::from)
+                .map(searchResult -> searchResult.toResponse())
                 .toList();
     }
 

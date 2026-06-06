@@ -1,8 +1,20 @@
 package jobflow.domain.job;
 
-import jobflow.domain.job.dto.*;
+import jobflow.domain.job.dto.JobCreateRequest;
+import jobflow.domain.job.dto.JobExperienceTagRequest;
+import jobflow.domain.job.dto.JobResponse;
+import jobflow.domain.job.dto.JobSearchResponse;
+import jobflow.domain.job.dto.JobSkillRequest;
+import jobflow.domain.job.dto.JobSummaryResponse;
+import jobflow.domain.job.dto.JobUpdateRequest;
+import jobflow.domain.job.search.JobSearchResult;
+import jobflow.domain.job.search.JobSearchService;
 import jobflow.domain.outbox.OutboxEventService;
-import jobflow.domain.skill.*;
+import jobflow.domain.skill.ExperienceTagCode;
+import jobflow.domain.skill.ExperienceTagCodeRepository;
+import jobflow.domain.skill.Skill;
+import jobflow.domain.skill.SkillCategory;
+import jobflow.domain.skill.SkillRepository;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.ConflictException;
 import jobflow.global.error.exception.EntityNotFoundException;
@@ -25,7 +37,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
-import jobflow.domain.job.dto.JobSearchResponse;
 
 @ExtendWith(MockitoExtension.class)
 class JobServiceTest {
@@ -50,6 +61,9 @@ class JobServiceTest {
 
     @Mock
     private OutboxEventService outboxEventService;
+
+    @Mock
+    private JobSearchService jobSearchService;
 
     @Test
     @DisplayName("공고를 생성하고 스킬과 경험 태그를 함께 저장한다")
@@ -185,12 +199,12 @@ class JobServiceTest {
     }
 
     @Test
-    @DisplayName("FULLTEXT 검색 결과와 score를 요약 응답으로 변환한다")
+    @DisplayName("검색 service 결과를 API 응답으로 변환한다")
     void searchJobs() {
-        JobSearchProjection projection = jobSearchProjection();
+        JobSearchResult result = jobSearchResult();
 
-        given(jobRepository.searchOpenJobsByFullText("백엔드", 20))
-                .willReturn(List.of(projection));
+        given(jobSearchService.search(" 백엔드 ", 20))
+                .willReturn(List.of(result));
 
         List<JobSearchResponse> responses = jobService.searchJobs(" 백엔드 ", 20);
 
@@ -199,31 +213,37 @@ class JobServiceTest {
         assertThat(responses.getFirst().title()).isEqualTo("백엔드 개발자");
         assertThat(responses.getFirst().score()).isEqualTo(0.42);
 
-        verify(jobRepository).searchOpenJobsByFullText("백엔드", 20);
+        verify(jobSearchService).search(" 백엔드 ", 20);
     }
 
     @Test
-    @DisplayName("검색어가 비어 있으면 빈 목록을 반환한다")
+    @DisplayName("검색어가 비어 있으면 검색 service의 빈 결과를 반환한다")
     void searchJobsWithBlankKeyword() {
+        given(jobSearchService.search(" ", 20))
+                .willReturn(List.of());
+
         List<JobSearchResponse> responses = jobService.searchJobs(" ", 20);
 
         assertThat(responses).isEmpty();
+
+        verify(jobSearchService).search(" ", 20);
     }
 
     @Test
-    @DisplayName("검색 limit은 1 이상 100 이하로 보정한다")
-    void searchJobsClampLimit() {
-        JobSearchProjection projection = jobSearchProjection();
+    @DisplayName("검색 limit은 검색 service에 위임한다")
+    void searchJobsDelegateLimit() {
+        JobSearchResult result = jobSearchResult();
 
-        given(jobRepository.searchOpenJobsByFullText("백엔드", 100))
-                .willReturn(List.of(projection));
+        given(jobSearchService.search("백엔드", 999))
+                .willReturn(List.of(result));
 
         List<JobSearchResponse> responses = jobService.searchJobs("백엔드", 999);
 
         assertThat(responses).hasSize(1);
 
-        verify(jobRepository).searchOpenJobsByFullText("백엔드", 100);
+        verify(jobSearchService).search("백엔드", 999);
     }
+
 
     @Test
     @DisplayName("공고 기본 정보를 수정한다")
@@ -408,68 +428,21 @@ class JobServiceTest {
         return job;
     }
 
-    private JobSearchProjection jobSearchProjection() {
-        return new JobSearchProjection() {
-            @Override
-            public Long getId() {
-                return 1L;
-            }
-
-            @Override
-            public String getTitle() {
-                return "백엔드 개발자";
-            }
-
-            @Override
-            public String getCompanyName() {
-                return "JobFlow";
-            }
-
-            @Override
-            public String getRole() {
-                return "BACKEND";
-            }
-
-            @Override
-            public String getCareerLevel() {
-                return "JUNIOR";
-            }
-
-            @Override
-            public String getEmploymentType() {
-                return "FULL_TIME";
-            }
-
-            @Override
-            public String getLocationRegion() {
-                return "Seoul";
-            }
-
-            @Override
-            public String getLocationCity() {
-                return "Gangnam";
-            }
-
-            @Override
-            public String getRemoteType() {
-                return "HYBRID";
-            }
-
-            @Override
-            public LocalDateTime getDeadlineAt() {
-                return LocalDateTime.of(2026, 7, 1, 23, 59);
-            }
-
-            @Override
-            public String getStatus() {
-                return "OPEN";
-            }
-
-            @Override
-            public Double getScore() {
-                return 0.42;
-            }
-        };
+    private JobSearchResult jobSearchResult() {
+        return new JobSearchResult(
+                1L,
+                "백엔드 개발자",
+                "JobFlow",
+                JobRole.BACKEND,
+                CareerLevel.JUNIOR,
+                EmploymentType.FULL_TIME,
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                LocalDateTime.of(2026, 7, 1, 23, 59),
+                JobStatus.OPEN,
+                0.42
+        );
     }
 
     private Skill createSkill(Long id) {
