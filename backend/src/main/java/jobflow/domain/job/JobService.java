@@ -7,6 +7,7 @@ import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSkillRequest;
 import jobflow.domain.job.dto.JobSummaryResponse;
 import jobflow.domain.job.dto.JobUpdateRequest;
+import jobflow.domain.job.search.JobSearchService;
 import jobflow.domain.outbox.OutboxEvent;
 import jobflow.domain.outbox.OutboxEventService;
 import jobflow.domain.outbox.OutboxEventTypes;
@@ -22,7 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import jobflow.domain.job.search.JobSearchService;
+
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +37,7 @@ public class JobService {
     private final ExperienceTagCodeRepository experienceTagCodeRepository;
     private final OutboxEventService outboxEventService;
     private final JobSearchService jobSearchService;
+    private final JobSkillNormalizationService jobSkillNormalizationService;
 
     @Transactional
     public JobResponse createJob(JobCreateRequest request) {
@@ -69,7 +71,7 @@ public class JobService {
         );
 
         Job savedJob = jobRepository.save(job);
-        List<JobSkill> jobSkills = saveJobSkills(savedJob, request.skills());
+        List<JobSkill> jobSkills = saveJobSkills(savedJob, request);
         List<JobExperienceTag> jobExperienceTags = saveJobExperienceTags(savedJob, request.experienceTags());
 
         outboxEventService.save(
@@ -193,9 +195,16 @@ public class JobService {
                 .orElseThrow(() -> new EntityNotFoundException(ErrorCode.JOB_NOT_FOUND));
     }
 
-    private List<JobSkill> saveJobSkills(Job job, List<JobSkillRequest> skillRequests) {
+    private List<JobSkill> saveJobSkills(Job job, JobCreateRequest request) {
+        List<JobSkillRequest> skillRequests = request.skills();
+
         if (skillRequests == null || skillRequests.isEmpty()) {
-            return List.of();
+            return jobSkillNormalizationService.saveNormalizedSkills(
+                    job,
+                    request.title(),
+                    request.description(),
+                    request.roleDetail()
+            );
         }
 
         List<JobSkill> jobSkills = skillRequests.stream()
