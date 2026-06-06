@@ -38,6 +38,7 @@ public class JobService {
     private final OutboxEventService outboxEventService;
     private final JobSearchService jobSearchService;
     private final JobSkillNormalizationService jobSkillNormalizationService;
+    private final JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
 
     @Transactional
     public JobResponse createJob(JobCreateRequest request) {
@@ -72,7 +73,7 @@ public class JobService {
 
         Job savedJob = jobRepository.save(job);
         List<JobSkill> jobSkills = saveJobSkills(savedJob, request);
-        List<JobExperienceTag> jobExperienceTags = saveJobExperienceTags(savedJob, request.experienceTags());
+        List<JobExperienceTag> jobExperienceTags = saveJobExperienceTags(savedJob, request);
 
         outboxEventService.save(
                 "JOB",
@@ -225,10 +226,17 @@ public class JobService {
 
     private List<JobExperienceTag> saveJobExperienceTags(
             Job job,
-            List<JobExperienceTagRequest> tagRequests
+            JobCreateRequest request
     ) {
+        List<JobExperienceTagRequest> tagRequests = request.experienceTags();
+
         if (tagRequests == null || tagRequests.isEmpty()) {
-            return List.of();
+            return jobExperienceTagNormalizationService.saveNormalizedExperienceTags(
+                    job,
+                    request.title(),
+                    request.description(),
+                    request.roleDetail()
+            );
         }
 
         List<JobExperienceTag> jobExperienceTags = tagRequests.stream()
