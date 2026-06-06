@@ -34,13 +34,21 @@ class JobIngestionServiceTest {
     @Mock
     private OutboxEventService outboxEventService;
 
+    @Mock
+    private JobSkillNormalizationService jobSkillNormalizationService;
+
     private final IngestedJobMapper mapper = new IngestedJobMapper(new CanonicalFingerprintGenerator());
 
     @Test
     @DisplayName("신규 수집 공고를 저장하고 JOB_CREATED outbox event를 기록한다")
     void ingestNewJob() {
         IngestedJobPosting posting = createPosting("zighang-123", "백엔드 개발자");
-        JobIngestionService service = new JobIngestionService(jobRepository, mapper, outboxEventService);
+        JobIngestionService service = new JobIngestionService(
+                jobRepository,
+                mapper,
+                outboxEventService,
+                jobSkillNormalizationService
+        );
 
         given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))
                 .willReturn(Optional.empty());
@@ -69,6 +77,12 @@ class JobIngestionServiceTest {
                 any(),
                 eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
+        verify(jobSkillNormalizationService).replaceNormalizedSkills(
+                result.job(),
+                result.job().getTitle(),
+                result.job().getDescription(),
+                result.job().getRoleDetail()
+        );
     }
 
     @Test
@@ -91,7 +105,12 @@ class JobIngestionServiceTest {
                 "zighang-parser-0.1"
         );
 
-        JobIngestionService service = new JobIngestionService(jobRepository, mapper, outboxEventService);
+        JobIngestionService service = new JobIngestionService(
+                jobRepository,
+                mapper,
+                outboxEventService,
+                jobSkillNormalizationService
+        );
 
         given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))
                 .willReturn(Optional.of(existingJob));
@@ -113,6 +132,12 @@ class JobIngestionServiceTest {
                 any(),
                 eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
+        verify(jobSkillNormalizationService).replaceNormalizedSkills(
+                existingJob,
+                existingJob.getTitle(),
+                existingJob.getDescription(),
+                existingJob.getRoleDetail()
+        );
     }
 
     @Test
@@ -122,7 +147,12 @@ class JobIngestionServiceTest {
         Job duplicateCandidate = createJob("JUMPIT", "jumpit-999", "백엔드 개발자");
         ReflectionTestUtils.setField(duplicateCandidate, "id", 2L);
 
-        JobIngestionService service = new JobIngestionService(jobRepository, mapper, outboxEventService);
+        JobIngestionService service = new JobIngestionService(
+                jobRepository,
+                mapper,
+                outboxEventService,
+                jobSkillNormalizationService
+        );
 
         given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))
                 .willReturn(Optional.empty());
