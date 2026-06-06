@@ -1,18 +1,12 @@
 package jobflow.domain.job.search;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Stream;
+import co.elastic.clients.elasticsearch._types.query_dsl.FunctionBoostMode;
+import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreMode;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
@@ -20,6 +14,17 @@ import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class ElasticsearchJobSearchServiceTest {
@@ -65,11 +70,21 @@ class ElasticsearchJobSearchServiceTest {
         assertThat(results.getFirst().title()).isEqualTo("백엔드 개발자");
         assertThat(results.getFirst().score()).isEqualTo(3.5);
 
+        ArgumentCaptor<NativeQuery> queryCaptor = ArgumentCaptor.forClass(NativeQuery.class);
+
         verify(elasticsearchOperations).search(
-                any(NativeQuery.class),
+                queryCaptor.capture(),
                 eq(JobSearchDocument.class),
                 eq(IndexCoordinates.of("jobflow-jobs"))
         );
+
+        Query capturedQuery = queryCaptor.getValue().getQuery();
+
+        assertThat(capturedQuery.isFunctionScore()).isTrue();
+        assertThat(capturedQuery.functionScore().query().isMultiMatch()).isTrue();
+        assertThat(capturedQuery.functionScore().functions()).hasSize(2);
+        assertThat(capturedQuery.functionScore().scoreMode()).isEqualTo(FunctionScoreMode.Sum);
+        assertThat(capturedQuery.functionScore().boostMode()).isEqualTo(FunctionBoostMode.Sum);
     }
 
     @Test
