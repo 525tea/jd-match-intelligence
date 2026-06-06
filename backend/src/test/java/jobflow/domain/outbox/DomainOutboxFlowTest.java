@@ -11,6 +11,7 @@ import jobflow.domain.job.EmploymentType;
 import jobflow.domain.job.JobRepository;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.job.JobService;
+import jobflow.domain.job.JobSkillNormalizationService;
 import jobflow.domain.job.RemoteType;
 import jobflow.domain.job.dto.JobCreateRequest;
 import jobflow.domain.job.dto.JobResponse;
@@ -55,6 +56,9 @@ class DomainOutboxFlowTest {
 
     @MockitoBean
     private JobSearchService jobSearchService;
+
+    @MockitoBean
+    private JobSkillNormalizationService jobSkillNormalizationService;
 
     @Autowired
     private ApplicationService applicationService;
