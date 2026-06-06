@@ -2,10 +2,12 @@ package jobflow.domain.job.search;
 
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class JobSearchService {
 
     private final ElasticsearchJobSearchService elasticsearchJobSearchService;
@@ -20,6 +22,12 @@ public class JobSearchService {
         try {
             return elasticsearchJobSearchService.search(normalizedKeyword, limit);
         } catch (RuntimeException exception) {
+            log.warn(
+                    "Elasticsearch search failed, falling back to MySQL FULLTEXT. keyword={}, error={}",
+                    normalizedKeyword,
+                    exception.getMessage()
+            );
+
             return mySqlFullTextJobSearchService.search(normalizedKeyword, limit);
         }
     }

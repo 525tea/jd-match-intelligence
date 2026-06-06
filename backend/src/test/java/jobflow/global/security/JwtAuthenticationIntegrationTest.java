@@ -1,15 +1,8 @@
 package jobflow.global.security;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import javax.crypto.SecretKey;
+import jobflow.domain.job.JobService;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -20,7 +13,19 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.List;
+
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -38,6 +43,9 @@ class JwtAuthenticationIntegrationTest {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
+    @MockitoBean
+    private JobService jobService;
+
     @Test
     @DisplayName("인증 토큰 없이 보호 API 요청 시 401 공통 ErrorResponse를 반환한다")
     void requestProtectedApiWithoutToken() throws Exception {
@@ -46,6 +54,20 @@ class JwtAuthenticationIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"))
                 .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
+    }
+
+    @Test
+    @DisplayName("인증 토큰 없이 공고 검색 API를 호출할 수 있다")
+    void searchJobsWithoutToken() throws Exception {
+        given(jobService.searchJobs("백엔드", 10))
+                .willReturn(List.of());
+
+        mockMvc.perform(get("/jobs/search")
+                        .param("keyword", "백엔드")
+                        .param("limit", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray());
     }
 
     @Test
