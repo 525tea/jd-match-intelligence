@@ -368,6 +368,7 @@ class JobServiceTest {
         JobUpdateRequest request = updateRequest();
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        givenRoleResolution(request, JobRole.BACKEND);
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
 
@@ -385,6 +386,23 @@ class JobServiceTest {
                 any(),
                 eq("job.events")
         );
+    }
+
+    @Test
+    @DisplayName("공고 수정 시 ETC role은 JD 텍스트 기반으로 보정한다")
+    void updateJobWithClassifiedRole() {
+        Long jobId = 1L;
+        Job job = createJobEntity(jobId, JobRole.ETC);
+        JobUpdateRequest request = updateRequestWithEtcRole();
+
+        given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        givenRoleResolution(request, JobRole.BACKEND);
+        given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
+        given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
+
+        JobResponse response = jobService.updateJob(jobId, request);
+
+        assertThat(response.role()).isEqualTo(JobRole.BACKEND);
     }
 
     @Test
@@ -609,6 +627,35 @@ class JobServiceTest {
         );
     }
 
+    private JobUpdateRequest updateRequestWithEtcRole() {
+        return new JobUpdateRequest(
+                "백엔드 개발자",
+                "Updated JobFlow",
+                "Spring Boot 기반 백엔드 API 개발",
+                "https://example.com/jobs/1-updated",
+                JobRole.ETC,
+                "Java/Spring/JPA",
+                CareerLevel.MID,
+                3,
+                5,
+                "BACHELOR",
+                EmploymentType.FULL_TIME,
+                "STARTUP",
+                "IT",
+                "KR",
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                4000,
+                7000,
+                "KRW",
+                true,
+                1,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 1, 23, 59)
+        );
+    }
+
     private Job createJobEntity(Long id) {
         Job job = Job.create(
                 "SARAMIN",
@@ -720,6 +767,15 @@ class JobServiceTest {
     }
 
     private void givenRoleResolution(JobCreateRequest request, JobRole resolvedRole) {
+        given(jdJobRoleClassificationService.resolve(
+                request.role(),
+                request.title(),
+                request.description(),
+                request.roleDetail()
+        )).willReturn(resolvedRole);
+    }
+
+    private void givenRoleResolution(JobUpdateRequest request, JobRole resolvedRole) {
         given(jdJobRoleClassificationService.resolve(
                 request.role(),
                 request.title(),

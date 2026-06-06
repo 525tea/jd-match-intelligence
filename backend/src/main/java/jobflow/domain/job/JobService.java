@@ -118,13 +118,19 @@ public class JobService {
     @Transactional
     public JobResponse updateJob(Long jobId, JobUpdateRequest request) {
         Job job = findJob(jobId);
+        JobRole resolvedRole = jdJobRoleClassificationService.resolve(
+                request.role(),
+                request.title(),
+                request.description(),
+                request.roleDetail()
+        );
 
         job.update(
                 request.title(),
                 request.companyName(),
                 request.description(),
                 request.url(),
-                request.role(),
+                resolvedRole,
                 request.roleDetail(),
                 request.careerLevel(),
                 request.minExperienceYears(),
