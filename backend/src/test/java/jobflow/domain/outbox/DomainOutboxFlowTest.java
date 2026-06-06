@@ -8,6 +8,7 @@ import jobflow.domain.application.dto.ApplicationResponse;
 import jobflow.domain.application.dto.ApplicationStatusUpdateRequest;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.EmploymentType;
+import jobflow.domain.job.JdJobRoleClassificationService;
 import jobflow.domain.job.JobExperienceTagNormalizationService;
 import jobflow.domain.job.JobRepository;
 import jobflow.domain.job.JobRole;
@@ -44,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import({
         JpaAuditingConfig.class,
         JobService.class,
+        JdJobRoleClassificationService.class,
         ApplicationService.class,
         OutboxEventService.class,
         OutboxRelayService.class,
