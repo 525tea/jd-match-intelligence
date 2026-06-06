@@ -41,7 +41,10 @@ class JobIngestionServiceTest {
     @Mock
     private JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
 
-    private final IngestedJobMapper mapper = new IngestedJobMapper(new CanonicalFingerprintGenerator());
+    private final IngestedJobMapper mapper = new IngestedJobMapper(
+            new CanonicalFingerprintGenerator(),
+            new JdJobRoleClassificationService()
+    );
 
     @Test
     @DisplayName("신규 수집 공고를 저장하고 JOB_CREATED outbox event를 기록한다")

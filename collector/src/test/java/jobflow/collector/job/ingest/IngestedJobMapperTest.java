@@ -15,7 +15,10 @@ import org.junit.jupiter.api.Test;
 
 class IngestedJobMapperTest {
 
-    private final IngestedJobMapper mapper = new IngestedJobMapper(new CanonicalFingerprintGenerator());
+    private final IngestedJobMapper mapper = new IngestedJobMapper(
+            new CanonicalFingerprintGenerator(),
+            new JdJobRoleClassificationService()
+    );
 
     @Test
     @DisplayName("수집된 공고를 Job entity로 변환하고 수집 metadata를 기록한다")
@@ -50,6 +53,16 @@ class IngestedJobMapperTest {
         assertThat(job.getStatus()).isEqualTo(JobStatus.OPEN);
     }
 
+    @Test
+    @DisplayName("수집 공고 role이 ETC면 JD 텍스트 기반으로 보정한다")
+    void toJobWithClassifiedRole() {
+        IngestedJobPosting posting = createPostingWithRole(JobRole.ETC);
+
+        Job job = mapper.toJob(posting);
+
+        assertThat(job.getRole()).isEqualTo(JobRole.BACKEND);
+    }
+
     private IngestedJobPosting createPosting() {
         return new IngestedJobPosting(
                 JobIngestionSource.ZIGHANG,
@@ -60,6 +73,45 @@ class IngestedJobMapperTest {
                 "https://zighang.com/jobs/zighang-123?utm=test",
                 "https://zighang.com/jobs/zighang-123",
                 JobRole.BACKEND,
+                "Java/Spring",
+                CareerLevel.JUNIOR,
+                0,
+                3,
+                "학력무관",
+                EmploymentType.FULL_TIME,
+                "STARTUP",
+                "IT",
+                "KR",
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                4000,
+                7000,
+                "KRW",
+                true,
+                1,
+                LocalDateTime.of(2026, 6, 4, 9, 0),
+                LocalDateTime.of(2026, 7, 1, 23, 59),
+                LocalDateTime.of(2026, 6, 4, 10, 0),
+                LocalDateTime.of(2026, 6, 4, 10, 5),
+                LocalDateTime.of(2026, 6, 4, 9, 30),
+                """
+                        {"titleText":"백엔드 개발자","companyText":"JobFlow"}
+                        """,
+                "zighang-parser-0.1"
+        );
+    }
+
+    private IngestedJobPosting createPostingWithRole(JobRole role) {
+        return new IngestedJobPosting(
+                JobIngestionSource.ZIGHANG,
+                "zighang-etc-role",
+                "백엔드 개발자",
+                "JobFlow",
+                "Spring Boot 기반 백엔드 개발자를 채용합니다.",
+                "https://zighang.com/jobs/zighang-etc-role?utm=test",
+                "https://zighang.com/jobs/zighang-etc-role",
+                role,
                 "Java/Spring",
                 CareerLevel.JUNIOR,
                 0,

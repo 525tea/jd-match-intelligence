@@ -1,6 +1,7 @@
 package jobflow.collector.job.ingest;
 
 import jobflow.collector.job.Job;
+import jobflow.collector.job.JobRole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -9,8 +10,16 @@ import org.springframework.stereotype.Component;
 public class IngestedJobMapper {
 
     private final CanonicalFingerprintGenerator canonicalFingerprintGenerator;
+    private final JdJobRoleClassificationService jdJobRoleClassificationService;
 
     public Job toJob(IngestedJobPosting posting) {
+        JobRole resolvedRole = jdJobRoleClassificationService.resolve(
+                posting.role(),
+                posting.title(),
+                posting.description(),
+                posting.roleDetail()
+        );
+
         Job job = Job.create(
                 posting.source().name(),
                 posting.externalId(),
@@ -18,7 +27,7 @@ public class IngestedJobMapper {
                 posting.companyName(),
                 posting.description(),
                 posting.detailUrl(),
-                posting.role(),
+                resolvedRole,
                 posting.roleDetail(),
                 posting.careerLevel(),
                 posting.minExperienceYears(),
