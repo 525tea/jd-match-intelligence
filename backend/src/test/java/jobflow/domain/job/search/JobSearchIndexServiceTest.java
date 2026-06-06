@@ -75,6 +75,30 @@ class JobSearchIndexServiceTest {
     }
 
     @Test
+    @DisplayName("검색 index 존재 확인이 빈 응답 오류로 실패하면 index를 생성한다")
+    void createIndexWhenExistsCheckFailsWithEmptyResponse() {
+        JobSearchIndexService service = new JobSearchIndexService(
+                elasticsearchOperations,
+                jobSearchProperties,
+                jobSearchIndexDefinition
+        );
+
+        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs")))
+                .willReturn(indexOperations);
+        given(indexOperations.exists())
+                .willThrow(new RuntimeException(
+                        "node: http://localhost:9200/, status: 400, [es/indices.exists] Expecting a response body, but none was sent"
+                ));
+
+        boolean created = service.createIndexIfMissing();
+
+        assertThat(created).isTrue();
+
+        verify(indexOperations).create(jobSearchIndexDefinition.settings());
+        verify(indexOperations).putMapping(Document.from(jobSearchIndexDefinition.mapping()));
+    }
+
+    @Test
     @DisplayName("검색 index 존재 여부를 조회한다")
     void indexExists() {
         JobSearchIndexService service = new JobSearchIndexService(

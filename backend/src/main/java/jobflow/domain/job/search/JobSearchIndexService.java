@@ -18,7 +18,7 @@ public class JobSearchIndexService {
     public boolean createIndexIfMissing() {
         IndexOperations indexOperations = indexOperations();
 
-        if (indexOperations.exists()) {
+        if (exists(indexOperations)) {
             return false;
         }
 
@@ -29,7 +29,35 @@ public class JobSearchIndexService {
     }
 
     public boolean indexExists() {
-        return indexOperations().exists();
+        return exists(indexOperations());
+    }
+
+    private boolean exists(IndexOperations indexOperations) {
+        try {
+            return indexOperations.exists();
+        } catch (RuntimeException exception) {
+            if (isEmptyExistsResponseFailure(exception)) {
+                return false;
+            }
+
+            throw exception;
+        }
+    }
+
+    private boolean isEmptyExistsResponseFailure(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null
+                    && message.contains("[es/indices.exists]")
+                    && message.contains("Expecting a response body")) {
+                return true;
+            }
+
+            current = current.getCause();
+        }
+
+        return false;
     }
 
     private IndexOperations indexOperations() {
