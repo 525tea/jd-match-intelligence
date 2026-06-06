@@ -20,6 +20,7 @@ public class JobIngestionService {
     private final IngestedJobMapper ingestedJobMapper;
     private final OutboxEventService outboxEventService;
     private final JobSkillNormalizationService jobSkillNormalizationService;
+    private final JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
 
     @Transactional
     public JobIngestionResult ingest(IngestedJobPosting posting) {
@@ -34,6 +35,7 @@ public class JobIngestionService {
         Job job = ingestedJobMapper.toJob(posting);
         Job savedJob = jobRepository.save(job);
         saveNormalizedSkills(savedJob);
+        saveNormalizedExperienceTags(savedJob);
 
         outboxEventService.save(
                 "JOB",
@@ -89,6 +91,7 @@ public class JobIngestionService {
         );
 
         saveNormalizedSkills(existingJob);
+        saveNormalizedExperienceTags(existingJob);
 
         outboxEventService.save(
                 "JOB",
@@ -105,6 +108,15 @@ public class JobIngestionService {
 
     private void saveNormalizedSkills(Job job) {
         jobSkillNormalizationService.replaceNormalizedSkills(
+                job,
+                job.getTitle(),
+                job.getDescription(),
+                job.getRoleDetail()
+        );
+    }
+
+    private void saveNormalizedExperienceTags(Job job) {
+        jobExperienceTagNormalizationService.replaceNormalizedExperienceTags(
                 job,
                 job.getTitle(),
                 job.getDescription(),

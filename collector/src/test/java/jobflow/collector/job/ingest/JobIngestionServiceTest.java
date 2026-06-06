@@ -1,14 +1,5 @@
 package jobflow.collector.job.ingest;
 
-import java.util.List;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.verify;
-
-import java.time.LocalDateTime;
-import java.util.Optional;
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
 import jobflow.collector.job.Job;
@@ -25,6 +16,16 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
+
 @ExtendWith(MockitoExtension.class)
 class JobIngestionServiceTest {
 
@@ -37,6 +38,9 @@ class JobIngestionServiceTest {
     @Mock
     private JobSkillNormalizationService jobSkillNormalizationService;
 
+    @Mock
+    private JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
+
     private final IngestedJobMapper mapper = new IngestedJobMapper(new CanonicalFingerprintGenerator());
 
     @Test
@@ -47,7 +51,8 @@ class JobIngestionServiceTest {
                 jobRepository,
                 mapper,
                 outboxEventService,
-                jobSkillNormalizationService
+                jobSkillNormalizationService,
+                jobExperienceTagNormalizationService
         );
 
         given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))
@@ -83,6 +88,12 @@ class JobIngestionServiceTest {
                 result.job().getDescription(),
                 result.job().getRoleDetail()
         );
+        verify(jobExperienceTagNormalizationService).replaceNormalizedExperienceTags(
+                result.job(),
+                result.job().getTitle(),
+                result.job().getDescription(),
+                result.job().getRoleDetail()
+        );
     }
 
     @Test
@@ -109,7 +120,8 @@ class JobIngestionServiceTest {
                 jobRepository,
                 mapper,
                 outboxEventService,
-                jobSkillNormalizationService
+                jobSkillNormalizationService,
+                jobExperienceTagNormalizationService
         );
 
         given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))
@@ -138,6 +150,12 @@ class JobIngestionServiceTest {
                 existingJob.getDescription(),
                 existingJob.getRoleDetail()
         );
+        verify(jobExperienceTagNormalizationService).replaceNormalizedExperienceTags(
+                existingJob,
+                existingJob.getTitle(),
+                existingJob.getDescription(),
+                existingJob.getRoleDetail()
+        );
     }
 
     @Test
@@ -151,7 +169,8 @@ class JobIngestionServiceTest {
                 jobRepository,
                 mapper,
                 outboxEventService,
-                jobSkillNormalizationService
+                jobSkillNormalizationService,
+                jobExperienceTagNormalizationService
         );
 
         given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))

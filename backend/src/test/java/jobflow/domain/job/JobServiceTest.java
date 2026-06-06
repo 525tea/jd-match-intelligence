@@ -23,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import static org.mockito.Mockito.never;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -37,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,6 +47,9 @@ class JobServiceTest {
 
     @Mock
     private JobSkillRepository jobSkillRepository;
+
+    @Mock
+    private JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
 
     @Mock
     private JobExperienceTagRepository jobExperienceTagRepository;
@@ -106,6 +109,7 @@ class JobServiceTest {
         verify(jobSkillRepository).saveAll(any());
         verify(jobExperienceTagRepository).saveAll(any());
         verify(jobSkillNormalizationService, never()).saveNormalizedSkills(any(), any());
+        verify(jobExperienceTagNormalizationService, never()).saveNormalizedExperienceTags(any(), any());
         verify(outboxEventService).save(
                 eq("JOB"),
                 eq(1L),
@@ -113,6 +117,45 @@ class JobServiceTest {
                 any(),
                 eq("job.events")
         );
+    }
+
+    @Test
+    @DisplayName("경험 태그 요청이 없으면 JD 텍스트에서 experience tag를 정규화해 저장한다")
+    void createJobWithNormalizedExperienceTags() {
+        JobCreateRequest request = createRequestWithoutExperienceTags();
+        Job savedJob = createJobEntity(1L);
+        Skill skill = createSkill(1L);
+        JobSkill jobSkill = JobSkill.create(savedJob, skill, RequirementType.REQUIRED);
+        ExperienceTagCode tagCode = createExperienceTagCode("HIGH_TRAFFIC");
+        JobExperienceTag jobExperienceTag = JobExperienceTag.create(
+                savedJob,
+                tagCode,
+                "대용량 트래픽"
+        );
+
+        given(jobRepository.save(any(Job.class))).willReturn(savedJob);
+        given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
+        given(jobSkillRepository.saveAll(any())).willReturn(List.of(jobSkill));
+        given(jobExperienceTagNormalizationService.saveNormalizedExperienceTags(
+                savedJob,
+                request.title(),
+                request.description(),
+                request.roleDetail()
+        )).willReturn(List.of(jobExperienceTag));
+
+        JobResponse response = jobService.createJob(request);
+
+        assertThat(response.experienceTags()).hasSize(1);
+        assertThat(response.experienceTags().getFirst().code()).isEqualTo("HIGH_TRAFFIC");
+        assertThat(response.experienceTags().getFirst().sourcePhrase()).isEqualTo("대용량 트래픽");
+
+        verify(jobExperienceTagNormalizationService).saveNormalizedExperienceTags(
+                savedJob,
+                request.title(),
+                request.description(),
+                request.roleDetail()
+        );
+        verify(experienceTagCodeRepository, never()).findById(any());
     }
 
     @Test
@@ -539,5 +582,38 @@ class JobServiceTest {
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("Failed to create ExperienceTagCode for test", exception);
         }
+    }
+
+    private JobCreateRequest createRequestWithoutExperienceTags() {
+        return new JobCreateRequest(
+                "SARAMIN",
+                "external-1",
+                "백엔드 개발자",
+                "JobFlow",
+                "대용량 트래픽 환경의 Spring Boot 기반 백엔드 개발자 채용",
+                "https://example.com/jobs/1",
+                JobRole.BACKEND,
+                "Java/Spring",
+                CareerLevel.JUNIOR,
+                1,
+                3,
+                "BACHELOR",
+                EmploymentType.FULL_TIME,
+                "STARTUP",
+                "IT",
+                "KR",
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                3000,
+                5000,
+                "KRW",
+                true,
+                2,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 1, 23, 59),
+                List.of(new JobSkillRequest(1L, RequirementType.REQUIRED)),
+                List.of()
+        );
     }
 }

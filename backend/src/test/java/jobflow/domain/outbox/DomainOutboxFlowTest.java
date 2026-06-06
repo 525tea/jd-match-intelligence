@@ -8,6 +8,7 @@ import jobflow.domain.application.dto.ApplicationResponse;
 import jobflow.domain.application.dto.ApplicationStatusUpdateRequest;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.EmploymentType;
+import jobflow.domain.job.JobExperienceTagNormalizationService;
 import jobflow.domain.job.JobRepository;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.job.JobService;
@@ -15,6 +16,7 @@ import jobflow.domain.job.JobSkillNormalizationService;
 import jobflow.domain.job.RemoteType;
 import jobflow.domain.job.dto.JobCreateRequest;
 import jobflow.domain.job.dto.JobResponse;
+import jobflow.domain.job.search.JobSearchService;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
 import jobflow.global.config.JpaAuditingConfig;
@@ -27,10 +29,9 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
-import jobflow.domain.job.search.JobSearchService;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -59,6 +60,9 @@ class DomainOutboxFlowTest {
 
     @MockitoBean
     private JobSkillNormalizationService jobSkillNormalizationService;
+
+    @MockitoBean
+    private JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
 
     @Autowired
     private ApplicationService applicationService;
