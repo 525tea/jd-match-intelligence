@@ -26,7 +26,7 @@ services:
   elasticsearch:
     build:
       context: ./infra/elasticsearch
-    image: jobflow-elasticsearch:8.17.0-nori
+    image: jobflow-elasticsearch:9.2.8-nori
     container_name: jobflow-elasticsearch
     environment:
       discovery.type: single-node
