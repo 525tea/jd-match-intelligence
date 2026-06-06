@@ -28,6 +28,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
+import jobflow.domain.job.search.JobSearchService;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -50,6 +52,9 @@ class DomainOutboxFlowTest {
 
     @Autowired
     private JobService jobService;
+
+    @MockitoBean
+    private JobSearchService jobSearchService;
 
     @Autowired
     private ApplicationService applicationService;
