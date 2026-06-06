@@ -19,6 +19,7 @@ public class JobIngestionService {
     private final JobRepository jobRepository;
     private final IngestedJobMapper ingestedJobMapper;
     private final OutboxEventService outboxEventService;
+    private final JobSkillNormalizationService jobSkillNormalizationService;
 
     @Transactional
     public JobIngestionResult ingest(IngestedJobPosting posting) {
@@ -32,6 +33,7 @@ public class JobIngestionService {
     private JobIngestionResult create(IngestedJobPosting posting) {
         Job job = ingestedJobMapper.toJob(posting);
         Job savedJob = jobRepository.save(job);
+        saveNormalizedSkills(savedJob);
 
         outboxEventService.save(
                 "JOB",
@@ -86,6 +88,8 @@ public class JobIngestionService {
                 crawledJob.getCrawlerVersion()
         );
 
+        saveNormalizedSkills(existingJob);
+
         outboxEventService.save(
                 "JOB",
                 existingJob.getId(),
@@ -97,6 +101,15 @@ public class JobIngestionService {
         List<Job> duplicateCandidates = findDuplicateCandidates(existingJob);
 
         return new JobIngestionResult(JobIngestionResultType.UPDATED, existingJob, duplicateCandidates);
+    }
+
+    private void saveNormalizedSkills(Job job) {
+        jobSkillNormalizationService.replaceNormalizedSkills(
+                job,
+                job.getTitle(),
+                job.getDescription(),
+                job.getRoleDetail()
+        );
     }
 
     private LocalDateTime preserveCollectedAt(Job existingJob, Job crawledJob) {

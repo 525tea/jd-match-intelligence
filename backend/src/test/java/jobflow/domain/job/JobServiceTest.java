@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import static org.mockito.Mockito.never;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -65,6 +66,9 @@ class JobServiceTest {
     @Mock
     private JobSearchService jobSearchService;
 
+    @Mock
+    private JobSkillNormalizationService jobSkillNormalizationService;
+
     @Test
     @DisplayName("공고를 생성하고 스킬과 경험 태그를 함께 저장한다")
     void createJob() {
@@ -101,6 +105,7 @@ class JobServiceTest {
         verify(jobRepository).save(any(Job.class));
         verify(jobSkillRepository).saveAll(any());
         verify(jobExperienceTagRepository).saveAll(any());
+        verify(jobSkillNormalizationService, never()).saveNormalizedSkills(any(), any());
         verify(outboxEventService).save(
                 eq("JOB"),
                 eq(1L),
@@ -142,6 +147,38 @@ class JobServiceTest {
                 .isInstanceOf(EntityNotFoundException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.EXPERIENCE_TAG_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("요청 스킬이 없으면 JD 텍스트에서 스킬을 정규화해 저장한다")
+    void createJobWithNormalizedSkills() {
+        JobCreateRequest request = createRequestWithoutSkills();
+        Job savedJob = createJobEntity(1L);
+        Skill springBoot = createSkill(1L);
+        JobSkill jobSkill = JobSkill.create(savedJob, springBoot, RequirementType.REQUIRED);
+
+        given(jobRepository.save(any(Job.class))).willReturn(savedJob);
+        given(jobSkillNormalizationService.saveNormalizedSkills(
+                savedJob,
+                request.title(),
+                request.description(),
+                request.roleDetail()
+        )).willReturn(List.of(jobSkill));
+        given(experienceTagCodeRepository.findById("HIGH_TRAFFIC"))
+                .willReturn(Optional.of(createExperienceTagCode("HIGH_TRAFFIC")));
+
+        JobResponse response = jobService.createJob(request);
+
+        assertThat(response.skills()).hasSize(1);
+        assertThat(response.skills().getFirst().name()).isEqualTo("Spring Boot");
+
+        verify(jobSkillNormalizationService).saveNormalizedSkills(
+                savedJob,
+                request.title(),
+                request.description(),
+                request.roleDetail()
+        );
+        verify(jobSkillRepository, never()).saveAll(any());
     }
 
     @Test
@@ -362,6 +399,39 @@ class JobServiceTest {
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 7, 1, 23, 59),
                 List.of(new JobSkillRequest(1L, RequirementType.REQUIRED)),
+                List.of(new JobExperienceTagRequest("HIGH_TRAFFIC", "대용량 트래픽 처리 경험"))
+        );
+    }
+
+    private JobCreateRequest createRequestWithoutSkills() {
+        return new JobCreateRequest(
+                "SARAMIN",
+                "external-1",
+                "백엔드 개발자",
+                "JobFlow",
+                "Spring Boot 기반 백엔드 개발자 채용",
+                "https://example.com/jobs/1",
+                JobRole.BACKEND,
+                "Java/Spring",
+                CareerLevel.JUNIOR,
+                1,
+                3,
+                "BACHELOR",
+                EmploymentType.FULL_TIME,
+                "STARTUP",
+                "IT",
+                "KR",
+                "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                3000,
+                5000,
+                "KRW",
+                true,
+                2,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 1, 23, 59),
+                List.of(),
                 List.of(new JobExperienceTagRequest("HIGH_TRAFFIC", "대용량 트래픽 처리 경험"))
         );
     }
