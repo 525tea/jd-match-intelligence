@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -39,9 +38,17 @@ public class JobService {
     private final JobSearchService jobSearchService;
     private final JobSkillNormalizationService jobSkillNormalizationService;
     private final JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
+    private final JdJobRoleClassificationService jdJobRoleClassificationService;
 
     @Transactional
     public JobResponse createJob(JobCreateRequest request) {
+        JobRole resolvedRole = jdJobRoleClassificationService.resolve(
+                request.role(),
+                request.title(),
+                request.description(),
+                request.roleDetail()
+        );
+
         Job job = Job.create(
                 request.source(),
                 request.externalId(),
@@ -49,7 +56,7 @@ public class JobService {
                 request.companyName(),
                 request.description(),
                 request.url(),
-                request.role(),
+                resolvedRole,
                 request.roleDetail(),
                 request.careerLevel(),
                 request.minExperienceYears(),
