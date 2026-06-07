@@ -120,6 +120,35 @@ class SkillTrendAggregationServiceTest {
         assertThat(trends.get(0).getTrendScore()).isEqualByComparingTo("2");
     }
 
+    @Test
+    @DisplayName("집계 대상이 없으면 해당 월 기존 skill trends도 비운다")
+    void clearMonthlySkillTrendsWhenNoSourceDataExists() {
+        Skill springBoot = skillRepository.save(
+                Skill.create("Spring Boot", "spring boot", SkillCategory.FRAMEWORK)
+        );
+        skillTrendRepository.save(SkillTrend.create(
+                AnalyticsPeriodType.MONTHLY,
+                LocalDate.of(2026, 6, 1),
+                springBoot,
+                10,
+                8,
+                2,
+                java.math.BigDecimal.valueOf(18)
+        ));
+        skillTrendRepository.flush();
+
+        int savedCount = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 1));
+
+        List<SkillTrend> trends = skillTrendRepository
+                .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        LocalDate.of(2026, 6, 1)
+                );
+
+        assertThat(savedCount).isZero();
+        assertThat(trends).isEmpty();
+    }
+
     private Job createJob(String externalId) {
         return Job.create(
                 "ANALYTICS_TEST",
