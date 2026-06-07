@@ -4,15 +4,23 @@ import java.time.Clock;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.job.JobExecution;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(
+        prefix = "jobflow.analytics.skill-trend.scheduler",
+        name = "enabled",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class SkillTrendAggregationScheduler {
 
-    private final SkillTrendAggregationService skillTrendAggregationService;
+    private final SkillTrendAggregationBatchLauncher batchLauncher;
     private final Clock clock;
 
     @Scheduled(
@@ -20,13 +28,27 @@ public class SkillTrendAggregationScheduler {
             initialDelayString = "${jobflow.analytics.skill-trend.initial-delay:60000}"
     )
     public void aggregateCurrentMonthSkillTrends() {
-        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(LocalDate.now(clock));
-        log.info(
-                "Skill trend aggregation completed. periodType={}, periodStart={}, sourceCount={}, savedCount={}",
-                result.periodType(),
-                result.periodStart(),
-                result.sourceCount(),
-                result.savedCount()
-        );
+        LocalDate month = LocalDate.now(clock);
+        LocalDate periodStart = month.withDayOfMonth(1);
+
+        try {
+            JobExecution jobExecution = batchLauncher.launchMonthly(periodStart);
+
+            log.info(
+                    "Skill trend aggregation batch launched. jobName={}, status={}, exitStatus={}, targetMonth={}",
+                    batchLauncher.jobName(),
+                    jobExecution.getStatus(),
+                    jobExecution.getExitStatus(),
+                    periodStart
+            );
+        } catch (Exception exception) {
+            log.warn(
+                    "Skill trend aggregation batch launch failed. jobName={}, targetMonth={}, error={}",
+                    batchLauncher.jobName(),
+                    periodStart,
+                    exception.getMessage(),
+                    exception
+            );
+        }
     }
 }
