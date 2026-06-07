@@ -2,6 +2,12 @@ spring:
   application:
     name: jobflow
 
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: embedded
+
   elasticsearch:
     uris: ${ELASTICSEARCH_URL:http://localhost:9200}
 

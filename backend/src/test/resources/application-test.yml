@@ -5,6 +5,12 @@ spring:
     username: sa
     password:
 
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+
   flyway:
     enabled: false
 
