@@ -12,7 +12,7 @@
 
 ### 기본 동작
 
-일반 API 서버 실행 시 Batch job은 자동 실행되지 않는다.
+Spring Boot의 Batch job 자동 실행은 비활성화되어 있다. 스케줄 실행은 `jobflow.analytics.skill-trend.scheduler.enabled`로 별도 제어한다.
 
 ```yaml
 spring:
@@ -27,6 +27,8 @@ spring:
 jobflow:
   analytics:
     skill-trend:
+      scheduler:
+        enabled: ${SKILL_TREND_AGGREGATION_SCHEDULER_ENABLED:true}
       fixed-delay: ${SKILL_TREND_AGGREGATION_FIXED_DELAY:3600000}
       initial-delay: ${SKILL_TREND_AGGREGATION_INITIAL_DELAY:60000}
 ```
@@ -34,6 +36,7 @@ jobflow:
 ### 수동 실행
 
 특정 월 스킬 트렌드를 한 번 집계하려면 runner를 활성화한다.
+수동 실행만 확인하고 scheduler를 끄고 싶으면 `SKILL_TREND_AGGREGATION_SCHEDULER_ENABLED=false`를 함께 지정한다.
 
 루트 디렉터리에서 실행:
 
@@ -50,6 +53,7 @@ jobflow:
 ### 환경 변수 실행
 
 ```bash
+SKILL_TREND_AGGREGATION_SCHEDULER_ENABLED=false \
 SKILL_TREND_AGGREGATION_RUNNER_ENABLED=true \
 SKILL_TREND_AGGREGATION_TARGET_MONTH=2026-06-01 \
 ./gradlew :backend:bootRun

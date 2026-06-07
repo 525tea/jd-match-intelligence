@@ -35,6 +35,8 @@ app:
 jobflow:
   analytics:
     skill-trend:
+      scheduler:
+        enabled: ${SKILL_TREND_AGGREGATION_SCHEDULER_ENABLED:true}
       fixed-delay: ${SKILL_TREND_AGGREGATION_FIXED_DELAY:3600000}
       initial-delay: ${SKILL_TREND_AGGREGATION_INITIAL_DELAY:60000}
       runner:
