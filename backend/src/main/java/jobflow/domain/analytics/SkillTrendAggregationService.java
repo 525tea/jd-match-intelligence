@@ -17,7 +17,7 @@ public class SkillTrendAggregationService {
     private final SkillTrendRepository skillTrendRepository;
 
     @Transactional
-    public int aggregateMonthly(LocalDate month) {
+    public SkillTrendAggregationResult aggregateMonthly(LocalDate month) {
         LocalDate periodStart = month.withDayOfMonth(1);
         LocalDateTime from = periodStart.atStartOfDay();
         LocalDateTime to = periodStart.plusMonths(1).atStartOfDay();
@@ -39,7 +39,12 @@ public class SkillTrendAggregationService {
                 .toList();
 
         skillTrendRepository.saveAll(skillTrends);
-        return skillTrends.size();
+        return new SkillTrendAggregationResult(
+                AnalyticsPeriodType.MONTHLY,
+                periodStart,
+                aggregates.size(),
+                skillTrends.size()
+        );
     }
 
     private BigDecimal calculateTrendScore(JobSkillTrendAggregate aggregate) {

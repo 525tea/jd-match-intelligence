@@ -62,7 +62,7 @@ class SkillTrendAggregationServiceTest {
         jobSkillRepository.save(JobSkill.create(platformJob, redis, RequirementType.REQUIRED));
         jobSkillRepository.flush();
 
-        int savedCount = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 15));
+        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 15));
 
         List<SkillTrend> trends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
@@ -70,7 +70,10 @@ class SkillTrendAggregationServiceTest {
                         LocalDate.of(2026, 6, 1)
                 );
 
-        assertThat(savedCount).isEqualTo(2);
+        assertThat(result.periodType()).isEqualTo(AnalyticsPeriodType.MONTHLY);
+        assertThat(result.periodStart()).isEqualTo(LocalDate.of(2026, 6, 1));
+        assertThat(result.sourceCount()).isEqualTo(2);
+        assertThat(result.savedCount()).isEqualTo(2);
         assertThat(trends).hasSize(2);
         assertThat(trends.get(0).getSkill().getName()).isEqualTo("Spring Boot");
         assertThat(trends.get(0).getJobCount()).isEqualTo(2);
@@ -105,7 +108,7 @@ class SkillTrendAggregationServiceTest {
         jobSkillRepository.save(JobSkill.create(backendJob, springBoot, RequirementType.REQUIRED));
         jobSkillRepository.flush();
 
-        int savedCount = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 1));
+        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 1));
 
         List<SkillTrend> trends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
@@ -113,7 +116,8 @@ class SkillTrendAggregationServiceTest {
                         LocalDate.of(2026, 6, 1)
                 );
 
-        assertThat(savedCount).isEqualTo(1);
+        assertThat(result.sourceCount()).isEqualTo(1);
+        assertThat(result.savedCount()).isEqualTo(1);
         assertThat(trends).hasSize(1);
         assertThat(trends.get(0).getJobCount()).isEqualTo(1);
         assertThat(trends.get(0).getRequiredCount()).isEqualTo(1);
@@ -137,7 +141,7 @@ class SkillTrendAggregationServiceTest {
         ));
         skillTrendRepository.flush();
 
-        int savedCount = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 1));
+        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 1));
 
         List<SkillTrend> trends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
@@ -145,7 +149,8 @@ class SkillTrendAggregationServiceTest {
                         LocalDate.of(2026, 6, 1)
                 );
 
-        assertThat(savedCount).isZero();
+        assertThat(result.sourceCount()).isZero();
+        assertThat(result.savedCount()).isZero();
         assertThat(trends).isEmpty();
     }
 

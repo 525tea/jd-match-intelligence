@@ -1,5 +1,7 @@
 package jobflow.domain.analytics;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -24,6 +26,14 @@ class SkillTrendAggregationSchedulerTest {
                 skillTrendAggregationService,
                 clock
         );
+
+        given(skillTrendAggregationService.aggregateMonthly(any()))
+                .willReturn(new SkillTrendAggregationResult(
+                        AnalyticsPeriodType.MONTHLY,
+                        LocalDate.of(2026, 6, 1),
+                        2,
+                        2
+                ));
 
         scheduler.aggregateCurrentMonthSkillTrends();
 
