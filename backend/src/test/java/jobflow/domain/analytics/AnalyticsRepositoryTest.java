@@ -1,9 +1,5 @@
 package jobflow.domain.analytics;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.skill.ExperienceTagCode;
@@ -16,6 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -183,6 +185,191 @@ class AnalyticsRepositoryTest {
         assertThat(saved.getSkillJobCount()).isEqualTo(15);
         assertThat(saved.getTagJobCount()).isEqualTo(9);
         assertThat(saved.getComputedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("스킬 트렌드를 trend score 내림차순으로 조회한다")
+    void findSkillTrendsOrderByTrendScoreDesc() {
+        Skill springBoot = skillRepository.save(
+                Skill.create("Spring Boot", "spring boot", SkillCategory.FRAMEWORK)
+        );
+        Skill redis = skillRepository.save(
+                Skill.create("Redis", "redis", SkillCategory.DATABASE)
+        );
+        LocalDate periodStart = LocalDate.of(2026, 6, 1);
+
+        skillTrendRepository.save(SkillTrend.create(
+                AnalyticsPeriodType.MONTHLY,
+                periodStart,
+                springBoot,
+                15,
+                10,
+                5,
+                BigDecimal.valueOf(12.5000)
+        ));
+        skillTrendRepository.save(SkillTrend.create(
+                AnalyticsPeriodType.MONTHLY,
+                periodStart,
+                redis,
+                20,
+                12,
+                8,
+                BigDecimal.valueOf(20.0000)
+        ));
+        skillTrendRepository.flush();
+
+        List<SkillTrend> trends = skillTrendRepository
+                .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        periodStart
+                );
+
+        assertThat(trends)
+                .extracting(trend -> trend.getSkill().getName())
+                .containsExactly("Redis", "Spring Boot");
+    }
+
+    @Test
+    @DisplayName("기준 스킬의 동시 출현 스킬을 lift score 내림차순으로 조회한다")
+    void findSkillCooccurrencesOrderByLiftScoreDesc() {
+        Skill springBoot = skillRepository.save(
+                Skill.create("Spring Boot", "spring boot", SkillCategory.FRAMEWORK)
+        );
+        Skill redis = skillRepository.save(
+                Skill.create("Redis", "redis", SkillCategory.DATABASE)
+        );
+        Skill kafka = skillRepository.save(
+                Skill.create("Kafka", "kafka", SkillCategory.INFRA)
+        );
+        LocalDate periodStart = LocalDate.of(2026, 6, 1);
+
+        skillCooccurrenceRepository.save(SkillCooccurrence.create(
+                AnalyticsPeriodType.MONTHLY,
+                periodStart,
+                springBoot,
+                redis,
+                8,
+                15,
+                10,
+                BigDecimal.valueOf(1.7500)
+        ));
+        skillCooccurrenceRepository.save(SkillCooccurrence.create(
+                AnalyticsPeriodType.MONTHLY,
+                periodStart,
+                springBoot,
+                kafka,
+                6,
+                15,
+                7,
+                BigDecimal.valueOf(2.1000)
+        ));
+        skillCooccurrenceRepository.flush();
+
+        List<SkillCooccurrence> cooccurrences = skillCooccurrenceRepository
+                .findByPeriodTypeAndPeriodStartAndBaseSkillIdOrderByLiftScoreDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        periodStart,
+                        springBoot.getId()
+                );
+
+        assertThat(cooccurrences)
+                .extracting(cooccurrence -> cooccurrence.getCoSkill().getName())
+                .containsExactly("Kafka", "Redis");
+    }
+
+    @Test
+    @DisplayName("직군별 공고 시장 통계를 공고 수 내림차순으로 조회한다")
+    void findJobMarketStatsOrderByJobCountDesc() {
+        LocalDate periodStart = LocalDate.of(2026, 6, 1);
+
+        jobMarketStatsRepository.save(JobMarketStats.create(
+                AnalyticsPeriodType.MONTHLY,
+                periodStart,
+                JobRole.BACKEND,
+                CareerLevel.JUNIOR,
+                "Seoul",
+                "HYBRID",
+                30,
+                25,
+                3,
+                2,
+                BigDecimal.valueOf(1.50),
+                BigDecimal.valueOf(4.00)
+        ));
+        jobMarketStatsRepository.save(JobMarketStats.create(
+                AnalyticsPeriodType.MONTHLY,
+                periodStart,
+                JobRole.BACKEND,
+                CareerLevel.ANY,
+                JobMarketStats.DIMENSION_ALL,
+                JobMarketStats.DIMENSION_ALL,
+                100,
+                90,
+                5,
+                5,
+                BigDecimal.valueOf(2.00),
+                BigDecimal.valueOf(5.00)
+        ));
+        jobMarketStatsRepository.flush();
+
+        List<JobMarketStats> stats = jobMarketStatsRepository
+                .findByPeriodTypeAndPeriodStartAndRoleOrderByJobCountDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        periodStart,
+                        JobRole.BACKEND
+                );
+
+        assertThat(stats)
+                .extracting(JobMarketStats::getJobCount)
+                .containsExactly(100L, 30L);
+    }
+
+    @Test
+    @DisplayName("스킬 기준 경험 태그 시장 집계를 lift score 내림차순으로 조회한다")
+    void findSkillExperienceMarketsOrderByLiftScoreDesc() {
+        Skill springBoot = skillRepository.save(
+                Skill.create("Spring Boot", "spring boot", SkillCategory.FRAMEWORK)
+        );
+        ExperienceTagCode highTraffic = experienceTagCodeRepository.save(
+                createExperienceTagCode("HIGH_TRAFFIC", "대용량 트래픽", "대용량 트래픽 처리 경험")
+        );
+        ExperienceTagCode ciCd = experienceTagCodeRepository.save(
+                createExperienceTagCode("CI_CD", "CI/CD", "빌드, 테스트, 배포 자동화 경험")
+        );
+        LocalDate periodStart = LocalDate.of(2026, 6, 1);
+
+        skillExperienceMarketRepository.save(SkillExperienceMarket.create(
+                AnalyticsPeriodType.MONTHLY,
+                periodStart,
+                springBoot,
+                highTraffic,
+                7,
+                15,
+                9,
+                BigDecimal.valueOf(1.4000)
+        ));
+        skillExperienceMarketRepository.save(SkillExperienceMarket.create(
+                AnalyticsPeriodType.MONTHLY,
+                periodStart,
+                springBoot,
+                ciCd,
+                10,
+                15,
+                12,
+                BigDecimal.valueOf(2.2000)
+        ));
+        skillExperienceMarketRepository.flush();
+
+        List<SkillExperienceMarket> markets = skillExperienceMarketRepository
+                .findByPeriodTypeAndPeriodStartAndSkillIdOrderByLiftScoreDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        periodStart,
+                        springBoot.getId()
+                );
+
+        assertThat(markets)
+                .extracting(market -> market.getTagCode().getCode())
+                .containsExactly("CI_CD", "HIGH_TRAFFIC");
     }
 
     private ExperienceTagCode createExperienceTagCode(
