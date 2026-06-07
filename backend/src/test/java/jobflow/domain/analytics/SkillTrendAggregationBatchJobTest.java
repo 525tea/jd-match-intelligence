@@ -59,6 +59,8 @@ class SkillTrendAggregationBatchJobTest {
     @DisplayName("Batch job 실행 시 월별 skill trends를 저장한다")
     void runSkillTrendAggregationJob() throws Exception {
         String suffix = UUID.randomUUID().toString();
+        LocalDate periodStart = currentPeriodStart();
+        String targetMonth = periodStart.toString();
         Skill springBoot = skillRepository.save(
                 Skill.create("Batch Spring Boot " + suffix, "batch-spring-boot-" + suffix, SkillCategory.FRAMEWORK)
         );
@@ -79,12 +81,12 @@ class SkillTrendAggregationBatchJobTest {
         jobSkillRepository.save(JobSkill.create(platformJob, redis, RequirementType.REQUIRED));
         jobSkillRepository.flush();
 
-        JobExecution jobExecution = runBatch("2026-06-01", nextRequestedAt());
+        JobExecution jobExecution = runBatch(targetMonth, nextRequestedAt());
 
         List<SkillTrend> trends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
                         AnalyticsPeriodType.MONTHLY,
-                        LocalDate.of(2026, 6, 1)
+                        periodStart
                 );
 
         assertThat(jobExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
@@ -107,6 +109,8 @@ class SkillTrendAggregationBatchJobTest {
     @DisplayName("같은 월 Batch job 재실행 시 기존 월별 집계를 교체한다")
     void rerunSkillTrendAggregationJob() throws Exception {
         String suffix = UUID.randomUUID().toString();
+        LocalDate periodStart = currentPeriodStart();
+        String targetMonth = periodStart.toString();
         Skill firstSkill = skillRepository.save(
                 Skill.create("Batch Kotlin " + suffix, "batch-kotlin-" + suffix, SkillCategory.LANGUAGE)
         );
@@ -115,7 +119,7 @@ class SkillTrendAggregationBatchJobTest {
         );
         skillTrendRepository.save(SkillTrend.create(
                 AnalyticsPeriodType.MONTHLY,
-                LocalDate.of(2026, 6, 1),
+                periodStart,
                 staleSkill,
                 99,
                 99,
@@ -130,12 +134,13 @@ class SkillTrendAggregationBatchJobTest {
         jobSkillRepository.save(JobSkill.create(firstJob, firstSkill, RequirementType.REQUIRED));
         jobSkillRepository.flush();
 
-        JobExecution firstExecution = runBatch("2026-06-01", nextRequestedAt());
+        JobExecution firstExecution = runBatch(targetMonth, nextRequestedAt());
+
 
         List<SkillTrend> firstTrends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
                         AnalyticsPeriodType.MONTHLY,
-                        LocalDate.of(2026, 6, 1)
+                        periodStart
                 );
 
         assertThat(firstExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
@@ -154,12 +159,12 @@ class SkillTrendAggregationBatchJobTest {
         jobSkillRepository.save(JobSkill.create(secondJob, secondSkill, RequirementType.PREFERRED));
         jobSkillRepository.flush();
 
-        JobExecution secondExecution = runBatch("2026-06-01", nextRequestedAt());
+        JobExecution secondExecution = runBatch(targetMonth, nextRequestedAt());
 
         List<SkillTrend> secondTrends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
                         AnalyticsPeriodType.MONTHLY,
-                        LocalDate.of(2026, 6, 1)
+                        periodStart
                 );
 
         assertThat(secondExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
@@ -167,6 +172,10 @@ class SkillTrendAggregationBatchJobTest {
                 .extracting(trend -> trend.getSkill().getId())
                 .contains(firstSkill.getId(), secondSkill.getId())
                 .doesNotContain(staleSkill.getId());
+    }
+
+    private LocalDate currentPeriodStart() {
+        return LocalDate.now().withDayOfMonth(1);
     }
 
     private long nextRequestedAt() {
