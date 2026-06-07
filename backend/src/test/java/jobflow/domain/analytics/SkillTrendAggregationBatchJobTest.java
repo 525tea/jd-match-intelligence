@@ -2,11 +2,8 @@ package jobflow.domain.analytics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import jobflow.domain.job.CareerLevel;
@@ -26,22 +23,22 @@ import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.job.JobExecution;
 import org.springframework.batch.core.job.parameters.JobParametersBuilder;
-import org.springframework.batch.test.JobLauncherTestUtils;
-import org.springframework.batch.test.context.SpringBatchTest;
+import org.springframework.batch.core.launch.JobOperator;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
 
-@SpringBatchTest
 @SpringBootTest
 @ActiveProfiles("test")
 class SkillTrendAggregationBatchJobTest {
 
     @Autowired
-    private JobLauncherTestUtils jobLauncherTestUtils;
+    private JobOperator jobOperator;
+
+    @Autowired
+    @Qualifier(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_JOB)
+    private org.springframework.batch.core.job.Job skillTrendAggregationJob;
 
     @Autowired
     private SkillTrendRepository skillTrendRepository;
@@ -72,8 +69,10 @@ class SkillTrendAggregationBatchJobTest {
         jobSkillRepository.save(JobSkill.create(platformJob, redis, RequirementType.REQUIRED));
         jobSkillRepository.flush();
 
-        JobExecution jobExecution = jobLauncherTestUtils.launchJob(
+        JobExecution jobExecution = jobOperator.start(
+                skillTrendAggregationJob,
                 new JobParametersBuilder()
+                        .addString("targetMonth", "2026-06-01")
                         .addString("run.id", UUID.randomUUID().toString())
                         .toJobParameters()
         );
@@ -126,18 +125,5 @@ class SkillTrendAggregationBatchJobTest {
                 LocalDateTime.of(2026, 6, 1, 9, 0),
                 LocalDateTime.of(2026, 7, 1, 23, 59)
         );
-    }
-
-    @TestConfiguration
-    static class FixedClockTestConfig {
-
-        @Bean
-        @Primary
-        Clock fixedClock() {
-            return Clock.fixed(
-                    Instant.parse("2026-06-07T01:30:00Z"),
-                    ZoneId.of("Asia/Seoul")
-            );
-        }
     }
 }

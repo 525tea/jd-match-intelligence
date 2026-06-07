@@ -1,6 +1,5 @@
 package jobflow.domain.analytics;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +22,6 @@ public class SkillTrendAggregationBatchConfig {
     public static final String SKILL_TREND_AGGREGATION_STEP = "skillTrendAggregationStep";
 
     private final SkillTrendAggregationService skillTrendAggregationService;
-    private final Clock clock;
 
     @Bean(SKILL_TREND_AGGREGATION_JOB)
     public Job skillTrendAggregationJob(
@@ -42,8 +40,12 @@ public class SkillTrendAggregationBatchConfig {
     ) {
         return new StepBuilder(SKILL_TREND_AGGREGATION_STEP, batchJobRepository)
                 .tasklet((contribution, chunkContext) -> {
+                    String targetMonth = chunkContext.getStepContext()
+                            .getJobParameters()
+                            .get("targetMonth")
+                            .toString();
                     SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(
-                            LocalDate.now(clock)
+                            LocalDate.parse(targetMonth)
                     );
                     log.info(
                             "Skill trend aggregation batch step completed. periodType={}, periodStart={}, sourceCount={}, savedCount={}",
