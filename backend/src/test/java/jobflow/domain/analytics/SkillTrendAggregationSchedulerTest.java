@@ -1,42 +1,39 @@
 package jobflow.domain.analytics;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.batch.core.job.Job;
+import org.springframework.batch.core.launch.JobOperator;
 
 class SkillTrendAggregationSchedulerTest {
 
     @Test
-    @DisplayName("스케줄러는 현재 월 스킬 트렌드 집계를 서비스에 위임한다")
-    void aggregateCurrentMonthSkillTrends() {
-        SkillTrendAggregationService skillTrendAggregationService = mock(SkillTrendAggregationService.class);
+    @DisplayName("스케줄러는 현재 월 스킬 트렌드 Batch Job을 실행한다")
+    void aggregateCurrentMonthSkillTrends() throws Exception {
+        JobOperator jobOperator = mock(JobOperator.class);
+        Job skillTrendAggregationJob = mock(Job.class);
         Clock clock = Clock.fixed(
                 Instant.parse("2026-06-07T01:30:00Z"),
                 ZoneId.of("Asia/Seoul")
         );
         SkillTrendAggregationScheduler scheduler = new SkillTrendAggregationScheduler(
-                skillTrendAggregationService,
+                jobOperator,
+                skillTrendAggregationJob,
                 clock
         );
 
-        given(skillTrendAggregationService.aggregateMonthly(any()))
-                .willReturn(new SkillTrendAggregationResult(
-                        AnalyticsPeriodType.MONTHLY,
-                        LocalDate.of(2026, 6, 1),
-                        2,
-                        2
-                ));
-
         scheduler.aggregateCurrentMonthSkillTrends();
 
-        verify(skillTrendAggregationService).aggregateMonthly(LocalDate.of(2026, 6, 7));
+        verify(jobOperator).start(eq(skillTrendAggregationJob), org.mockito.ArgumentMatchers.argThat(parameters ->
+                "2026-06-01".equals(parameters.getString("targetMonth"))
+                        && parameters.getLong("requestedAt") == clock.millis()
+        ));
     }
 }
