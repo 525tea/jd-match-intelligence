@@ -14,7 +14,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.JobRole;
-import jobflow.domain.job.RemoteType;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -24,6 +23,8 @@ import lombok.NoArgsConstructor;
 @Table(name = "job_market_stats")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class JobMarketStats {
+
+    public static final String DIMENSION_ALL = "ALL";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,11 +46,10 @@ public class JobMarketStats {
     private CareerLevel careerLevel;
 
     @Column(nullable = false, length = 100)
-    private String locationRegion = "ALL";
+    private String locationRegion = DIMENSION_ALL;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private RemoteType remoteType;
+    private String remoteType = DIMENSION_ALL;
 
     @Column(nullable = false)
     private long jobCount;
@@ -78,7 +78,7 @@ public class JobMarketStats {
             JobRole role,
             CareerLevel careerLevel,
             String locationRegion,
-            RemoteType remoteType,
+            String remoteType,
             long jobCount,
             long openJobCount,
             long closedJobCount,
@@ -91,8 +91,8 @@ public class JobMarketStats {
         stats.periodStart = periodStart;
         stats.role = role;
         stats.careerLevel = careerLevel;
-        stats.locationRegion = locationRegion;
-        stats.remoteType = remoteType;
+        stats.locationRegion = normalizeDimension(locationRegion);
+        stats.remoteType = normalizeDimension(remoteType);
         stats.jobCount = jobCount;
         stats.openJobCount = openJobCount;
         stats.closedJobCount = closedJobCount;
@@ -100,6 +100,14 @@ public class JobMarketStats {
         stats.avgMinExperienceYears = avgMinExperienceYears;
         stats.avgMaxExperienceYears = avgMaxExperienceYears;
         return stats;
+    }
+
+    private static String normalizeDimension(String value) {
+        if (value == null || value.isBlank()) {
+            return DIMENSION_ALL;
+        }
+
+        return value;
     }
 
     @PrePersist
