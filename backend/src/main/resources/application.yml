@@ -25,3 +25,9 @@ app:
   oauth2:
     success-redirect-uri: ${OAUTH2_SUCCESS_REDIRECT_URI:http://localhost:3000/oauth2/success}
     failure-redirect-uri: ${OAUTH2_FAILURE_REDIRECT_URI:http://localhost:3000/oauth2/failure}
+
+jobflow:
+  analytics:
+    skill-trend:
+      fixed-delay: ${SKILL_TREND_AGGREGATION_FIXED_DELAY:3600000}
+      initial-delay: ${SKILL_TREND_AGGREGATION_INITIAL_DELAY:60000}
