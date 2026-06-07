@@ -18,9 +18,11 @@ class SkillTrendAggregationBatchConfigTest {
     @DisplayName("스킬 트렌드 집계 Batch Job과 Step을 등록한다")
     void registerSkillTrendAggregationJobAndStep(
             @Qualifier(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_JOB) Job job,
-            @Qualifier(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_STEP) Step step
+            @Qualifier(SkillTrendAggregationBatchConfig.SKILL_TREND_CLEAR_STEP) Step clearStep,
+            @Qualifier(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_STEP) Step aggregationStep
     ) {
         assertThat(job.getName()).isEqualTo(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_JOB);
-        assertThat(step.getName()).isEqualTo(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_STEP);
+        assertThat(clearStep.getName()).isEqualTo(SkillTrendAggregationBatchConfig.SKILL_TREND_CLEAR_STEP);
+        assertThat(aggregationStep.getName()).isEqualTo(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_STEP);
     }
 }
