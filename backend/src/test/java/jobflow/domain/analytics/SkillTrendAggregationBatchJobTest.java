@@ -28,10 +28,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import java.util.concurrent.atomic.AtomicLong;
 
 @SpringBootTest
 @ActiveProfiles("test")
 class SkillTrendAggregationBatchJobTest {
+
+    private static final AtomicLong REQUESTED_AT_SEQUENCE = new AtomicLong(1000L);
 
     @Autowired
     private JobOperator jobOperator;
@@ -55,27 +58,28 @@ class SkillTrendAggregationBatchJobTest {
     @Test
     @DisplayName("Batch job 실행 시 월별 skill trends를 저장한다")
     void runSkillTrendAggregationJob() throws Exception {
+        String suffix = UUID.randomUUID().toString();
         Skill springBoot = skillRepository.save(
-                Skill.create("Spring Boot", "spring boot", SkillCategory.FRAMEWORK)
+                Skill.create("Batch Spring Boot " + suffix, "batch-spring-boot-" + suffix, SkillCategory.FRAMEWORK)
         );
         Skill redis = skillRepository.save(
-                Skill.create("Redis", "redis", SkillCategory.DATABASE)
+                Skill.create("Batch Redis " + suffix, "batch-redis-" + suffix, SkillCategory.DATABASE)
         );
-        Job backendJob = jobRepository.save(createJob("batch-backend-spring"));
-        Job platformJob = jobRepository.save(createJob("batch-platform-spring-redis"));
+        Job backendJob = jobRepository.save(createJob(
+                "batch-backend-spring-" + suffix,
+                LocalDateTime.of(2026, 6, 1, 9, 0)
+        ));
+        Job platformJob = jobRepository.save(createJob(
+                "batch-platform-spring-redis-" + suffix,
+                LocalDateTime.of(2026, 6, 2, 9, 0)
+        ));
 
         jobSkillRepository.save(JobSkill.create(backendJob, springBoot, RequirementType.REQUIRED));
         jobSkillRepository.save(JobSkill.create(platformJob, springBoot, RequirementType.PREFERRED));
         jobSkillRepository.save(JobSkill.create(platformJob, redis, RequirementType.REQUIRED));
         jobSkillRepository.flush();
 
-        JobExecution jobExecution = jobOperator.start(
-                skillTrendAggregationJob,
-                new JobParametersBuilder()
-                        .addString("targetMonth", "2026-06-01")
-                        .addString("run.id", UUID.randomUUID().toString())
-                        .toJobParameters()
-        );
+        JobExecution jobExecution = runBatch("2026-06-01", nextRequestedAt());
 
         List<SkillTrend> trends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
@@ -84,19 +88,109 @@ class SkillTrendAggregationBatchJobTest {
                 );
 
         assertThat(jobExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
-        assertThat(trends).hasSize(2);
-        assertThat(trends.get(0).getSkill().getId()).isEqualTo(springBoot.getId());
-        assertThat(trends.get(0).getJobCount()).isEqualTo(2);
-        assertThat(trends.get(0).getRequiredCount()).isEqualTo(1);
-        assertThat(trends.get(0).getPreferredCount()).isEqualTo(1);
+        assertThat(trends)
+                .extracting(trend -> trend.getSkill().getId())
+                .contains(springBoot.getId(), redis.getId());
 
-        assertThat(trends.get(1).getSkill().getId()).isEqualTo(redis.getId());
-        assertThat(trends.get(1).getJobCount()).isEqualTo(1);
-        assertThat(trends.get(1).getRequiredCount()).isEqualTo(1);
-        assertThat(trends.get(1).getPreferredCount()).isEqualTo(0);
+        SkillTrend springBootTrend = findTrend(trends, springBoot);
+        assertThat(springBootTrend.getJobCount()).isEqualTo(2);
+        assertThat(springBootTrend.getRequiredCount()).isEqualTo(1);
+        assertThat(springBootTrend.getPreferredCount()).isEqualTo(1);
+
+        SkillTrend redisTrend = findTrend(trends, redis);
+        assertThat(redisTrend.getJobCount()).isEqualTo(1);
+        assertThat(redisTrend.getRequiredCount()).isEqualTo(1);
+        assertThat(redisTrend.getPreferredCount()).isEqualTo(0);
     }
 
-    private Job createJob(String externalId) {
+    @Test
+    @DisplayName("같은 월 Batch job 재실행 시 기존 월별 집계를 교체한다")
+    void rerunSkillTrendAggregationJob() throws Exception {
+        String suffix = UUID.randomUUID().toString();
+        Skill firstSkill = skillRepository.save(
+                Skill.create("Batch Kotlin " + suffix, "batch-kotlin-" + suffix, SkillCategory.LANGUAGE)
+        );
+        Skill staleSkill = skillRepository.save(
+                Skill.create("Batch Stale " + suffix, "batch-stale-" + suffix, SkillCategory.TOOL)
+        );
+        skillTrendRepository.save(SkillTrend.create(
+                AnalyticsPeriodType.MONTHLY,
+                LocalDate.of(2026, 6, 1),
+                staleSkill,
+                99,
+                99,
+                0,
+                java.math.BigDecimal.valueOf(198)
+        ));
+
+        Job firstJob = jobRepository.save(createJob(
+                "batch-rerun-kotlin-" + suffix,
+                LocalDateTime.of(2026, 5, 1, 9, 0)
+        ));
+        jobSkillRepository.save(JobSkill.create(firstJob, firstSkill, RequirementType.REQUIRED));
+        jobSkillRepository.flush();
+
+        JobExecution firstExecution = runBatch("2026-06-01", nextRequestedAt());
+
+        List<SkillTrend> firstTrends = skillTrendRepository
+                .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        LocalDate.of(2026, 6, 1)
+                );
+
+        assertThat(firstExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
+        assertThat(firstTrends)
+                .extracting(trend -> trend.getSkill().getId())
+                .contains(firstSkill.getId())
+                .doesNotContain(staleSkill.getId());
+
+        Skill secondSkill = skillRepository.save(
+                Skill.create("Batch Kafka " + suffix, "batch-kafka-" + suffix, SkillCategory.INFRA)
+        );
+        Job secondJob = jobRepository.save(createJob(
+                "batch-rerun-kafka-" + suffix,
+                LocalDateTime.of(2026, 5, 2, 9, 0)
+        ));
+        jobSkillRepository.save(JobSkill.create(secondJob, secondSkill, RequirementType.PREFERRED));
+        jobSkillRepository.flush();
+
+        JobExecution secondExecution = runBatch("2026-06-01", nextRequestedAt());
+
+        List<SkillTrend> secondTrends = skillTrendRepository
+                .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        LocalDate.of(2026, 6, 1)
+                );
+
+        assertThat(secondExecution.getExitStatus()).isEqualTo(ExitStatus.COMPLETED);
+        assertThat(secondTrends)
+                .extracting(trend -> trend.getSkill().getId())
+                .contains(firstSkill.getId(), secondSkill.getId())
+                .doesNotContain(staleSkill.getId());
+    }
+
+    private long nextRequestedAt() {
+        return REQUESTED_AT_SEQUENCE.incrementAndGet();
+    }
+
+    private JobExecution runBatch(String targetMonth, long requestedAt) throws Exception {
+        return jobOperator.start(
+                skillTrendAggregationJob,
+                new JobParametersBuilder()
+                        .addString("targetMonth", targetMonth)
+                        .addLong("requestedAt", requestedAt)
+                        .toJobParameters()
+        );
+    }
+
+    private SkillTrend findTrend(List<SkillTrend> trends, Skill skill) {
+        return trends.stream()
+                .filter(trend -> trend.getSkill().getId().equals(skill.getId()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private Job createJob(String externalId, LocalDateTime createdAt) {
         return Job.create(
                 "ANALYTICS_BATCH_TEST",
                 externalId,
@@ -122,7 +216,7 @@ class SkillTrendAggregationBatchJobTest {
                 "KRW",
                 false,
                 null,
-                LocalDateTime.of(2026, 6, 1, 9, 0),
+                createdAt,
                 LocalDateTime.of(2026, 7, 1, 23, 59)
         );
     }
