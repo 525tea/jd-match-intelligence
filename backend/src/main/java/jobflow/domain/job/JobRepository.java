@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import jobflow.domain.analytics.JobMarketStatsAggregate;
 
 @Repository("jobDomainRepository")
 public interface JobRepository extends JpaRepository<Job, Long> {
@@ -22,6 +23,34 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
             LocalDateTime from,
             LocalDateTime to
+    );
+
+    @Query("""
+        SELECT new jobflow.domain.analytics.JobMarketStatsAggregate(
+            job.role,
+            job.careerLevel,
+            job.locationRegion,
+            job.remoteType,
+            COUNT(job.id),
+            SUM(CASE WHEN job.status = jobflow.domain.job.JobStatus.OPEN THEN 1L ELSE 0L END),
+            SUM(CASE WHEN job.status = jobflow.domain.job.JobStatus.CLOSED THEN 1L ELSE 0L END),
+            SUM(CASE WHEN job.status = jobflow.domain.job.JobStatus.EXPIRED THEN 1L ELSE 0L END),
+            AVG(job.minExperienceYears),
+            AVG(job.maxExperienceYears)
+        )
+        FROM Job job
+        WHERE job.createdAt >= :from
+          AND job.createdAt < :to
+        GROUP BY
+            job.role,
+            job.careerLevel,
+            job.locationRegion,
+            job.remoteType
+        ORDER BY COUNT(job.id) DESC, job.role ASC, job.careerLevel ASC
+        """)
+    List<JobMarketStatsAggregate> aggregateJobMarketStats(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
     );
 
     @Query(
