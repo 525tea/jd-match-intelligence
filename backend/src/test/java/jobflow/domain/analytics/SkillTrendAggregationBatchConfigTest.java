@@ -19,10 +19,14 @@ class SkillTrendAggregationBatchConfigTest {
     void registerSkillTrendAggregationJobAndStep(
             @Qualifier(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_JOB) Job job,
             @Qualifier(SkillTrendAggregationBatchConfig.SKILL_TREND_CLEAR_STEP) Step clearStep,
-            @Qualifier(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_STEP) Step aggregationStep
+            @Qualifier(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_STEP) Step aggregationStep,
+            @Qualifier(SkillTrendAggregationBatchConfig.SKILL_MARKET_AGGREGATION_STEP) Step marketAggregationStep
     ) {
         assertThat(job.getName()).isEqualTo(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_JOB);
         assertThat(clearStep.getName()).isEqualTo(SkillTrendAggregationBatchConfig.SKILL_TREND_CLEAR_STEP);
         assertThat(aggregationStep.getName()).isEqualTo(SkillTrendAggregationBatchConfig.SKILL_TREND_AGGREGATION_STEP);
+        assertThat(marketAggregationStep.getName()).isEqualTo(
+                SkillTrendAggregationBatchConfig.SKILL_MARKET_AGGREGATION_STEP
+        );
     }
 }
