@@ -1,13 +1,17 @@
 # JobFlow Backend Runbook
 
-## Skill Trend Aggregation Batch
+## Analytics Aggregation Batch
 
-월별 스킬 트렌드는 Spring Batch job으로 집계한다.
+월별 Analytics 집계는 Spring Batch job으로 실행한다.
 
 - Job name: `skillTrendAggregationJob`
 - Clear step: `skillTrendClearStep`
-- Aggregation step: `skillTrendAggregationStep`
-- Target table: `skill_trends`
+- Skill trend aggregation step: `skillTrendAggregationStep`
+- Skill market aggregation step: `skillMarketAggregationStep`
+- Target tables:
+    - `skill_trends`
+    - `skill_cooccurrence`
+    - `skill_experience_market`
 - Target period: monthly, first day of month
 
 ### 기본 동작
@@ -22,6 +26,7 @@ spring:
 ```
 
 스케줄러는 `SkillTrendAggregationBatchLauncher`를 통해 현재 월 Batch job을 실행한다.
+이 job은 스킬 트렌드 집계 이후 스킬 동시 등장과 스킬-경험 태그 시장 집계를 이어서 수행한다.
 
 ```yaml
 jobflow:
@@ -35,7 +40,7 @@ jobflow:
 
 ### 수동 실행
 
-특정 월 스킬 트렌드를 한 번 집계하려면 runner를 활성화한다.
+특정 월 Analytics 집계를 한 번 실행하려면 runner를 활성화한다.
 수동 실행만 확인하고 scheduler를 끄고 싶으면 `SKILL_TREND_AGGREGATION_SCHEDULER_ENABLED=false`를 함께 지정한다.
 
 루트 디렉터리에서 실행:
@@ -65,7 +70,7 @@ SKILL_TREND_AGGREGATION_TARGET_MONTH=2026-06-01 \
 
 `requestedAt`은 Batch JobInstance를 구분하기 위한 실행 요청 시각이다. 같은 `targetMonth`라도 `requestedAt`이 다르면 별도 Batch 실행으로 기록된다.
 
-재실행 시 같은 월의 기존 `skill_trends`는 먼저 삭제되고, 현재 `job_skills` 기준으로 다시 생성된다.
+재실행 시 같은 월의 기존 `skill_trends`, `skill_cooccurrence`, `skill_experience_market`는 먼저 삭제되고, 현재 `job_skills`, `job_experience_tags` 기준으로 다시 생성된다.
 
 ### 검증 쿼리
 
@@ -80,10 +85,16 @@ SELECT
     st.trend_score,
     st.computed_at
 FROM skill_trends st
-JOIN skills s ON s.id = st.skill_id
+         JOIN skills s ON s.id = st.skill_id
 WHERE st.period_type = 'MONTHLY'
   AND st.period_start = '2026-06-01'
 ORDER BY st.trend_score DESC, st.job_count DESC;
+```
+
+스킬 동시 등장과 스킬-경험 태그 시장 집계는 아래 SQL 파일로 함께 확인한다.
+
+```bash
+docker compose exec -T mysql mysql -u jobflow -pjobflow jobflow < performance/sql/analytics-market-aggregation-check.sql
 ```
 
 ### 테스트
@@ -94,5 +105,7 @@ ORDER BY st.trend_score DESC, st.job_count DESC;
   --tests jobflow.domain.analytics.SkillTrendAggregationBatchJobTest \
   --tests jobflow.domain.analytics.SkillTrendAggregationBatchLauncherTest \
   --tests jobflow.domain.analytics.SkillTrendAggregationBatchRunnerTest \
-  --tests jobflow.domain.analytics.SkillTrendAggregationSchedulerTest
+  --tests jobflow.domain.analytics.SkillTrendAggregationSchedulerTest \
+  --tests jobflow.domain.analytics.SkillMarketAggregationServiceTest \
+  --tests jobflow.domain.analytics.JobMarketAggregationRepositoryTest
 ```
