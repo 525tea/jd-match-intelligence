@@ -13,7 +13,7 @@ FROM skill_trends st
 WHERE st.period_type = 'MONTHLY'
   AND st.period_start = @target_month
 ORDER BY st.trend_score DESC, st.job_count DESC, s.name ASC
-    LIMIT 20;
+LIMIT 20;
 
 SELECT
     sc.period_type,
@@ -30,7 +30,7 @@ FROM skill_cooccurrence sc
 WHERE sc.period_type = 'MONTHLY'
   AND sc.period_start = @target_month
 ORDER BY sc.lift_score DESC, sc.cooccurrence_count DESC, base.name ASC, co.name ASC
-    LIMIT 20;
+LIMIT 20;
 
 SELECT
     sem.period_type,
@@ -47,4 +47,28 @@ FROM skill_experience_market sem
 WHERE sem.period_type = 'MONTHLY'
   AND sem.period_start = @target_month
 ORDER BY sem.lift_score DESC, sem.job_count DESC, s.name ASC, etc.name ASC
-    LIMIT 20;
+LIMIT 20;
+
+SELECT
+    jms.period_type,
+    jms.period_start,
+    jms.role,
+    jms.career_level,
+    jms.location_region,
+    jms.remote_type,
+    jms.job_count,
+    jms.open_job_count,
+    jms.closed_job_count,
+    jms.expired_job_count,
+    jms.avg_min_experience_years,
+    jms.avg_max_experience_years
+FROM job_market_stats jms
+WHERE jms.period_type = 'MONTHLY'
+  AND jms.period_start = @target_month
+ORDER BY jms.job_count DESC,
+         jms.open_job_count DESC,
+         jms.role ASC,
+         jms.career_level ASC,
+         jms.location_region ASC,
+         jms.remote_type ASC
+LIMIT 20;
