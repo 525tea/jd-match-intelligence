@@ -32,8 +32,10 @@ public class SkillTrendAggregationBatchConfig {
     public static final String SKILL_TREND_AGGREGATION_JOB = "skillTrendAggregationJob";
     public static final String SKILL_TREND_CLEAR_STEP = "skillTrendClearStep";
     public static final String SKILL_TREND_AGGREGATION_STEP = "skillTrendAggregationStep";
+    public static final String SKILL_MARKET_AGGREGATION_STEP = "skillMarketAggregationStep";
 
     private static final int SKILL_TREND_CHUNK_SIZE = 500;
+    private final SkillMarketAggregationService skillMarketAggregationService;
 
     private final JobSkillRepository jobSkillRepository;
     private final SkillTrendRepository skillTrendRepository;
@@ -42,11 +44,13 @@ public class SkillTrendAggregationBatchConfig {
     public Job skillTrendAggregationJob(
             JobRepository batchJobRepository,
             @Qualifier(SKILL_TREND_CLEAR_STEP) Step skillTrendClearStep,
-            @Qualifier(SKILL_TREND_AGGREGATION_STEP) Step skillTrendAggregationStep
+            @Qualifier(SKILL_TREND_AGGREGATION_STEP) Step skillTrendAggregationStep,
+            @Qualifier(SKILL_MARKET_AGGREGATION_STEP) Step skillMarketAggregationStep
     ) {
         return new JobBuilder(SKILL_TREND_AGGREGATION_JOB, batchJobRepository)
                 .start(skillTrendClearStep)
                 .next(skillTrendAggregationStep)
+                .next(skillMarketAggregationStep)
                 .build();
     }
 
@@ -87,6 +91,36 @@ public class SkillTrendAggregationBatchConfig {
                 .processor(skillTrendAggregationProcessor)
                 .writer(skillTrendAggregationWriter)
                 .transactionManager(transactionManager)
+                .build();
+    }
+
+    @Bean(SKILL_MARKET_AGGREGATION_STEP)
+    public Step skillMarketAggregationStep(
+            JobRepository batchJobRepository,
+            PlatformTransactionManager transactionManager
+    ) {
+        return new StepBuilder(SKILL_MARKET_AGGREGATION_STEP, batchJobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    LocalDate periodStart = parseTargetMonth(
+                            chunkContext.getStepContext().getJobParameters().get("targetMonth").toString()
+                    );
+
+                    SkillMarketAggregationResult result = skillMarketAggregationService.aggregateMonthly(periodStart);
+
+                    log.info(
+                            "Skill market aggregation step completed. periodType={}, periodStart={}, "
+                                    + "cooccurrenceSourceCount={}, cooccurrenceSavedCount={}, "
+                                    + "skillExperienceSourceCount={}, skillExperienceSavedCount={}",
+                            result.periodType(),
+                            result.periodStart(),
+                            result.cooccurrenceSourceCount(),
+                            result.cooccurrenceSavedCount(),
+                            result.skillExperienceSourceCount(),
+                            result.skillExperienceSavedCount()
+                    );
+
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
                 .build();
     }
 
