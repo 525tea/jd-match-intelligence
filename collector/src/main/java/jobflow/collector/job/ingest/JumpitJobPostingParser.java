@@ -1,6 +1,10 @@
 package jobflow.collector.job.ingest;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
 import jobflow.collector.job.RemoteType;
@@ -12,6 +16,19 @@ import org.springframework.stereotype.Component;
 public class JumpitJobPostingParser implements JobPostingParser {
 
     private static final String CRAWLER_VERSION = "jumpit-parser-0.1";
+    private static final Pattern KOREAN_DATE_PATTERN =
+            Pattern.compile("(20\\d{2})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})\\.");
+    private static final List<String> INVALID_TITLE_KEYWORDS = List.of(
+            "점핏",
+            "점핏 | 개발 직무 탐색",
+            "개발 직무 탐색"
+    );
+    private static final List<String> INVALID_COMPANY_KEYWORDS = List.of(
+            "기업 정보 보기",
+            "회사 정보 보기",
+            "점핏"
+    );
+
     private final JdJobRoleClassificationService jdJobRoleClassificationService;
 
     public JumpitJobPostingParser(JdJobRoleClassificationService jdJobRoleClassificationService) {
@@ -33,28 +50,31 @@ public class JumpitJobPostingParser implements JobPostingParser {
 
         Document document = Jsoup.parse(fetchedJobPosting.body(), fetchedJobPosting.detailUrl());
         String pageText = normalize(document.text());
-        String title = firstText(
+        String title = cleanTitle(firstValidText(
                 document,
                 "[data-testid=position-title]",
                 "[data-testid=job-title]",
                 ".position-title",
                 "h1",
                 "meta[property=og:title]"
-        );
-        String companyName = firstText(
+        ));
+        String companyName = firstValidCompanyText(
                 document,
                 "[data-testid=company-name]",
+                "[data-testid=company]",
+                "[class*=companyName]",
+                "[class*=company-name]",
                 ".company-name",
-                ".company",
-                "meta[property=og:site_name]"
+                ".company"
         );
-        String description = firstText(
+        String description = firstValidText(
                 document,
                 "[data-testid=position-description]",
                 "[data-testid=job-description]",
+                "[class*=position-description]",
+                "[class*=job-description]",
                 ".position-description",
-                "main",
-                "body"
+                "main"
         );
 
         validateRequired("title", title, fetchedJobPosting);
@@ -82,7 +102,7 @@ public class JumpitJobPostingParser implements JobPostingParser {
                 null,
                 "KR",
                 inferRegion(pageText),
-                null,
+                inferCity(pageText),
                 inferRemoteType(pageText),
                 null,
                 null,
@@ -90,7 +110,7 @@ public class JumpitJobPostingParser implements JobPostingParser {
                 false,
                 null,
                 null,
-                null,
+                inferDeadlineAt(pageText),
                 now,
                 now,
                 null,
@@ -99,11 +119,23 @@ public class JumpitJobPostingParser implements JobPostingParser {
         );
     }
 
-    private String firstText(Document document, String... selectors) {
+    private String firstValidText(Document document, String... selectors) {
         for (String selector : selectors) {
             String value = text(document, selector);
 
-            if (!value.isBlank()) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+
+        return "";
+    }
+
+    private String firstValidCompanyText(Document document, String... selectors) {
+        for (String selector : selectors) {
+            String value = text(document, selector);
+
+            if (value != null && !value.isBlank() && !containsAny(value, INVALID_COMPANY_KEYWORDS.toArray(String[]::new))) {
                 return value;
             }
         }
@@ -202,6 +234,49 @@ public class JumpitJobPostingParser implements JobPostingParser {
         return null;
     }
 
+    private String inferCity(String pageText) {
+        if (containsAny(pageText, "강남")) {
+            return "Gangnam";
+        }
+
+        if (containsAny(pageText, "서초")) {
+            return "Seocho";
+        }
+
+        if (containsAny(pageText, "성동")) {
+            return "Seongdong";
+        }
+
+        if (containsAny(pageText, "판교", "분당")) {
+            return "Bundang";
+        }
+
+        return null;
+    }
+
+    private LocalDateTime inferDeadlineAt(String pageText) {
+        Matcher matcher = KOREAN_DATE_PATTERN.matcher(pageText);
+
+        while (matcher.find()) {
+            int end = Math.min(pageText.length(), matcher.end() + 12);
+            String dateContext = pageText.substring(matcher.start(), end);
+
+            if (!dateContext.contains("마감")) {
+                continue;
+            }
+
+            LocalDate date = LocalDate.of(
+                    Integer.parseInt(matcher.group(1)),
+                    Integer.parseInt(matcher.group(2)),
+                    Integer.parseInt(matcher.group(3))
+            );
+
+            return date.atTime(23, 59);
+        }
+
+        return null;
+    }
+
     private boolean containsAny(String text, String... keywords) {
         for (String keyword : keywords) {
             if (text.contains(keyword)) {
@@ -210,6 +285,20 @@ public class JumpitJobPostingParser implements JobPostingParser {
         }
 
         return false;
+    }
+
+    private String cleanTitle(String value) {
+        String title = normalize(value);
+
+        if (title.contains("|")) {
+            title = normalize(title.split("\\|", 2)[0]);
+        }
+
+        if (containsAny(title, INVALID_TITLE_KEYWORDS.toArray(String[]::new))) {
+            return "";
+        }
+
+        return title;
     }
 
     private String rawData(FetchedJobPosting fetchedJobPosting, String title, String companyName) {
