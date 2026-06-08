@@ -131,6 +131,63 @@ class SkillMarketAggregationServiceTest {
         assertThat(springTraffic.getLiftScore()).isEqualByComparingTo(BigDecimal.valueOf(1.0000));
     }
 
+    @Test
+    @DisplayName("같은 월 스킬 시장 집계 재실행 시 기존 결과를 교체한다")
+    void replaceMonthlySkillMarketOnRerun() {
+        String suffix = UUID.randomUUID().toString();
+        LocalDate periodStart = LocalDate.of(2026, 6, 1);
+
+        Skill springBoot = skillRepository.save(
+                Skill.create("Rerun Spring Boot " + suffix, "rerun-spring-boot-" + suffix, SkillCategory.FRAMEWORK)
+        );
+        Skill redis = skillRepository.save(
+                Skill.create("Rerun Redis " + suffix, "rerun-redis-" + suffix, SkillCategory.DATABASE)
+        );
+        ExperienceTagCode traffic = experienceTagCodeRepository.save(
+                ExperienceTagCodeTestFactory.create(
+                        "RERUN_TRAFFIC_" + suffix.substring(0, 8),
+                        "대용량 트래픽",
+                        "대용량 트래픽 처리 경험"
+                )
+        );
+
+        Job backendJob = jobRepository.save(createJob("market-rerun-backend-" + suffix));
+
+        jobSkillRepository.save(JobSkill.create(backendJob, springBoot, RequirementType.REQUIRED));
+        jobSkillRepository.save(JobSkill.create(backendJob, redis, RequirementType.PREFERRED));
+        jobExperienceTagRepository.save(JobExperienceTag.create(backendJob, traffic, "대용량 트래픽"));
+        jobSkillRepository.flush();
+        jobExperienceTagRepository.flush();
+
+        SkillMarketAggregationResult firstResult = skillMarketAggregationService.aggregateMonthly(periodStart);
+        SkillMarketAggregationResult secondResult = skillMarketAggregationService.aggregateMonthly(periodStart);
+
+        List<SkillCooccurrence> springCooccurrences =
+                skillCooccurrenceRepository.findByPeriodTypeAndPeriodStartAndBaseSkillIdOrderByLiftScoreDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        periodStart,
+                        springBoot.getId()
+                );
+        List<SkillExperienceMarket> springExperienceMarkets =
+                skillExperienceMarketRepository.findByPeriodTypeAndPeriodStartAndSkillIdOrderByLiftScoreDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        periodStart,
+                        springBoot.getId()
+                );
+
+        assertThat(firstResult.cooccurrenceSavedCount()).isEqualTo(2);
+        assertThat(secondResult.cooccurrenceSavedCount()).isEqualTo(2);
+        assertThat(springCooccurrences)
+                .extracting(cooccurrence -> cooccurrence.getCoSkill().getId())
+                .containsExactly(redis.getId());
+
+        assertThat(firstResult.skillExperienceSavedCount()).isEqualTo(2);
+        assertThat(secondResult.skillExperienceSavedCount()).isEqualTo(2);
+        assertThat(springExperienceMarkets)
+                .extracting(market -> market.getTagCode().getCode())
+                .containsExactly(traffic.getCode());
+    }
+
     private Job createJob(String externalId) {
         return Job.create(
                 "ANALYTICS_MARKET_SERVICE_TEST",
