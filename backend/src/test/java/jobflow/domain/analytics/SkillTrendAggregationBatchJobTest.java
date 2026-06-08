@@ -10,19 +10,20 @@ import java.util.concurrent.atomic.AtomicLong;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.EmploymentType;
 import jobflow.domain.job.Job;
+import jobflow.domain.job.JobExperienceTag;
+import jobflow.domain.job.JobExperienceTagRepository;
 import jobflow.domain.job.JobRepository;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.job.JobSkill;
 import jobflow.domain.job.JobSkillRepository;
-import jobflow.domain.job.JobExperienceTag;
-import jobflow.domain.job.JobExperienceTagRepository;
 import jobflow.domain.job.RemoteType;
 import jobflow.domain.job.RequirementType;
+import jobflow.domain.skill.ExperienceTagCode;
+import jobflow.domain.skill.ExperienceTagCodeRepository;
 import jobflow.domain.skill.Skill;
 import jobflow.domain.skill.SkillCategory;
 import jobflow.domain.skill.SkillRepository;
-import jobflow.domain.skill.ExperienceTagCode;
-import jobflow.domain.skill.ExperienceTagCodeRepository;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.ExitStatus;
@@ -33,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -49,6 +51,9 @@ class SkillTrendAggregationBatchJobTest {
 
     @Autowired
     private SkillTrendRepository skillTrendRepository;
+
+    @Autowired
+    private JobMarketStatsRepository jobMarketStatsRepository;
 
     @Autowired
     private SkillCooccurrenceRepository skillCooccurrenceRepository;
@@ -77,6 +82,7 @@ class SkillTrendAggregationBatchJobTest {
         String suffix = UUID.randomUUID().toString();
         LocalDate periodStart = currentPeriodStart();
         String targetMonth = periodStart.toString();
+        String locationRegion = "Batch Seoul " + suffix;
         Skill springBoot = skillRepository.save(
                 Skill.create("Batch Spring Boot " + suffix, "batch-spring-boot-" + suffix, SkillCategory.FRAMEWORK)
         );
@@ -92,11 +98,13 @@ class SkillTrendAggregationBatchJobTest {
         );
         Job backendJob = jobRepository.save(createJob(
                 "batch-backend-spring-" + suffix,
-                LocalDateTime.of(2026, 6, 1, 9, 0)
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                locationRegion
         ));
         Job platformJob = jobRepository.save(createJob(
                 "batch-platform-spring-redis-" + suffix,
-                LocalDateTime.of(2026, 6, 2, 9, 0)
+                LocalDateTime.of(2026, 6, 2, 9, 0),
+                locationRegion
         ));
 
         jobSkillRepository.save(JobSkill.create(backendJob, springBoot, RequirementType.REQUIRED));
@@ -142,6 +150,12 @@ class SkillTrendAggregationBatchJobTest {
                         periodStart,
                         springBoot.getId()
                 );
+        List<JobMarketStats> jobMarketStats = jobMarketStatsRepository
+                .findByPeriodTypeAndPeriodStartAndRoleOrderByJobCountDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        periodStart,
+                        JobRole.BACKEND
+                );
 
         assertThat(cooccurrences)
                 .extracting(cooccurrence -> cooccurrence.getCoSkill().getId())
@@ -155,6 +169,18 @@ class SkillTrendAggregationBatchJobTest {
         assertThat(springBootTrafficMarket.getJobCount()).isEqualTo(2);
         assertThat(springBootTrafficMarket.getSkillJobCount()).isEqualTo(2);
         assertThat(springBootTrafficMarket.getTagJobCount()).isEqualTo(2);
+
+        JobMarketStats juniorBackendStats = jobMarketStats.stream()
+                .filter(stats -> stats.getCareerLevel() == CareerLevel.JUNIOR)
+                .filter(stats -> stats.getLocationRegion().equals(locationRegion))
+                .filter(stats -> stats.getRemoteType().equals(RemoteType.HYBRID.name()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(juniorBackendStats.getJobCount()).isEqualTo(2);
+        assertThat(juniorBackendStats.getOpenJobCount()).isEqualTo(2);
+        assertThat(juniorBackendStats.getClosedJobCount()).isEqualTo(0);
+        assertThat(juniorBackendStats.getExpiredJobCount()).isEqualTo(0);
     }
 
     @Test
@@ -270,6 +296,41 @@ class SkillTrendAggregationBatchJobTest {
                 "IT",
                 "KR",
                 "Seoul",
+                "Gangnam",
+                RemoteType.HYBRID,
+                null,
+                null,
+                "KRW",
+                false,
+                null,
+                createdAt,
+                LocalDateTime.of(2026, 7, 1, 23, 59)
+        );
+    }
+
+    private Job createJob(
+            String externalId,
+            LocalDateTime createdAt,
+            String locationRegion
+    ) {
+        return Job.create(
+                "ANALYTICS_BATCH_TEST",
+                externalId,
+                "백엔드 개발자",
+                "JobFlow",
+                "Spring Boot 기반 백엔드 API 개발",
+                "https://example.com/jobs/" + externalId,
+                JobRole.BACKEND,
+                "Java Spring Boot JPA",
+                CareerLevel.JUNIOR,
+                0,
+                3,
+                null,
+                EmploymentType.FULL_TIME,
+                null,
+                "IT",
+                "KR",
+                locationRegion,
                 "Gangnam",
                 RemoteType.HYBRID,
                 null,

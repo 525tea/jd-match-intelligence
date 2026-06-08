@@ -125,6 +125,64 @@ class JobMarketAggregationRepositoryTest {
         assertThat(tagAggregates.get(0).jobCount()).isEqualTo(2L);
     }
 
+    @Test
+    @DisplayName("기간 내 공고를 시장 통계 차원으로 집계한다")
+    void aggregateJobMarketStats() {
+        Job juniorBackendJob = jobRepository.save(createJob(
+                "market-stats-junior-backend",
+                JobRole.BACKEND,
+                CareerLevel.JUNIOR,
+                "Seoul",
+                RemoteType.HYBRID
+        ));
+        Job anotherJuniorBackendJob = jobRepository.save(createJob(
+                "market-stats-junior-backend-2",
+                JobRole.BACKEND,
+                CareerLevel.JUNIOR,
+                "Seoul",
+                RemoteType.HYBRID
+        ));
+        Job midBackendJob = jobRepository.save(createJob(
+                "market-stats-mid-backend",
+                JobRole.BACKEND,
+                CareerLevel.MID,
+                "Gyeonggi",
+                RemoteType.REMOTE
+        ));
+        jobRepository.saveAll(List.of(juniorBackendJob, anotherJuniorBackendJob, midBackendJob));
+        jobRepository.flush();
+
+        List<JobMarketStatsAggregate> aggregates = jobRepository.aggregateJobMarketStats(
+                currentPeriodStart().atStartOfDay(),
+                currentPeriodStart().plusMonths(1).atStartOfDay()
+        );
+
+        JobMarketStatsAggregate juniorBackendAggregate = findJobMarketStats(
+                aggregates,
+                JobRole.BACKEND,
+                CareerLevel.JUNIOR,
+                "Seoul",
+                RemoteType.HYBRID
+        );
+        JobMarketStatsAggregate midBackendAggregate = findJobMarketStats(
+                aggregates,
+                JobRole.BACKEND,
+                CareerLevel.MID,
+                "Gyeonggi",
+                RemoteType.REMOTE
+        );
+
+        assertThat(juniorBackendAggregate.jobCount()).isEqualTo(2L);
+        assertThat(juniorBackendAggregate.openJobCount()).isEqualTo(2L);
+        assertThat(juniorBackendAggregate.closedJobCount()).isEqualTo(0L);
+        assertThat(juniorBackendAggregate.expiredJobCount()).isEqualTo(0L);
+        assertThat(juniorBackendAggregate.avgMinExperienceYears()).isEqualByComparingTo(0.0);
+        assertThat(juniorBackendAggregate.avgMaxExperienceYears()).isEqualByComparingTo(3.0);
+
+        assertThat(midBackendAggregate.jobCount()).isEqualTo(1L);
+        assertThat(midBackendAggregate.openJobCount()).isEqualTo(1L);
+    }
+
     private JobSkillCooccurrenceAggregate findCooccurrence(
             List<JobSkillCooccurrenceAggregate> aggregates,
             Skill baseSkill,
@@ -145,6 +203,22 @@ class JobMarketAggregationRepositoryTest {
         return aggregates.stream()
                 .filter(aggregate -> aggregate.skill().getId().equals(skill.getId()))
                 .filter(aggregate -> aggregate.tagCode().getCode().equals(tagCode.getCode()))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private JobMarketStatsAggregate findJobMarketStats(
+            List<JobMarketStatsAggregate> aggregates,
+            JobRole role,
+            CareerLevel careerLevel,
+            String locationRegion,
+            RemoteType remoteType
+    ) {
+        return aggregates.stream()
+                .filter(aggregate -> aggregate.role() == role)
+                .filter(aggregate -> aggregate.careerLevel() == careerLevel)
+                .filter(aggregate -> aggregate.locationRegion().equals(locationRegion))
+                .filter(aggregate -> aggregate.remoteType() == remoteType)
                 .findFirst()
                 .orElseThrow();
     }
@@ -174,6 +248,43 @@ class JobMarketAggregationRepositoryTest {
                 "Seoul",
                 "Gangnam",
                 RemoteType.HYBRID,
+                null,
+                null,
+                "KRW",
+                false,
+                null,
+                LocalDateTime.of(2026, 6, 1, 9, 0),
+                LocalDateTime.of(2026, 7, 1, 23, 59)
+        );
+    }
+
+    private Job createJob(
+            String externalId,
+            JobRole role,
+            CareerLevel careerLevel,
+            String locationRegion,
+            RemoteType remoteType
+    ) {
+        return Job.create(
+                "ANALYTICS_MARKET_TEST",
+                externalId,
+                "백엔드 개발자",
+                "JobFlow",
+                "Spring Boot 기반 백엔드 API 개발",
+                "https://example.com/jobs/" + externalId,
+                role,
+                "Java Spring Boot JPA",
+                careerLevel,
+                0,
+                3,
+                null,
+                EmploymentType.FULL_TIME,
+                null,
+                "IT",
+                "KR",
+                locationRegion,
+                "Gangnam",
+                remoteType,
                 null,
                 null,
                 "KRW",

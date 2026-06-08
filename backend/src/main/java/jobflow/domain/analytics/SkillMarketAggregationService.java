@@ -50,6 +50,8 @@ public class SkillMarketAggregationService {
 
         skillCooccurrenceRepository.deleteByPeriodTypeAndPeriodStart(AnalyticsPeriodType.MONTHLY, periodStart);
         skillExperienceMarketRepository.deleteByPeriodTypeAndPeriodStart(AnalyticsPeriodType.MONTHLY, periodStart);
+        skillCooccurrenceRepository.flush();
+        skillExperienceMarketRepository.flush();
 
         List<SkillCooccurrence> cooccurrences = cooccurrenceAggregates.stream()
                 .map(aggregate -> toSkillCooccurrence(
