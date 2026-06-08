@@ -19,6 +19,11 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
     Optional<Job> findBySourceAndExternalId(String source, String externalId);
 
+    long countByCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+            LocalDateTime from,
+            LocalDateTime to
+    );
+
     @Query(
             value = """
                 SELECT
