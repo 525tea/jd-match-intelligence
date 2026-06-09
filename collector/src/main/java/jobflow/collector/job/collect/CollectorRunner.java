@@ -1,6 +1,7 @@
 package jobflow.collector.job.collect;
 
 import jobflow.collector.job.ingest.CrawlerUrlCandidate;
+import jobflow.collector.job.ingest.JobIngestionResultType;
 import jobflow.collector.job.ingest.JobIngestionSource;
 import jobflow.collector.job.ingest.JobPostingCollectionResult;
 import jobflow.collector.job.ingest.JobPostingCollectionService;
@@ -65,22 +66,32 @@ public class CollectorRunner implements ApplicationRunner {
     }
 
     private void logCollectionResult(JobPostingCollectionResult result) {
-        if (result.success()) {
-            log.info(
-                    "Collector job posting collected. source={}, externalId={}, resultType={}, duplicateCandidateCount={}",
+        if (!result.success()) {
+            log.warn(
+                    "Collector job posting failed. source={}, externalId={}, error={}",
                     result.candidate().source(),
                     result.candidate().externalId(),
-                    result.ingestionResultType(),
-                    result.duplicateCandidateCount()
+                    result.errorMessage()
             );
             return;
         }
 
-        log.warn(
-                "Collector job posting skipped. source={}, externalId={}, error={}",
+        if (result.ingestionResultType() == JobIngestionResultType.SKIPPED) {
+            log.info(
+                    "Collector job posting skipped. source={}, externalId={}, resultType={}",
+                    result.candidate().source(),
+                    result.candidate().externalId(),
+                    result.ingestionResultType()
+            );
+            return;
+        }
+
+        log.info(
+                "Collector job posting collected. source={}, externalId={}, resultType={}, duplicateCandidateCount={}",
                 result.candidate().source(),
                 result.candidate().externalId(),
-                result.errorMessage()
+                result.ingestionResultType(),
+                result.duplicateCandidateCount()
         );
     }
 }
