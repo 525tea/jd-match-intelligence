@@ -1,8 +1,8 @@
 package jobflow.collector.job.ingest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.LocalDateTime;
@@ -14,9 +14,9 @@ import jobflow.collector.job.JobRole;
 import jobflow.collector.job.RemoteType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(MockitoExtension.class)
 class JobPostingCollectionServiceTest {
@@ -25,31 +25,31 @@ class JobPostingCollectionServiceTest {
     private JobPostingFetchService jobPostingFetchService;
 
     @Mock
+    private JobPostingPreFilter jobPostingPreFilter;
+
+    @Mock
     private JobPostingParser jobPostingParser;
 
     @Mock
     private JobIngestionService jobIngestionService;
 
     @Test
-    @DisplayName("공고 후보를 fetch, parse, ingest 순서로 처리한다")
+    @DisplayName("공고 후보를 fetch, pre-filter, parse, ingest 순서로 처리한다")
     void collect() {
         CrawlerUrlCandidate candidate = createCandidate();
-        FetchedJobPosting fetched = new FetchedJobPosting(
-                JobIngestionSource.ZIGHANG,
-                "zighang-example-1",
-                candidate.sourceUrl(),
-                candidate.detailUrl(),
-                "<html><body><h1>Backend Engineer</h1></body></html>"
-        );
+        FetchedJobPosting fetched = createFetched(candidate);
         IngestedJobPosting posting = createPosting();
         Job job = createJob();
         JobPostingCollectionService service = new JobPostingCollectionService(
                 jobPostingFetchService,
+                List.of(jobPostingPreFilter),
                 List.of(jobPostingParser),
                 jobIngestionService
         );
 
         given(jobPostingFetchService.fetch(candidate)).willReturn(fetched);
+        given(jobPostingPreFilter.supports(JobIngestionSource.ZIGHANG)).willReturn(true);
+        given(jobPostingPreFilter.shouldSkip(fetched)).willReturn(false);
         given(jobPostingParser.supports(JobIngestionSource.ZIGHANG)).willReturn(true);
         given(jobPostingParser.parse(fetched)).willReturn(posting);
         given(jobIngestionService.ingest(posting))
@@ -69,28 +69,82 @@ class JobPostingCollectionServiceTest {
         assertThat(result.duplicateCandidateCount()).isEqualTo(1);
 
         verify(jobPostingFetchService).fetch(candidate);
+        verify(jobPostingPreFilter).shouldSkip(fetched);
         verify(jobPostingParser).parse(fetched);
         verify(jobIngestionService).ingest(posting);
+    }
+
+    @Test
+    @DisplayName("pre-filter가 skip하면 parse와 ingest를 실행하지 않는다")
+    void skippedByPreFilter() {
+        CrawlerUrlCandidate candidate = createCandidate();
+        FetchedJobPosting fetched = createFetched(candidate);
+        JobPostingCollectionService service = new JobPostingCollectionService(
+                jobPostingFetchService,
+                List.of(jobPostingPreFilter),
+                List.of(jobPostingParser),
+                jobIngestionService
+        );
+
+        given(jobPostingFetchService.fetch(candidate)).willReturn(fetched);
+        given(jobPostingPreFilter.supports(JobIngestionSource.ZIGHANG)).willReturn(true);
+        given(jobPostingPreFilter.shouldSkip(fetched)).willReturn(true);
+
+        JobPostingCollectionResult result = service.collect(candidate);
+
+        assertThat(result.candidate()).isEqualTo(candidate);
+        assertThat(result.success()).isTrue();
+        assertThat(result.ingestionResultType()).isEqualTo(JobIngestionResultType.SKIPPED);
+        assertThat(result.errorMessage()).isNull();
+        assertThat(result.hasDuplicateCandidates()).isFalse();
+        assertThat(result.duplicateCandidateCount()).isZero();
+
+        verify(jobPostingFetchService).fetch(candidate);
+        verify(jobPostingPreFilter).shouldSkip(fetched);
+        verify(jobPostingParser, never()).parse(fetched);
+        verify(jobIngestionService, never()).ingest(createPosting());
+    }
+
+    @Test
+    @DisplayName("지원하는 pre-filter가 없으면 실패 결과를 반환한다")
+    void preFilterNotFound() {
+        CrawlerUrlCandidate candidate = createCandidate();
+        FetchedJobPosting fetched = createFetched(candidate);
+        JobPostingCollectionService service = new JobPostingCollectionService(
+                jobPostingFetchService,
+                List.of(jobPostingPreFilter),
+                List.of(jobPostingParser),
+                jobIngestionService
+        );
+
+        given(jobPostingFetchService.fetch(candidate)).willReturn(fetched);
+        given(jobPostingPreFilter.supports(JobIngestionSource.ZIGHANG)).willReturn(false);
+
+        JobPostingCollectionResult result = service.collect(candidate);
+
+        assertThat(result.candidate()).isEqualTo(candidate);
+        assertThat(result.success()).isFalse();
+        assertThat(result.ingestionResultType()).isNull();
+        assertThat(result.errorMessage()).contains("Job posting pre-filter not found");
+        assertThat(result.hasDuplicateCandidates()).isFalse();
+        assertThat(result.duplicateCandidateCount()).isZero();
     }
 
     @Test
     @DisplayName("지원하는 parser가 없으면 실패 결과를 반환한다")
     void parserNotFound() {
         CrawlerUrlCandidate candidate = createCandidate();
-        FetchedJobPosting fetched = new FetchedJobPosting(
-                JobIngestionSource.ZIGHANG,
-                "zighang-example-1",
-                candidate.sourceUrl(),
-                candidate.detailUrl(),
-                "<html><body><h1>Backend Engineer</h1></body></html>"
-        );
+        FetchedJobPosting fetched = createFetched(candidate);
         JobPostingCollectionService service = new JobPostingCollectionService(
                 jobPostingFetchService,
+                List.of(jobPostingPreFilter),
                 List.of(jobPostingParser),
                 jobIngestionService
         );
 
         given(jobPostingFetchService.fetch(candidate)).willReturn(fetched);
+        given(jobPostingPreFilter.supports(JobIngestionSource.ZIGHANG)).willReturn(true);
+        given(jobPostingPreFilter.shouldSkip(fetched)).willReturn(false);
         given(jobPostingParser.supports(JobIngestionSource.ZIGHANG)).willReturn(false);
 
         JobPostingCollectionResult result = service.collect(candidate);
@@ -106,21 +160,31 @@ class JobPostingCollectionServiceTest {
     private CrawlerUrlCandidate createCandidate() {
         return new CrawlerUrlCandidate(
                 JobIngestionSource.ZIGHANG,
-                "https://zighang.com/jobs/zighang-example-1?utm=test",
-                "https://zighang.com/jobs/zighang-example-1",
-                "zighang-example-1"
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100?utm=test",
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100",
+                "00000000-0000-0000-0000-000000000100"
+        );
+    }
+
+    private FetchedJobPosting createFetched(CrawlerUrlCandidate candidate) {
+        return new FetchedJobPosting(
+                candidate.source(),
+                candidate.externalId(),
+                candidate.sourceUrl(),
+                candidate.detailUrl(),
+                "<html><body><h1>Backend Engineer</h1></body></html>"
         );
     }
 
     private IngestedJobPosting createPosting() {
         return new IngestedJobPosting(
                 JobIngestionSource.ZIGHANG,
-                "zighang-example-1",
+                "00000000-0000-0000-0000-000000000100",
                 "Backend Engineer",
                 "JobFlow Labs",
                 "Spring Boot 기반 백엔드 개발자를 채용합니다.",
-                "https://zighang.com/jobs/zighang-example-1?utm=test",
-                "https://zighang.com/jobs/zighang-example-1",
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100?utm=test",
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100",
                 JobRole.BACKEND,
                 "Java/Spring",
                 CareerLevel.JUNIOR,
@@ -145,7 +209,7 @@ class JobPostingCollectionServiceTest {
                 LocalDateTime.of(2026, 6, 4, 10, 0),
                 null,
                 """
-                        {"source":"ZIGHANG","externalId":"zighang-example-1"}
+                        {"source":"ZIGHANG","externalId":"00000000-0000-0000-0000-000000000100"}
                         """,
                 "zighang-parser-0.1"
         );
@@ -154,11 +218,11 @@ class JobPostingCollectionServiceTest {
     private Job createJob() {
         return Job.create(
                 "ZIGHANG",
-                "zighang-example-1",
+                "00000000-0000-0000-0000-000000000100",
                 "Backend Engineer",
                 "JobFlow Labs",
                 "Spring Boot 기반 백엔드 개발자를 채용합니다.",
-                "https://zighang.com/jobs/zighang-example-1",
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100",
                 JobRole.BACKEND,
                 "Java/Spring",
                 CareerLevel.JUNIOR,
