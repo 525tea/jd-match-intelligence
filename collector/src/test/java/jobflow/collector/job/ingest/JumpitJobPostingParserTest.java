@@ -1,15 +1,16 @@
 package jobflow.collector.job.ingest;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
-import java.time.LocalDateTime;
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
 import jobflow.collector.job.JobRole;
 import jobflow.collector.job.RemoteType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class JumpitJobPostingParserTest {
 
@@ -33,11 +34,14 @@ class JumpitJobPostingParserTest {
                           <body>
                             <main>
                               <h1>Backend Engineer</h1>
-                              <section class="company-name">JobFlow Labs</section>
+                              <a href="/company/company-example-1">JobFlow Labs</a>
                               <section data-testid="position-description">
                                 Java, Spring Boot 기반 백엔드 개발자를 채용합니다.
-                                주니어 1년 이상, 서울 강남 하이브리드 근무를 지원합니다.
-                                2026. 7. 31. 마감
+                                포지션 경력/학력/마감일/근무지역 정보
+                                경력 경력 1~10년
+                                학력 대학교졸업(4년) 이상
+                                마감일 2026-07-31
+                                근무지역 경기 과천시 과천대로7길 65
                               </section>
                             </main>
                           </body>
@@ -57,16 +61,19 @@ class JumpitJobPostingParserTest {
         assertThat(posting.role()).isEqualTo(JobRole.BACKEND);
         assertThat(posting.careerLevel()).isEqualTo(CareerLevel.JUNIOR);
         assertThat(posting.employmentType()).isEqualTo(EmploymentType.FULL_TIME);
-        assertThat(posting.remoteType()).isEqualTo(RemoteType.HYBRID);
+        assertThat(posting.remoteType()).isEqualTo(RemoteType.ONSITE);
         assertThat(posting.locationCountry()).isEqualTo("KR");
-        assertThat(posting.locationRegion()).isEqualTo("Seoul");
-        assertThat(posting.locationCity()).isEqualTo("Gangnam");
+        assertThat(posting.locationRegion()).isEqualTo("Gyeonggi");
+        assertThat(posting.locationCity()).isEqualTo("Gwacheon");
         assertThat(posting.deadlineAt()).isEqualTo(LocalDateTime.of(2026, 7, 31, 23, 59));
         assertThat(posting.salaryCurrency()).isEqualTo("KRW");
         assertThat(posting.rawData()).contains("12345");
         assertThat(posting.crawlerVersion()).isEqualTo("jumpit-parser-0.1");
         assertThat(posting.collectedAt()).isNotNull();
         assertThat(posting.lastSeenAt()).isNotNull();
+        assertThat(posting.minExperienceYears()).isEqualTo(1);
+        assertThat(posting.maxExperienceYears()).isEqualTo(10);
+        assertThat(posting.educationLevel()).isEqualTo("BACHELOR");
     }
 
     @Test

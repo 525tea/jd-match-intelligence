@@ -18,6 +18,12 @@ public class JumpitJobPostingParser implements JobPostingParser {
     private static final String CRAWLER_VERSION = "jumpit-parser-0.1";
     private static final Pattern KOREAN_DATE_PATTERN =
             Pattern.compile("(20\\d{2})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})\\.");
+    private static final Pattern ISO_DATE_PATTERN =
+            Pattern.compile("(20\\d{2})-(\\d{1,2})-(\\d{1,2})");
+    private static final Pattern CAREER_RANGE_PATTERN =
+            Pattern.compile("경력\\s*(\\d+)\\s*[~\\-–]\\s*(\\d+)년");
+    private static final Pattern CAREER_MIN_PATTERN =
+            Pattern.compile("경력\\s*(\\d+)년\\s*이상");
     private static final List<String> INVALID_TITLE_KEYWORDS = List.of(
             "점핏",
             "점핏 | 개발 직무 탐색",
@@ -58,14 +64,20 @@ public class JumpitJobPostingParser implements JobPostingParser {
                 "h1",
                 "meta[property=og:title]"
         ));
-        String companyName = firstValidCompanyText(
-                document,
-                "[data-testid=company-name]",
-                "[data-testid=company]",
-                "[class*=companyName]",
-                "[class*=company-name]",
-                ".company-name",
-                ".company"
+        String companyName = firstNonBlank(
+                firstValidCompanyText(
+                        document,
+                        "a[href^=/company/]",
+                        "a[href*=jumpit.saramin.co.kr/company/]",
+                        "a[href*=company]",
+                        "[data-testid=company-name]",
+                        "[data-testid=company]",
+                        "[class*=companyName]",
+                        "[class*=company-name]",
+                        ".company-name",
+                        ".company"
+                ),
+                inferCompanyName(pageText, title)
         );
         String description = firstValidText(
                 document,
@@ -76,6 +88,7 @@ public class JumpitJobPostingParser implements JobPostingParser {
                 ".position-description",
                 "main"
         );
+        ExperienceRange experienceRange = inferExperienceRange(pageText);
 
         validateRequired("title", title, fetchedJobPosting);
         validateRequired("companyName", companyName, fetchedJobPosting);
@@ -93,10 +106,10 @@ public class JumpitJobPostingParser implements JobPostingParser {
                 fetchedJobPosting.detailUrl(),
                 jdJobRoleClassificationService.classify(title, description, pageText),
                 null,
-                inferCareerLevel(pageText),
-                null,
-                null,
-                null,
+                inferCareerLevel(pageText, experienceRange),
+                experienceRange.min(),
+                experienceRange.max(),
+                inferEducationLevel(pageText),
                 inferEmploymentType(pageText),
                 null,
                 null,
@@ -133,9 +146,9 @@ public class JumpitJobPostingParser implements JobPostingParser {
 
     private String firstValidCompanyText(Document document, String... selectors) {
         for (String selector : selectors) {
-            String value = text(document, selector);
+            String value = cleanCompanyName(text(document, selector));
 
-            if (value != null && !value.isBlank() && !containsAny(value, INVALID_COMPANY_KEYWORDS.toArray(String[]::new))) {
+            if (!value.isBlank()) {
                 return value;
             }
         }
@@ -170,9 +183,21 @@ public class JumpitJobPostingParser implements JobPostingParser {
         }
     }
 
-    private CareerLevel inferCareerLevel(String pageText) {
+    private CareerLevel inferCareerLevel(String pageText, ExperienceRange experienceRange) {
         if (containsAny(pageText, "신입", "인턴", "newcomer")) {
             return CareerLevel.NEWCOMER;
+        }
+
+        if (experienceRange.min() != null) {
+            if (experienceRange.min() >= 8) {
+                return CareerLevel.SENIOR;
+            }
+
+            if (experienceRange.min() >= 4) {
+                return CareerLevel.MID;
+            }
+
+            return CareerLevel.JUNIOR;
         }
 
         if (containsAny(pageText, "주니어", "1년", "2년", "3년", "junior")) {
@@ -188,6 +213,44 @@ public class JumpitJobPostingParser implements JobPostingParser {
         }
 
         return CareerLevel.ANY;
+    }
+
+    private ExperienceRange inferExperienceRange(String pageText) {
+        Matcher rangeMatcher = CAREER_RANGE_PATTERN.matcher(pageText);
+
+        if (rangeMatcher.find()) {
+            return new ExperienceRange(
+                    Integer.parseInt(rangeMatcher.group(1)),
+                    Integer.parseInt(rangeMatcher.group(2))
+            );
+        }
+
+        Matcher minMatcher = CAREER_MIN_PATTERN.matcher(pageText);
+
+        if (minMatcher.find()) {
+            return new ExperienceRange(
+                    Integer.parseInt(minMatcher.group(1)),
+                    null
+            );
+        }
+
+        if (containsAny(pageText, "경력 무관", "신입 가능")) {
+            return new ExperienceRange(0, null);
+        }
+
+        return new ExperienceRange(null, null);
+    }
+
+    private String inferEducationLevel(String pageText) {
+        if (containsAny(pageText, "대학교졸업(4년)", "4년제")) {
+            return "BACHELOR";
+        }
+
+        if (containsAny(pageText, "학력 무관")) {
+            return "ANY";
+        }
+
+        return null;
     }
 
     private EmploymentType inferEmploymentType(String pageText) {
@@ -223,7 +286,7 @@ public class JumpitJobPostingParser implements JobPostingParser {
             return "Seoul";
         }
 
-        if (containsAny(pageText, "경기", "성남", "판교", "분당")) {
+        if (containsAny(pageText, "경기", "성남", "판교", "분당", "과천")) {
             return "Gyeonggi";
         }
 
@@ -247,6 +310,10 @@ public class JumpitJobPostingParser implements JobPostingParser {
             return "Seongdong";
         }
 
+        if (containsAny(pageText, "과천")) {
+            return "Gwacheon";
+        }
+
         if (containsAny(pageText, "판교", "분당")) {
             return "Bundang";
         }
@@ -255,26 +322,57 @@ public class JumpitJobPostingParser implements JobPostingParser {
     }
 
     private LocalDateTime inferDeadlineAt(String pageText) {
-        Matcher matcher = KOREAN_DATE_PATTERN.matcher(pageText);
+        Matcher isoMatcher = ISO_DATE_PATTERN.matcher(pageText);
 
-        while (matcher.find()) {
-            int end = Math.min(pageText.length(), matcher.end() + 12);
-            String dateContext = pageText.substring(matcher.start(), end);
+        while (isoMatcher.find()) {
+            int start = Math.max(0, isoMatcher.start() - 12);
+            int end = Math.min(pageText.length(), isoMatcher.end() + 12);
+            String dateContext = pageText.substring(start, end);
 
             if (!dateContext.contains("마감")) {
                 continue;
             }
 
-            LocalDate date = LocalDate.of(
-                    Integer.parseInt(matcher.group(1)),
-                    Integer.parseInt(matcher.group(2)),
-                    Integer.parseInt(matcher.group(3))
-            );
+            return LocalDate.of(
+                    Integer.parseInt(isoMatcher.group(1)),
+                    Integer.parseInt(isoMatcher.group(2)),
+                    Integer.parseInt(isoMatcher.group(3))
+            ).atTime(23, 59);
+        }
 
-            return date.atTime(23, 59);
+        Matcher koreanMatcher = KOREAN_DATE_PATTERN.matcher(pageText);
+
+        while (koreanMatcher.find()) {
+            int end = Math.min(pageText.length(), koreanMatcher.end() + 12);
+            String dateContext = pageText.substring(koreanMatcher.start(), end);
+
+            if (!dateContext.contains("마감")) {
+                continue;
+            }
+
+            return LocalDate.of(
+                    Integer.parseInt(koreanMatcher.group(1)),
+                    Integer.parseInt(koreanMatcher.group(2)),
+                    Integer.parseInt(koreanMatcher.group(3))
+            ).atTime(23, 59);
         }
 
         return null;
+    }
+
+    private String inferCompanyName(String pageText, String title) {
+        if (title == null || title.isBlank()) {
+            return "";
+        }
+
+        Pattern pattern = Pattern.compile(Pattern.quote(title) + "\\s+(.{1,50}?)\\s+취업축하금");
+        Matcher matcher = pattern.matcher(pageText);
+
+        if (matcher.find()) {
+            return cleanCompanyName(matcher.group(1));
+        }
+
+        return "";
     }
 
     private boolean containsAny(String text, String... keywords) {
@@ -301,6 +399,30 @@ public class JumpitJobPostingParser implements JobPostingParser {
         return title;
     }
 
+    private String cleanCompanyName(String value) {
+        String companyName = normalize(value);
+
+        if (companyName.contains("|")) {
+            companyName = normalize(companyName.split("\\|", 2)[0]);
+        }
+
+        if (containsAny(companyName, INVALID_COMPANY_KEYWORDS.toArray(String[]::new))) {
+            return "";
+        }
+
+        return companyName;
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+
+        return "";
+    }
+
     private String rawData(FetchedJobPosting fetchedJobPosting, String title, String companyName) {
         return """
                 {"source":"%s","externalId":"%s","detailUrl":"%s","title":"%s","companyName":"%s"}
@@ -325,5 +447,11 @@ public class JumpitJobPostingParser implements JobPostingParser {
         }
 
         return value.replaceAll("\\s+", " ").trim();
+    }
+
+    private record ExperienceRange(
+            Integer min,
+            Integer max
+    ) {
     }
 }
