@@ -1,5 +1,11 @@
+-- Change this value before running:
+--   SET @source = 'JUMPIT';
+--   SET @source = 'ZIGHANG';
 SET @source = 'ZIGHANG';
 SET @limit = 50;
+
+SELECT
+    @source AS checked_source;
 
 SELECT
     COUNT(*) AS collected_job_count
@@ -29,7 +35,7 @@ SELECT
 FROM jobs
 WHERE source = @source COLLATE utf8mb4_unicode_ci
 ORDER BY id DESC
-    LIMIT 50;
+LIMIT 50;
 
 SELECT
     COUNT(*) AS missing_external_id_count
@@ -62,6 +68,24 @@ WHERE source = @source COLLATE utf8mb4_unicode_ci
   AND (original_url IS NULL OR original_url = '');
 
 SELECT
+    COUNT(*) AS missing_opened_at_count
+FROM jobs
+WHERE source = @source COLLATE utf8mb4_unicode_ci
+  AND opened_at IS NULL;
+
+SELECT
+    COUNT(*) AS missing_deadline_at_count
+FROM jobs
+WHERE source = @source COLLATE utf8mb4_unicode_ci
+  AND deadline_at IS NULL;
+
+SELECT
+    COUNT(*) AS missing_location_count
+FROM jobs
+WHERE source = @source COLLATE utf8mb4_unicode_ci
+  AND (location_region IS NULL OR location_region = '');
+
+SELECT
     COUNT(*) AS polluted_external_id_count
 FROM jobs
 WHERE source = @source COLLATE utf8mb4_unicode_ci
@@ -80,11 +104,13 @@ WHERE source = @source COLLATE utf8mb4_unicode_ci
     external_id IN ('position', 'positions', 'recruitment')
         OR title LIKE '%직무 탐색%'
         OR title LIKE '%점핏%'
-        OR company_name IN ('기업 정보 보기', '회사 정보 보기')
+        OR title LIKE '%기업 검색%'
+        OR company_name IN ('기업 정보 보기', '회사 정보 보기', '직행', '점핏')
         OR company_name LIKE '%직무 탐색%'
+        OR company_name LIKE '%기업 검색%'
     )
 ORDER BY id DESC
-    LIMIT 50;
+LIMIT 50;
 
 SELECT
     source,
@@ -106,7 +132,7 @@ WHERE canonical_fingerprint IS NOT NULL
 GROUP BY canonical_fingerprint
 HAVING COUNT(*) > 1
 ORDER BY same_fingerprint_count DESC, canonical_fingerprint ASC
-    LIMIT 50;
+LIMIT 50;
 
 SELECT
     j.id,
@@ -121,7 +147,7 @@ FROM jobs j
 WHERE j.source = @source COLLATE utf8mb4_unicode_ci
 GROUP BY j.id, j.external_id, j.title, j.company_name, j.role, j.role_detail
 ORDER BY j.id DESC
-    LIMIT 50;
+LIMIT 50;
 
 SELECT
     j.id,
@@ -134,7 +160,7 @@ FROM jobs j
          JOIN skills s ON s.id = js.skill_id
 WHERE j.source = @source COLLATE utf8mb4_unicode_ci
 ORDER BY j.id DESC, s.name ASC
-    LIMIT 100;
+LIMIT 100;
 
 SELECT
     j.id,
@@ -142,7 +168,8 @@ SELECT
     j.title,
     j.company_name,
     j.role,
-    j.role_detail
+    j.role_detail,
+    j.description
 FROM jobs j
 WHERE j.source = @source COLLATE utf8mb4_unicode_ci
   AND NOT EXISTS (
@@ -151,7 +178,7 @@ WHERE j.source = @source COLLATE utf8mb4_unicode_ci
     WHERE js.job_id = j.id
 )
 ORDER BY j.id DESC
-    LIMIT 50;
+LIMIT 50;
 
 SELECT
     j.id,
@@ -163,7 +190,7 @@ FROM jobs j
 WHERE j.source = @source COLLATE utf8mb4_unicode_ci
 GROUP BY j.id, j.external_id, j.title
 ORDER BY j.id DESC
-    LIMIT 50;
+LIMIT 50;
 
 SELECT
     j.id,
@@ -177,7 +204,7 @@ FROM jobs j
          JOIN experience_tag_codes etc ON etc.code = jet.tag_code
 WHERE j.source = @source COLLATE utf8mb4_unicode_ci
 ORDER BY j.id DESC, etc.code ASC
-    LIMIT 100;
+LIMIT 100;
 
 SELECT
     j.id,
@@ -195,4 +222,4 @@ WHERE j.source = @source COLLATE utf8mb4_unicode_ci
     WHERE jet.job_id = j.id
 )
 ORDER BY j.id DESC
-    LIMIT 50;
+LIMIT 50;
