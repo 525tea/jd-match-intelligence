@@ -1,10 +1,12 @@
 package jobflow.collector.job.ingest;
 
 import java.util.List;
+import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 public class ZighangJobPostingPreFilter implements JobPostingPreFilter {
 
@@ -36,17 +38,26 @@ public class ZighangJobPostingPreFilter implements JobPostingPreFilter {
     @Override
     public boolean shouldSkip(FetchedJobPosting fetchedJobPosting) {
         Document document = Jsoup.parse(fetchedJobPosting.body(), fetchedJobPosting.detailUrl());
-        String sourceCategory = firstNonBlank(
-                extractCategory(document.select("meta[property=og:title]").attr("content")),
-                extractCategory(document.title())
+        String titleSignal = firstNonBlank(
+                document.select("meta[property=og:title]").attr("content"),
+                document.title()
+        );
+        String sourceCategory = extractCategory(titleSignal);
+
+        boolean shouldSkip = sourceCategory.isBlank()
+                || TARGET_CATEGORY_KEYWORDS.stream()
+                .noneMatch(sourceCategory::contains);
+
+        log.info(
+                "Zighang pre-filter evaluated. externalId={}, category={}, shouldSkip={}, titlePreview={}, bodyLength={}",
+                fetchedJobPosting.externalId(),
+                sourceCategory,
+                shouldSkip,
+                preview(titleSignal),
+                fetchedJobPosting.body() == null ? 0 : fetchedJobPosting.body().length()
         );
 
-        if (sourceCategory.isBlank()) {
-            return true;
-        }
-
-        return TARGET_CATEGORY_KEYWORDS.stream()
-                .noneMatch(sourceCategory::contains);
+        return shouldSkip;
     }
 
     private String extractCategory(String titleLikeValue) {
@@ -81,5 +92,15 @@ public class ZighangJobPostingPreFilter implements JobPostingPreFilter {
         }
 
         return value.replaceAll("\\s+", " ").trim();
+    }
+
+    private String preview(String value) {
+        String normalized = normalize(value);
+
+        if (normalized.length() <= 120) {
+            return normalized;
+        }
+
+        return normalized.substring(0, 120);
     }
 }

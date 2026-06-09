@@ -1,7 +1,6 @@
--- Change this value before running:
---   SET @source = 'JUMPIT';
+-- Change this value before running if checking another source:
 --   SET @source = 'ZIGHANG';
-SET @source = 'ZIGHANG';
+SET @source = 'JUMPIT';
 SET @limit = 50;
 
 SELECT
