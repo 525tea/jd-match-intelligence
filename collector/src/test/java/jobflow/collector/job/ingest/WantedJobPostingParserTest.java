@@ -119,6 +119,102 @@ class WantedJobPostingParserTest {
     }
 
     @Test
+    @DisplayName("title에 명확한 직군이 있으면 상세 내용보다 title 직군을 우선한다")
+    void preferTitleRole() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "367244",
+                "https://www.wanted.co.kr/wd/367244",
+                "https://www.wanted.co.kr/api/v4/jobs/367244",
+                """
+                        {
+                          "job": {
+                            "position": "[모모콜] 프론트엔드 엔지니어",
+                            "company": {"name": "매도왕"},
+                            "detail": {
+                              "requirements": "React 기반 화면 개발 및 Android 앱 연동 경험"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.role()).isEqualTo(JobRole.FRONTEND);
+    }
+
+    @Test
+    @DisplayName("title에 경력 단어 없이 연차가 있으면 경력 범위로 변환한다")
+    void inferExperienceFromTitle() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "367242",
+                "https://www.wanted.co.kr/wd/367242",
+                "https://www.wanted.co.kr/api/v4/jobs/367242",
+                """
+                        {
+                          "job": {
+                            "position": "안드로이드 시니어 개발자(5년이상)",
+                            "company": {"name": "딥메디"},
+                            "detail": {
+                              "requirements": "Kotlin 기반 Android 앱 개발 경험"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.careerLevel()).isEqualTo(CareerLevel.MID);
+        assertThat(posting.minExperienceYears()).isEqualTo(5);
+        assertThat(posting.maxExperienceYears()).isNull();
+    }
+
+    @Test
+    @DisplayName("skill tag가 길면 role detail을 DB 컬럼 길이에 맞게 제한한다")
+    void truncateLongRoleDetail() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "367233",
+                "https://www.wanted.co.kr/wd/367233",
+                "https://www.wanted.co.kr/api/v4/jobs/367233",
+                """
+                        {
+                          "job": {
+                            "position": "백엔드 개발자",
+                            "skill_tags": [
+                              {"title": "Java"},
+                              {"title": "Spring Boot"},
+                              {"title": "Kubernetes"},
+                              {"title": "AWS"},
+                              {"title": "MySQL"},
+                              {"title": "Redis"},
+                              {"title": "Kafka"},
+                              {"title": "Docker"},
+                              {"title": "Elasticsearch"},
+                              {"title": "Prometheus"},
+                              {"title": "Grafana"},
+                              {"title": "Terraform"},
+                              {"title": "GitHub Actions"}
+                            ],
+                            "company": {"name": "JobFlow Labs"},
+                            "detail": {
+                              "requirements": "대규모 백엔드 시스템 개발 경험"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.roleDetail()).hasSizeLessThanOrEqualTo(100);
+        assertThat(posting.rawData()).contains("GitHub Actions");
+    }
+
+    @Test
     @DisplayName("지원하지 않는 source는 파싱하지 않는다")
     void unsupportedSource() {
         FetchedJobPosting fetched = new FetchedJobPosting(

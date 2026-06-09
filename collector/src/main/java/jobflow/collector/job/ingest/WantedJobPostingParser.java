@@ -9,6 +9,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
+import jobflow.collector.job.JobRole;
 import jobflow.collector.job.RemoteType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -21,10 +22,11 @@ import tools.jackson.databind.ObjectMapper;
 public class WantedJobPostingParser implements JobPostingParser {
 
     private static final String CRAWLER_VERSION = "wanted-parser-0.1";
+    private static final int ROLE_DETAIL_MAX_LENGTH = 100;
     private static final Pattern EXPERIENCE_RANGE_PATTERN =
-            Pattern.compile("경력\\s*(\\d+)\\s*[~\\-–]\\s*(\\d+)\\s*년");
+            Pattern.compile("(?:경력\\s*)?(\\d+)\\s*[~\\-–]\\s*(\\d+)\\s*년");
     private static final Pattern EXPERIENCE_MIN_PATTERN =
-            Pattern.compile("경력\\s*(\\d+)\\s*년\\s*이상");
+            Pattern.compile("(?:경력\\s*)?(\\d+)\\s*년\\s*이상");
 
     private final ObjectMapper objectMapper;
     private final JdJobRoleClassificationService jdJobRoleClassificationService;
@@ -67,7 +69,7 @@ public class WantedJobPostingParser implements JobPostingParser {
                 description,
                 fetchedJobPosting.sourceUrl(),
                 fetchedJobPosting.detailUrl(),
-                jdJobRoleClassificationService.classify(title, description, pageText),
+                classifyRole(title, description, pageText),
                 buildRoleDetail(job),
                 inferCareerLevel(pageText, experienceRange),
                 experienceRange.min(),
@@ -109,6 +111,16 @@ public class WantedJobPostingParser implements JobPostingParser {
         }
     }
 
+    private JobRole classifyRole(String title, String description, String pageText) {
+        JobRole titleRole = jdJobRoleClassificationService.classify(title);
+
+        if (titleRole != JobRole.ETC) {
+            return titleRole;
+        }
+
+        return jdJobRoleClassificationService.classify(description, pageText);
+    }
+
     private String buildDescription(JsonNode detail) {
         List<String> parts = new ArrayList<>();
 
@@ -147,7 +159,7 @@ public class WantedJobPostingParser implements JobPostingParser {
 
         return skillTags.isEmpty()
                 ? null
-                : String.join(" ", skillTags);
+                : truncate(String.join(" ", skillTags), ROLE_DETAIL_MAX_LENGTH);
     }
 
     private CareerLevel inferCareerLevel(String pageText, ExperienceRange experienceRange) {
@@ -350,6 +362,14 @@ public class WantedJobPostingParser implements JobPostingParser {
         }
 
         return value.replaceAll("\\s+", " ").trim();
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value.length() <= maxLength) {
+            return value;
+        }
+
+        return value.substring(0, maxLength);
     }
 
     private record ExperienceRange(
