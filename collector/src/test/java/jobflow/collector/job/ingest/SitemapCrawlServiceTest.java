@@ -20,6 +20,8 @@ class SitemapCrawlServiceTest {
             crawlerProperties,
             new SitemapFetchService(
                     crawlerProperties,
+                    new NoOpRobotsPolicyService(crawlerProperties),
+                    new CrawlerRequestThrottle(crawlerProperties),
                     httpClient,
                     new SitemapParser()
             ),
@@ -43,10 +45,10 @@ class SitemapCrawlServiceTest {
         httpClient.responses.put("https://zighang.com/seo/sitemap/jobs-1.xml", new CrawlerHttpResponse(200, """
                 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                     <url>
-                        <loc>https://zighang.com/jobs/100</loc>
+                        <loc>https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100</loc>
                     </url>
                     <url>
-                        <loc>https://zighang.com/jobs/200?utm_source=sitemap</loc>
+                        <loc>https://zighang.com/recruitment/00000000-0000-0000-0000-000000000200?utm_source=sitemap</loc>
                     </url>
                 </urlset>
                 """));
@@ -54,10 +56,10 @@ class SitemapCrawlServiceTest {
         httpClient.responses.put("https://zighang.com/seo/sitemap/jobs-2.xml", new CrawlerHttpResponse(200, """
                 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                     <url>
-                        <loc>https://zighang.com/jobs/200</loc>
+                        <loc>https://zighang.com/recruitment/00000000-0000-0000-0000-000000000200</loc>
                     </url>
                     <url>
-                        <loc>https://zighang.com/api/jobs/300</loc>
+                        <loc>https://zighang.com/api/recruitment/00000000-0000-0000-0000-000000000300</loc>
                     </url>
                 </urlset>
                 """));
@@ -74,7 +76,10 @@ class SitemapCrawlServiceTest {
         assertThat(result.discoveredJobUrlCount()).isEqualTo(2);
         assertThat(result.jobUrls())
                 .extracting(CrawlerUrlCandidate::externalId)
-                .containsExactly("100", "200");
+                .containsExactly(
+                        "00000000-0000-0000-0000-000000000100",
+                        "00000000-0000-0000-0000-000000000200"
+                );
     }
 
     @Test
@@ -94,7 +99,7 @@ class SitemapCrawlServiceTest {
         httpClient.responses.put("https://zighang.com/seo/sitemap/jobs-1.xml", new CrawlerHttpResponse(200, """
                 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                     <url>
-                        <loc>https://zighang.com/jobs/100</loc>
+                        <loc>https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100</loc>
                     </url>
                 </urlset>
                 """));
@@ -146,6 +151,17 @@ class SitemapCrawlServiceTest {
                     url,
                     new CrawlerHttpResponse(404, "not found")
             );
+        }
+    }
+
+    private static class NoOpRobotsPolicyService extends RobotsPolicyService {
+
+        NoOpRobotsPolicyService(CrawlerProperties crawlerProperties) {
+            super(crawlerProperties, url -> new CrawlerHttpResponse(200, ""), new RobotsTxtParser());
+        }
+
+        @Override
+        public void assertAllowed(JobIngestionSource source, String url) {
         }
     }
 }

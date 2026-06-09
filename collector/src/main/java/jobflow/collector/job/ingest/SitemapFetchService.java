@@ -7,15 +7,21 @@ import org.springframework.stereotype.Service;
 public class SitemapFetchService {
 
     private final CrawlerProperties crawlerProperties;
+    private final RobotsPolicyService robotsPolicyService;
+    private final CrawlerRequestThrottle crawlerRequestThrottle;
     private final CrawlerHttpClient crawlerHttpClient;
     private final SitemapParser sitemapParser;
 
     public SitemapFetchService(
             CrawlerProperties crawlerProperties,
+            RobotsPolicyService robotsPolicyService,
+            CrawlerRequestThrottle crawlerRequestThrottle,
             CrawlerHttpClient crawlerHttpClient,
             SitemapParser sitemapParser
     ) {
         this.crawlerProperties = crawlerProperties;
+        this.robotsPolicyService = robotsPolicyService;
+        this.crawlerRequestThrottle = crawlerRequestThrottle;
         this.crawlerHttpClient = crawlerHttpClient;
         this.sitemapParser = sitemapParser;
     }
@@ -28,6 +34,9 @@ public class SitemapFetchService {
 
     public FetchedSitemap fetch(JobIngestionSource source, String sitemapUrl) {
         String normalizedUrl = normalizeAndValidate(source, sitemapUrl);
+        robotsPolicyService.assertAllowed(source, normalizedUrl);
+        crawlerRequestThrottle.waitUntilAllowed(source);
+
         CrawlerHttpResponse response = crawlerHttpClient.get(normalizedUrl);
 
         if (!response.isSuccessful()) {
