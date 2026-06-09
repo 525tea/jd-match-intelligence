@@ -32,7 +32,7 @@ VALUES
     ('WANTED', '367038', 'FRONTEND', '프론트엔드 개발자 명시'),
     ('WANTED', '366999', 'FRONTEND', 'Frontend Engineer 명시'),
     ('WANTED', '367078', 'DEVOPS', 'DevOps Engineer 명시'),
-    ('WANTED', '367100', 'EMBEDDED_SOFTWARE', '자동화 제어 엔지니어는 제어/embedded 계열로 분류'),
+    ('WANTED', '367100', 'ROBOT_SOFTWARE', '자동화 제어 엔지니어는 제어/robotics 계열로 분류'),
     ('WANTED', '367083', 'AUTONOMOUS_DRIVING', 'UAV Autonomy 항공/로보틱스 엔지니어'),
     ('WANTED', '366855', 'EMBEDDED_SOFTWARE', '임베디드 Embedded C/C++ IT SW 개발자'),
     ('WANTED', '366845', 'ROBOT_SOFTWARE', 'SLAM Engineer'),
