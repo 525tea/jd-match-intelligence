@@ -57,11 +57,22 @@ class JdJobRoleClassificationServiceTest {
     }
 
     @Test
-    @DisplayName("명시된 role이 ETC가 아니면 자동 분류보다 우선한다")
-    void keepProvidedRoleWhenSpecific() {
+    @DisplayName("명시된 role보다 JD 텍스트 기반 분류가 더 구체적이면 보정한다")
+    void inferRoleFromTextBeforeProvidedRole() {
         JobRole role = service.resolve(
                 JobRole.FRONTEND,
                 "Spring Boot 백엔드 API 개발"
+        );
+
+        assertThat(role).isEqualTo(JobRole.BACKEND);
+    }
+
+    @Test
+    @DisplayName("JD 텍스트로 분류할 수 없으면 명시된 role을 유지한다")
+    void keepProvidedRoleWhenTextIsUnknown() {
+        JobRole role = service.resolve(
+                JobRole.FRONTEND,
+                "서비스 화면 개선과 사용자 경험 고도화"
         );
 
         assertThat(role).isEqualTo(JobRole.FRONTEND);

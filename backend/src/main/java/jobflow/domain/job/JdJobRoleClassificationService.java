@@ -1,11 +1,10 @@
 package jobflow.domain.job;
 
-import org.springframework.stereotype.Service;
-
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.springframework.stereotype.Service;
 
 @Service
 public class JdJobRoleClassificationService {
@@ -13,11 +12,17 @@ public class JdJobRoleClassificationService {
     private static final Pattern NON_WORD_PATTERN = Pattern.compile("[^a-z0-9가-힣+#.]+");
 
     public JobRole resolve(JobRole providedRole, String... texts) {
+        JobRole classifiedRole = classify(texts);
+
+        if (classifiedRole != JobRole.ETC) {
+            return classifiedRole;
+        }
+
         if (providedRole != null && providedRole != JobRole.ETC) {
             return providedRole;
         }
 
-        return classify(texts);
+        return JobRole.ETC;
     }
 
     public JobRole classify(String... texts) {
@@ -31,8 +36,31 @@ public class JdJobRoleClassificationService {
             return JobRole.ANDROID;
         }
 
-        if (matchesAny(text, "ios", "iphone", "swift", "objective c", "아이폰", "iOS")) {
+        if (matchesAny(text, "ios", "iphone", "swift", "objective c", "아이폰")) {
             return JobRole.IOS;
+        }
+
+        if (matchesAny(text, "backend", "back end", "back-end", "server", "spring", "java", "백엔드", "서버")) {
+            return JobRole.BACKEND;
+        }
+
+        if (matchesAny(text, "frontend", "front end", "front-end", "react", "vue", "프론트엔드")) {
+            return JobRole.FRONTEND;
+        }
+
+        if (matchesAny(text, "devops", "sre", "platform engineer", "kubernetes", "k8s", "infra", "infrastructure",
+                "cloud engineer", "클라우드 엔지니어", "인프라", "플랫폼 엔지니어", "linux", "리눅스", "network engineer",
+                "네트워크 엔지니어")) {
+            return JobRole.DEVOPS;
+        }
+
+        if (matchesAny(text, "security engineer", "security", "cybersecurity", "cyber security", "보안", "사이버보안",
+                "패치 관리", "patch management")) {
+            return JobRole.SECURITY;
+        }
+
+        if (matchesAny(text, "data engineer", "data pipeline", "etl", "데이터 엔지니어", "데이터 파이프라인")) {
+            return JobRole.DATA_ENGINEER;
         }
 
         if (matchesAny(text, "machine learning", "ml engineer", "mlops", "머신러닝")) {
@@ -43,20 +71,8 @@ public class JdJobRoleClassificationService {
             return JobRole.AI_ENGINEER;
         }
 
-        if (matchesAny(text, "data engineer", "data pipeline", "etl", "데이터 엔지니어", "데이터 파이프라인")) {
-            return JobRole.DATA_ENGINEER;
-        }
-
-        if (matchesAny(text, "devops", "sre", "platform engineer", "kubernetes", "k8s", "infra", "인프라", "플랫폼 엔지니어")) {
-            return JobRole.DEVOPS;
-        }
-
         if (matchesAny(text, "dba", "database administrator", "데이터베이스 관리자")) {
             return JobRole.DBA;
-        }
-
-        if (matchesAny(text, "security engineer", "security", "보안")) {
-            return JobRole.SECURITY;
         }
 
         if (matchesAny(text, "qa", "test engineer", "quality assurance", "테스트 엔지니어", "품질")) {
@@ -67,12 +83,10 @@ public class JdJobRoleClassificationService {
             return JobRole.PM;
         }
 
-        if (matchesAny(text, "frontend", "front end", "front-end", "react", "vue", "프론트엔드")) {
-            return JobRole.FRONTEND;
-        }
-
-        if (matchesAny(text, "backend", "back end", "back-end", "server", "spring", "java", "백엔드", "서버")) {
-            return JobRole.BACKEND;
+        if (matchesAny(text, "software engineer", "software developer", "소프트웨어 엔지니어", "소프트웨어 개발자",
+                "sw engineer", "sw 개발", "fw 개발", "firmware", "펌웨어", "application 개발", "application기능",
+                "application ui", "web viewer", "pc sw", "controls engineer", "control engineer", "제어 엔지니어")) {
+            return JobRole.FULLSTACK;
         }
 
         return JobRole.ETC;
