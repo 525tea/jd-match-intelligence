@@ -7,7 +7,8 @@ public class PassThroughJobPostingPreFilter implements JobPostingPreFilter {
 
     @Override
     public boolean supports(JobIngestionSource source) {
-        return source == JobIngestionSource.JUMPIT;
+        return source == JobIngestionSource.JUMPIT
+                || source == JobIngestionSource.WANTED;
     }
 
     @Override

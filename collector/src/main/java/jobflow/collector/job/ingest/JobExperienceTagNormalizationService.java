@@ -21,6 +21,7 @@ public class JobExperienceTagNormalizationService {
     @Transactional
     public List<JobExperienceTag> replaceNormalizedExperienceTags(Job job, String... texts) {
         jobExperienceTagRepository.deleteByJobId(job.getId());
+        jobExperienceTagRepository.flush();
 
         List<NormalizedExperienceTagMatch> matches = jdExperienceTagNormalizationService.normalize(texts);
 

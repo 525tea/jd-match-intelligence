@@ -22,6 +22,7 @@ public class JobSkillNormalizationService {
     @Transactional
     public List<JobSkill> replaceNormalizedSkills(Job job, String... texts) {
         jobSkillRepository.deleteByJobId(job.getId());
+        jobSkillRepository.flush();
 
         List<NormalizedSkillMatch> matches = jdSkillNormalizationService.normalize(texts);
 

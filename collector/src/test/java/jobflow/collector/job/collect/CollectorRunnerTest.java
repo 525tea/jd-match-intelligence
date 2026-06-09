@@ -12,6 +12,7 @@ import jobflow.collector.job.ingest.JobPostingCollectionResult;
 import jobflow.collector.job.ingest.JobPostingCollectionService;
 import jobflow.collector.job.ingest.SitemapCrawlResult;
 import jobflow.collector.job.ingest.SitemapCrawlService;
+import jobflow.collector.job.ingest.WantedJobUrlDiscoveryService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,9 @@ class CollectorRunnerTest {
 
     @Mock
     private SitemapCrawlService sitemapCrawlService;
+
+    @Mock
+    private WantedJobUrlDiscoveryService wantedJobUrlDiscoveryService;
 
     @Mock
     private JobPostingCollectionService jobPostingCollectionService;
@@ -41,6 +45,7 @@ class CollectorRunnerTest {
         CollectorRunner runner = new CollectorRunner(
                 properties,
                 sitemapCrawlService,
+                wantedJobUrlDiscoveryService,
                 jobPostingCollectionService
         );
         CrawlerUrlCandidate firstCandidate = zighangCandidate("00000000-0000-0000-0000-000000000100");
@@ -84,6 +89,7 @@ class CollectorRunnerTest {
         CollectorRunner runner = new CollectorRunner(
                 properties,
                 sitemapCrawlService,
+                wantedJobUrlDiscoveryService,
                 jobPostingCollectionService
         );
         CrawlerUrlCandidate firstCandidate = jumpitCandidate("54111922");
@@ -116,6 +122,7 @@ class CollectorRunnerTest {
         CollectorRunner runner = new CollectorRunner(
                 properties,
                 sitemapCrawlService,
+                wantedJobUrlDiscoveryService,
                 jobPostingCollectionService
         );
 
@@ -132,6 +139,41 @@ class CollectorRunnerTest {
         verify(sitemapCrawlService).crawl(JobIngestionSource.ZIGHANG, 100);
     }
 
+    @Test
+    @DisplayName("WANTED source는 sitemap 대신 목록 API discovery로 후보를 수집한다")
+    void runWantedWithApiDiscovery() {
+        CollectorRunnerProperties properties = new CollectorRunnerProperties(
+                true,
+                JobIngestionSource.WANTED,
+                5,
+                1,
+                10
+        );
+        CollectorRunner runner = new CollectorRunner(
+                properties,
+                sitemapCrawlService,
+                wantedJobUrlDiscoveryService,
+                jobPostingCollectionService
+        );
+        CrawlerUrlCandidate firstCandidate = wantedCandidate("367044");
+        CrawlerUrlCandidate secondCandidate = wantedCandidate("367045");
+
+        given(wantedJobUrlDiscoveryService.discover(10))
+                .willReturn(List.of(firstCandidate, secondCandidate));
+        given(jobPostingCollectionService.collect(firstCandidate))
+                .willReturn(JobPostingCollectionResult.success(
+                        firstCandidate,
+                        JobIngestionResultType.CREATED
+                ));
+
+        runner.run(new DefaultApplicationArguments());
+
+        verify(wantedJobUrlDiscoveryService).discover(10);
+        verify(sitemapCrawlService, never()).crawl(JobIngestionSource.WANTED, 10);
+        verify(jobPostingCollectionService).collect(firstCandidate);
+        verify(jobPostingCollectionService, never()).collect(secondCandidate);
+    }
+
     private CrawlerUrlCandidate zighangCandidate(String externalId) {
         return new CrawlerUrlCandidate(
                 JobIngestionSource.ZIGHANG,
@@ -146,6 +188,15 @@ class CollectorRunnerTest {
                 JobIngestionSource.JUMPIT,
                 "https://jumpit.saramin.co.kr/position/" + externalId,
                 "https://jumpit.saramin.co.kr/position/" + externalId,
+                externalId
+        );
+    }
+
+    private CrawlerUrlCandidate wantedCandidate(String externalId) {
+        return new CrawlerUrlCandidate(
+                JobIngestionSource.WANTED,
+                "https://www.wanted.co.kr/wd/" + externalId,
+                "https://www.wanted.co.kr/api/v4/jobs/" + externalId,
                 externalId
         );
     }

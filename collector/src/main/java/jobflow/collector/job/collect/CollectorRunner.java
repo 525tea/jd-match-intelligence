@@ -7,6 +7,8 @@ import jobflow.collector.job.ingest.JobPostingCollectionResult;
 import jobflow.collector.job.ingest.JobPostingCollectionService;
 import jobflow.collector.job.ingest.SitemapCrawlResult;
 import jobflow.collector.job.ingest.SitemapCrawlService;
+import jobflow.collector.job.ingest.WantedJobUrlDiscoveryService;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
@@ -22,6 +24,7 @@ public class CollectorRunner implements ApplicationRunner {
 
     private final CollectorRunnerProperties collectorRunnerProperties;
     private final SitemapCrawlService sitemapCrawlService;
+    private final WantedJobUrlDiscoveryService wantedJobUrlDiscoveryService;
     private final JobPostingCollectionService jobPostingCollectionService;
 
     @Override
@@ -39,20 +42,13 @@ public class CollectorRunner implements ApplicationRunner {
                 scanLimit
         );
 
-        SitemapCrawlResult result = sitemapCrawlService.crawl(source, scanLimit);
+        List<CrawlerUrlCandidate> jobUrls = discoverJobUrls(source, scanLimit);
 
-        log.info(
-                "Collector sitemap crawl completed. source={}, fetchedSitemapCount={}, discoveredJobUrlCount={}",
-                result.source(),
-                result.fetchedSitemapCount(),
-                result.discoveredJobUrlCount()
-        );
-
-        result.jobUrls().stream()
+        jobUrls.stream()
                 .limit(previewLimit)
                 .forEach(this::logDiscoveredJobUrl);
 
-        CollectionSummary summary = collectUntilLimit(result, collectLimit, scanLimit);
+        CollectionSummary summary = collectUntilLimit(jobUrls, collectLimit, scanLimit);
 
         log.info(
                 "Collector completed. source={}, processedCount={}, collectedCount={}, skippedCount={}, failedCount={}",
@@ -64,8 +60,33 @@ public class CollectorRunner implements ApplicationRunner {
         );
     }
 
+    private List<CrawlerUrlCandidate> discoverJobUrls(JobIngestionSource source, int scanLimit) {
+        if (source == JobIngestionSource.WANTED) {
+            List<CrawlerUrlCandidate> jobUrls = wantedJobUrlDiscoveryService.discover(scanLimit);
+
+            log.info(
+                    "Collector wanted discovery completed. source={}, discoveredJobUrlCount={}",
+                    source,
+                    jobUrls.size()
+            );
+
+            return jobUrls;
+        }
+
+        SitemapCrawlResult result = sitemapCrawlService.crawl(source, scanLimit);
+
+        log.info(
+                "Collector sitemap crawl completed. source={}, fetchedSitemapCount={}, discoveredJobUrlCount={}",
+                result.source(),
+                result.fetchedSitemapCount(),
+                result.discoveredJobUrlCount()
+        );
+
+        return result.jobUrls();
+    }
+
     private CollectionSummary collectUntilLimit(
-            SitemapCrawlResult result,
+            List<CrawlerUrlCandidate> jobUrls,
             int collectLimit,
             int scanLimit
     ) {
@@ -74,7 +95,7 @@ public class CollectorRunner implements ApplicationRunner {
         int skippedCount = 0;
         int failedCount = 0;
 
-        for (CrawlerUrlCandidate candidate : result.jobUrls()) {
+        for (CrawlerUrlCandidate candidate : jobUrls) {
             if (processedCount >= scanLimit || collectedCount >= collectLimit) {
                 break;
             }

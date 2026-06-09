@@ -82,6 +82,25 @@ class RobotsPolicyServiceTest {
     }
 
     @Test
+    @DisplayName("WANTED robots.txt가 403이면 설정된 allowed path만 fallback 허용한다")
+    void wantedRobotsForbiddenFallsBackToConfiguredPathRules() {
+        httpClient.response = new CrawlerHttpResponse(403, "forbidden");
+
+        assertThat(service.isAllowed(
+                JobIngestionSource.WANTED,
+                "https://www.wanted.co.kr/api/v4/jobs/367044"
+        )).isTrue();
+        assertThat(service.isAllowed(
+                JobIngestionSource.WANTED,
+                "https://www.wanted.co.kr/api/v4/applications/1"
+        )).isFalse();
+        assertThat(service.isAllowed(
+                JobIngestionSource.WANTED,
+                "https://www.wanted.co.kr/search"
+        )).isFalse();
+    }
+
+    @Test
     @DisplayName("assertAllowed는 차단 URL이면 예외가 발생한다")
     void assertAllowedThrowsWhenUrlIsDisallowed() {
         httpClient.response = new CrawlerHttpResponse(200, """
@@ -160,6 +179,18 @@ class RobotsPolicyServiceTest {
                         List.of("/"),
                         List.of("/api/", "/short/", "/join", "/menu/"),
                         Duration.ofSeconds(20),
+                        1000
+                )
+        );
+        sources.put(
+                JobIngestionSource.WANTED,
+                new CrawlerProperties.SourceProperties(
+                        "https://www.wanted.co.kr",
+                        "https://www.wanted.co.kr/robots.txt",
+                        "https://www.wanted.co.kr/api/v4/jobs",
+                        List.of("/api/v4/jobs", "/wd"),
+                        List.of("/login", "/auth", "/api/v4/applications"),
+                        Duration.ofSeconds(1),
                         1000
                 )
         );

@@ -1,6 +1,8 @@
 package jobflow.collector.job.ingest;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
@@ -31,9 +33,10 @@ public class RobotsPolicyService {
             return false;
         }
 
+        String path = pathWithQuery(uri);
         RobotsTxt robotsTxt = loadRobotsTxt(source, policy);
 
-        return robotsTxt.isAllowed(pathWithQuery(uri));
+        return robotsTxt.isAllowed(path);
     }
 
     public void assertAllowed(JobIngestionSource source, String url) {
@@ -62,6 +65,10 @@ public class RobotsPolicyService {
         CrawlerHttpResponse response = httpClient.get(policy.robotsUrl());
 
         if (!response.isSuccessful()) {
+            if (source == JobIngestionSource.WANTED && response.statusCode() == 403) {
+                return fallbackRobotsTxt(policy);
+            }
+
             throw new RobotsPolicyException(
                     "Failed to fetch robots.txt. source="
                             + source
@@ -73,6 +80,18 @@ public class RobotsPolicyService {
         }
 
         return robotsTxtParser.parse(response.body(), crawlerProperties.userAgent());
+    }
+
+    private RobotsTxt fallbackRobotsTxt(CrawlerSourcePolicy policy) {
+        List<RobotsPathRule> rules = new ArrayList<>();
+
+        rules.add(new RobotsPathRule(false, "/"));
+        policy.allowedPathPrefixes()
+                .forEach(path -> rules.add(new RobotsPathRule(true, path)));
+        policy.disallowedPathPrefixes()
+                .forEach(path -> rules.add(new RobotsPathRule(false, path)));
+
+        return new RobotsTxt(rules, List.of());
     }
 
     private String pathWithQuery(URI uri) {
