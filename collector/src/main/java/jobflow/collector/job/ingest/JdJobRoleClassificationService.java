@@ -21,7 +21,13 @@ public class JdJobRoleClassificationService {
     }
 
     public JobRole classify(String... texts) {
-        String text = normalize(String.join(" ", nonNullTexts(texts)));
+        List<String> textParts = nonNullTexts(texts);
+        String text = normalize(String.join(" ", textParts));
+        JobRole titleRole = classifyTitle(textParts);
+
+        if (titleRole != null) {
+            return titleRole;
+        }
 
         if (matchesAny(text, "게임 서버", "게임개발 서버", "game server")) {
             return JobRole.GAME_SERVER;
@@ -79,19 +85,52 @@ public class JdJobRoleClassificationService {
             return JobRole.GAME_SOUND;
         }
 
+        if (matchesAny(text, "product manager", "project manager", "program manager", "pmo", "pm", "po",
+                "project management", "서비스 기획", "프로덕트 매니저", "개발매니저", "개발 매니저", "cto",
+                "chief technology officer", "기술 총괄")) {
+            return JobRole.PM;
+        }
+
+        if (matchesAny(text, "frontend", "frontendengineer", "front end", "front-end", "react", "vue",
+                "next.js", "nextjs", "프론트엔드")) {
+            return JobRole.FRONTEND;
+        }
+
+        if (matchesAny(text, "backend", "backendengineer", "back end", "back-end", "server", "spring", "java",
+                "백엔드", "서버", "api 개발", "api개발", "back end개발")) {
+            return JobRole.BACKEND;
+        }
+
+        if (matchesAny(text, "security engineer", "security", "cybersecurity", "cyber security", "보안", "사이버보안",
+                "패치 관리", "patch management")) {
+            return JobRole.SECURITY;
+        }
+
         if (matchesAny(text, "sap", "erp", "abap", "si sm", "si/sm", "sm 모듈", "erp 컨설팅",
                 "erp 시스템", "기간계", "그룹웨어")) {
             return JobRole.ERP_SAP;
         }
 
-        if (matchesAny(text, "embedded", "임베디드", "firmware", "펌웨어", "fw 개발", "fw개발",
-                "embedded c", "rtos", "autosar", "rtl design", "rtl", "soc", "nvr", "pc sw", "web viewer")) {
-            return JobRole.EMBEDDED_SOFTWARE;
+        if (matchesAny(text, "autonomous driving", "자율주행", "uav autonomy")) {
+            return JobRole.AUTONOMOUS_DRIVING;
         }
 
         if (matchesAny(text, "robot", "robotics", "로봇", "ros", "slam", "manipulation", "motion",
                 "robot control", "robot controls", "로봇 제어", "로봇 응용", "mobile robot")) {
             return JobRole.ROBOT_SOFTWARE;
+        }
+
+        if (matchesAny(text, "ai engineer", "ai developer", "ai 개발자", "ai 엔지니어", "인공지능")) {
+            return JobRole.AI_ENGINEER;
+        }
+
+        if (matchesAny(text, "소프트웨어 엔지니어", "소프트웨어 개발자", "s/w 소프트웨어 개발")) {
+            return JobRole.SOFTWARE_ENGINEER;
+        }
+
+        if (matchesAny(text, "embedded", "임베디드", "firmware", "펌웨어", "fw 개발", "fw개발",
+                "embedded c", "rtos", "autosar", "rtl design", "rtl", "soc", "nvr", "pc sw", "web viewer")) {
+            return JobRole.EMBEDDED_SOFTWARE;
         }
 
         if (matchesAny(text, "hardware engineer", "하드웨어 엔지니어", "하드웨어엔지니어", "회로개발", "회로 개발",
@@ -104,10 +143,6 @@ public class JdJobRoleClassificationService {
             return JobRole.SYSTEM_SOFTWARE;
         }
 
-        if (matchesAny(text, "fullstack", "full stack", "full-stack", "풀스택")) {
-            return JobRole.FULLSTACK;
-        }
-
         if (matchesAny(text, "android", "안드로이드")) {
             return JobRole.ANDROID;
         }
@@ -116,14 +151,8 @@ public class JdJobRoleClassificationService {
             return JobRole.IOS;
         }
 
-        if (matchesAny(text, "backend", "backendengineer", "back end", "back-end", "server", "spring", "java",
-                "백엔드", "서버", "api 개발", "api개발", "back end개발")) {
-            return JobRole.BACKEND;
-        }
-
-        if (matchesAny(text, "frontend", "frontendengineer", "front end", "front-end", "react", "vue",
-                "next.js", "nextjs", "프론트엔드")) {
-            return JobRole.FRONTEND;
+        if (matchesAny(text, "fullstack", "full stack", "full-stack", "풀스택")) {
+            return JobRole.FULLSTACK;
         }
 
         if (matchesAny(text, "sre", "site reliability")) {
@@ -139,11 +168,6 @@ public class JdJobRoleClassificationService {
         if (matchesAny(text, "network engineer", "네트워크 엔지니어", "시스템 네트워크", "시스템·네트워크",
                 "system engineer", "시스템 엔지니어", "시스템운영", "네트워크")) {
             return JobRole.SYSTEM_NETWORK;
-        }
-
-        if (matchesAny(text, "security engineer", "security", "cybersecurity", "cyber security", "보안", "사이버보안",
-                "패치 관리", "patch management")) {
-            return JobRole.SECURITY;
         }
 
         if (matchesAny(text, "data analyst", "데이터 분석가", "데이터분석가", "데이터 분석")) {
@@ -166,10 +190,6 @@ public class JdJobRoleClassificationService {
 
         if (matchesAny(text, "영상 음성", "영상·음성", "음성 ai", "speech", "voice", "audio")) {
             return JobRole.VISION_AUDIO_AI;
-        }
-
-        if (matchesAny(text, "autonomous driving", "자율주행", "uav autonomy")) {
-            return JobRole.AUTONOMOUS_DRIVING;
         }
 
         if (matchesAny(text, "nlp", "natural language")) {
@@ -214,22 +234,12 @@ public class JdJobRoleClassificationService {
             return JobRole.AI_SERVICE_PLANNING;
         }
 
-        if (matchesAny(text, "ai engineer", "ai developer", "ai 개발자", "ai 엔지니어", "인공지능")) {
-            return JobRole.AI_ENGINEER;
-        }
-
         if (matchesAny(text, "dba", "database administrator", "데이터베이스 관리자")) {
             return JobRole.DBA;
         }
 
         if (matchesAny(text, "qa", "test engineer", "quality assurance", "테스트 엔지니어", "품질")) {
             return JobRole.QA;
-        }
-
-        if (matchesAny(text, "product manager", "project manager", "program manager", "pmo", "pm", "po",
-                "서비스 기획", "프로덕트 매니저", "개발매니저", "개발 매니저", "cto", "chief technology officer",
-                "기술 총괄")) {
-            return JobRole.PM;
         }
 
         if (matchesAny(text, "cross platform", "크로스플랫폼", "react native", "flutter", "xamarin")) {
@@ -267,6 +277,79 @@ public class JdJobRoleClassificationService {
         }
 
         return JobRole.ETC;
+    }
+
+    private JobRole classifyTitle(List<String> textParts) {
+        if (textParts.isEmpty()) {
+            return null;
+        }
+
+        String title = normalize(textParts.get(0));
+
+        if (matchesAny(title, "게임 서버", "게임개발 서버", "game server")) {
+            return JobRole.GAME_SERVER;
+        }
+
+        if (matchesAny(title, "게임 클라이언트", "게임개발 클라이언트", "game client")) {
+            return JobRole.GAME_CLIENT;
+        }
+
+        if (matchesAny(title, "게임 모바일", "게임개발 모바일", "mobile game")) {
+            return JobRole.GAME_MOBILE;
+        }
+
+        if (matchesAny(title, "product manager", "project manager", "program manager", "project management",
+                "pmo", "pm", "po", "개발매니저", "개발 매니저", "cto", "chief technology officer", "기술 총괄")) {
+            return JobRole.PM;
+        }
+
+        if (matchesAny(title, "fullstack", "full stack", "full-stack", "풀스택")) {
+            return JobRole.FULLSTACK;
+        }
+
+        if (matchesAny(title, "frontend", "frontendengineer", "front end", "front-end", "프론트엔드")) {
+            return JobRole.FRONTEND;
+        }
+
+        if (matchesAny(title, "backend", "backendengineer", "back end", "back-end", "백엔드", "서버")) {
+            return JobRole.BACKEND;
+        }
+
+        if (matchesAny(title, "security engineer", "security", "cybersecurity", "cyber security", "보안", "사이버보안")) {
+            return JobRole.SECURITY;
+        }
+
+        if (matchesAny(title, "sap", "erp", "abap", "si sm", "si/sm")) {
+            return JobRole.ERP_SAP;
+        }
+
+        if (matchesAny(title, "autonomous driving", "자율주행", "uav autonomy")) {
+            return JobRole.AUTONOMOUS_DRIVING;
+        }
+
+        if (matchesAny(title, "robot", "robotics", "로봇", "ros", "slam", "robot control", "robot controls")) {
+            return JobRole.ROBOT_SOFTWARE;
+        }
+
+        if (matchesAny(title, "ai engineer", "ai developer", "ai 개발자", "ai 엔지니어")) {
+            return JobRole.AI_ENGINEER;
+        }
+
+        if (matchesAny(title, "embedded", "임베디드", "firmware", "펌웨어", "fw 개발", "fw개발",
+                "rtl", "soc", "nvr")) {
+            return JobRole.EMBEDDED_SOFTWARE;
+        }
+
+        if (matchesAny(title, "hardware engineer", "하드웨어 엔지니어", "하드웨어엔지니어", "회로개발", "회로 개발",
+                "antenna", "안테나", "phased array")) {
+            return JobRole.HARDWARE_ENGINEER;
+        }
+
+        if (matchesAny(title, "소프트웨어 엔지니어", "소프트웨어 개발자", "s/w 소프트웨어 개발")) {
+            return JobRole.SOFTWARE_ENGINEER;
+        }
+
+        return null;
     }
 
     private List<String> nonNullTexts(String... texts) {

@@ -165,4 +165,70 @@ class JdJobRoleClassificationServiceTest {
 
         assertThat(role).isEqualTo(JobRole.GAME_SERVER);
     }
+
+    @Test
+    @DisplayName("사이버보안 JD는 네트워크 키워드보다 SECURITY를 우선한다")
+    void classifyCyberSecurityRoleBeforeNetwork() {
+        JobRole role = service.classify(
+                "해양 사이버보안 전문가",
+                "네트워크 보안 시스템 진단"
+        );
+
+        assertThat(role).isEqualTo(JobRole.SECURITY);
+    }
+
+    @Test
+    @DisplayName("AI 개발자 JD는 embedded 키워드보다 AI_ENGINEER를 우선한다")
+    void classifyAiDeveloperRoleBeforeEmbedded() {
+        JobRole role = service.classify(
+                "AI 개발자 (경력5년↑)",
+                "embedded device firmware와 AI 모델 연동 개발"
+        );
+
+        assertThat(role).isEqualTo(JobRole.AI_ENGINEER);
+    }
+
+    @Test
+    @DisplayName("Frontend Engineer JD는 security/backend 키워드보다 FRONTEND를 우선한다")
+    void classifyFrontendRoleBeforeSecurityAndBackend() {
+        JobRole role = service.classify(
+                "Frontend Engineer (React/Security)",
+                "보안 솔루션의 backend API 연동 화면 개발"
+        );
+
+        assertThat(role).isEqualTo(JobRole.FRONTEND);
+    }
+
+    @Test
+    @DisplayName("서비스 백엔드 JD는 React 키워드보다 BACKEND를 우선한다")
+    void classifyBackendRoleBeforeFullstack() {
+        JobRole role = service.classify(
+                "서비스 백엔드 개발자 | Node.js · React · 운영 자동화",
+                "React 기반 관리 화면과 Node.js API 운영"
+        );
+
+        assertThat(role).isEqualTo(JobRole.BACKEND);
+    }
+
+    @Test
+    @DisplayName("UAV Autonomy JD는 embedded 키워드보다 AUTONOMOUS_DRIVING을 우선한다")
+    void classifyAutonomousRoleBeforeEmbedded() {
+        JobRole role = service.classify(
+                "항공 및 로보틱스 엔지니어 (UAV Autonomy)",
+                "embedded controller 기반 자율주행 알고리즘 개발"
+        );
+
+        assertThat(role).isEqualTo(JobRole.AUTONOMOUS_DRIVING);
+    }
+
+    @Test
+    @DisplayName("PM JD는 frontend 키워드보다 PM을 우선한다")
+    void classifyPmRoleBeforeFrontend() {
+        JobRole role = service.classify(
+                "Project Management Officer",
+                "frontend 개발 조직의 프로젝트 관리"
+        );
+
+        assertThat(role).isEqualTo(JobRole.PM);
+    }
 }
