@@ -1,9 +1,9 @@
 package jobflow.domain.job;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class JdJobRoleClassificationServiceTest {
 
@@ -101,13 +101,68 @@ class JdJobRoleClassificationServiceTest {
     }
 
     @Test
-    @DisplayName("firmware/embedded 계열은 현재 enum 기준 ETC로 둔다")
-    void classifyFirmwareRoleAsEtc() {
+    @DisplayName("firmware/embedded 계열은 EMBEDDED_SOFTWARE로 분류한다")
+    void classifyFirmwareRole() {
         JobRole role = service.classify(
                 "Application UI FW개발자",
                 "NVR PC SW 및 firmware 개발"
         );
 
-        assertThat(role).isEqualTo(JobRole.ETC);
+        assertThat(role).isEqualTo(JobRole.EMBEDDED_SOFTWARE);
+    }
+
+    @Test
+    @DisplayName("ERP/SAP JD를 ERP_SAP으로 분류한다")
+    void classifyErpSapRole() {
+        JobRole role = service.classify(
+                "SAP ERP기술컨설팅(SI/SM)",
+                "SAP SM 모듈 운영과 ERP 시스템 유지보수"
+        );
+
+        assertThat(role).isEqualTo(JobRole.ERP_SAP);
+    }
+
+    @Test
+    @DisplayName("robotics JD를 ROBOT_SOFTWARE로 분류한다")
+    void classifyRobotSoftwareRole() {
+        JobRole role = service.classify(
+                "ROS 기반 주행 SW 개발",
+                "Mobile Robot control software 개발"
+        );
+
+        assertThat(role).isEqualTo(JobRole.ROBOT_SOFTWARE);
+    }
+
+    @Test
+    @DisplayName("회로/안테나 JD를 HARDWARE_ENGINEER로 분류한다")
+    void classifyHardwareEngineerRole() {
+        JobRole role = service.classify(
+                "Phased Array Antenna Design 채용",
+                "RF 회로개발"
+        );
+
+        assertThat(role).isEqualTo(JobRole.HARDWARE_ENGINEER);
+    }
+
+    @Test
+    @DisplayName("붙어 있는 FrontendEngineer 표현을 FRONTEND로 분류한다")
+    void classifyJoinedFrontendEngineerRole() {
+        JobRole role = service.classify(
+                "FrontendEngineer(Next.js-Typescript)",
+                "React 기반 웹 서비스 개발"
+        );
+
+        assertThat(role).isEqualTo(JobRole.FRONTEND);
+    }
+
+    @Test
+    @DisplayName("게임 서버 JD를 GAME_SERVER로 분류한다")
+    void classifyGameServerRole() {
+        JobRole role = service.classify(
+                "게임개발·서버",
+                "대규모 게임 서버 개발"
+        );
+
+        assertThat(role).isEqualTo(JobRole.GAME_SERVER);
     }
 }
