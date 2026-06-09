@@ -1,16 +1,15 @@
 package jobflow.collector.job.ingest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.time.LocalDateTime;
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
 import jobflow.collector.job.JobRole;
 import jobflow.collector.job.RemoteType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import java.time.LocalDateTime;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ZighangJobPostingParserTest {
 
@@ -29,7 +28,8 @@ class ZighangJobPostingParserTest {
                 """
                         <html>
                           <head>
-                            <meta property="og:title" content="Backend Engineer">
+                            <meta property="og:title" content="Backend Engineer | JobFlow Labs | IT_개발 | 직행">
+                            <title>Backend Engineer | JobFlow Labs | IT_개발 | 직행</title>
                           </head>
                           <body>
                             <main>

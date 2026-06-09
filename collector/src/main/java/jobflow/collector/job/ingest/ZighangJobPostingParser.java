@@ -1,18 +1,16 @@
 package jobflow.collector.job.ingest;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
 import jobflow.collector.job.RemoteType;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Component;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @Component
 public class ZighangJobPostingParser implements JobPostingParser {
@@ -136,7 +134,6 @@ public class ZighangJobPostingParser implements JobPostingParser {
     private String firstValidCompanyText(Document document, String... selectors) {
         for (String selector : selectors) {
             String value = text(document, selector);
-
             String companyName = cleanCompanyName(value);
 
             if (!companyName.isBlank()) {
@@ -177,6 +174,8 @@ public class ZighangJobPostingParser implements JobPostingParser {
                             + ", companyPreview="
                             + preview(firstValidText(
                             document,
+                            "a[href^=/company/]",
+                            "a[href*=zighang.com/company/]",
                             "[data-testid=company-name]",
                             "[data-testid=company]",
                             "[class*=companyName]",
@@ -185,8 +184,6 @@ public class ZighangJobPostingParser implements JobPostingParser {
                             ".company",
                             "meta[property=og:site_name]"
                     ))
-                            + ", companyCandidatePreview="
-                            + preview(companyCandidatePreview(document))
             );
         }
     }
@@ -416,23 +413,5 @@ public class ZighangJobPostingParser implements JobPostingParser {
         }
 
         return normalized.substring(0, 80);
-    }
-
-    private String companyCandidatePreview(Document document) {
-        return document.select("a, button, span, div, p, section")
-                .stream()
-                .map(element -> normalize(element.text()))
-                .filter(text -> !text.isBlank())
-                .filter(text -> text.length() <= 120)
-                .filter(text -> text.contains("기업")
-                        || text.contains("회사")
-                        || text.contains("채용")
-                        || text.contains("정보")
-                        || text.contains("담당")
-                        || text.contains("개발")
-                        || text.contains("전략"))
-                .distinct()
-                .limit(20)
-                .collect(Collectors.joining(" | "));
     }
 }
