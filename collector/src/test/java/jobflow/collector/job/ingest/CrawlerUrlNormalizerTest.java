@@ -65,6 +65,24 @@ class CrawlerUrlNormalizerTest {
     }
 
     @Test
+    @DisplayName("점핏 숫자 id가 아닌 position URL은 공고 후보에서 제외한다")
+    void ignoreJumpitNonNumericPositionUrl() {
+        assertThat(normalizer.normalize(
+                JobIngestionSource.JUMPIT,
+                "https://jumpit.saramin.co.kr/position/abc"
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("점핏 상세 path보다 깊은 URL은 공고 후보에서 제외한다")
+    void ignoreJumpitNestedPositionUrl() {
+        assertThat(normalizer.normalize(
+                JobIngestionSource.JUMPIT,
+                "https://jumpit.saramin.co.kr/position/12345/extra"
+        )).isEmpty();
+    }
+
+    @Test
     @DisplayName("직행 상세 공고 UUID URL만 후보로 정규화한다")
     void normalizeZighangRecruitmentUrl() {
         CrawlerUrlCandidate candidate = normalizer.normalize(
@@ -132,7 +150,7 @@ class CrawlerUrlNormalizerTest {
                         "https://jumpit.saramin.co.kr",
                         "https://jumpit.saramin.co.kr/robots.txt",
                         "https://jumpit.saramin.co.kr/sitemap.xml",
-                        List.of("/"),
+                        List.of("/position", "/sitemap"),
                         List.of("/resumes", "/auth/"),
                         Duration.ofSeconds(20),
                         1000
