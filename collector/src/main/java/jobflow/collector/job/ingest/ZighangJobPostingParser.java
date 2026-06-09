@@ -152,6 +152,8 @@ public class ZighangJobPostingParser implements JobPostingParser {
             FetchedJobPosting fetchedJobPosting
     ) {
         if (value == null || value.isBlank()) {
+            Document document = Jsoup.parse(fetchedJobPosting.body(), fetchedJobPosting.detailUrl());
+
             throw new JobPostingParseException(
                     "Required field is missing. field="
                             + fieldName
@@ -159,6 +161,19 @@ public class ZighangJobPostingParser implements JobPostingParser {
                             + fetchedJobPosting.source()
                             + ", externalId="
                             + fetchedJobPosting.externalId()
+                            + ", titlePreview="
+                            + preview(firstValidText(document, "h1", "meta[property=og:title]", "title"))
+                            + ", companyPreview="
+                            + preview(firstValidText(
+                            document,
+                            "[data-testid=company-name]",
+                            "[data-testid=company]",
+                            "[class*=companyName]",
+                            "[class*=company-name]",
+                            ".company-name",
+                            ".company",
+                            "meta[property=og:site_name]"
+                    ))
             );
         }
     }
@@ -318,5 +333,15 @@ public class ZighangJobPostingParser implements JobPostingParser {
         }
 
         return value.replaceAll("\\s+", " ").trim();
+    }
+
+    private String preview(String value) {
+        String normalized = normalize(value);
+
+        if (normalized.length() <= 80) {
+            return normalized;
+        }
+
+        return normalized.substring(0, 80);
     }
 }
