@@ -34,15 +34,15 @@ class SitemapCrawlServiceTest {
         httpClient.responses.put("https://zighang.com/seo/sitemap/sitemap-index.xml", new CrawlerHttpResponse(200, """
                 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                     <sitemap>
-                        <loc>https://zighang.com/seo/sitemap/sitemap-recruitment-1.xml</loc>
+                        <loc>https://zighang.com/seo/sitemap/jobs-1.xml</loc>
                     </sitemap>
                     <sitemap>
-                        <loc>https://zighang.com/seo/sitemap/sitemap-recruitment-2.xml</loc>
+                        <loc>https://zighang.com/seo/sitemap/jobs-2.xml</loc>
                     </sitemap>
                 </sitemapindex>
                 """));
 
-        httpClient.responses.put("https://zighang.com/seo/sitemap/sitemap-recruitment-1.xml", new CrawlerHttpResponse(200, """
+        httpClient.responses.put("https://zighang.com/seo/sitemap/jobs-1.xml", new CrawlerHttpResponse(200, """
                 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                     <url>
                         <loc>https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100</loc>
@@ -53,7 +53,7 @@ class SitemapCrawlServiceTest {
                 </urlset>
                 """));
 
-        httpClient.responses.put("https://zighang.com/seo/sitemap/sitemap-recruitment-2.xml", new CrawlerHttpResponse(200, """
+        httpClient.responses.put("https://zighang.com/seo/sitemap/jobs-2.xml", new CrawlerHttpResponse(200, """
                 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                     <url>
                         <loc>https://zighang.com/recruitment/00000000-0000-0000-0000-000000000200</loc>
@@ -70,15 +70,15 @@ class SitemapCrawlServiceTest {
         assertThat(result.fetchedSitemapCount()).isEqualTo(3);
         assertThat(result.fetchedSitemapUrls()).containsExactly(
                 "https://zighang.com/seo/sitemap/sitemap-index.xml",
-                "https://zighang.com/seo/sitemap/sitemap-recruitment-2.xml",
-                "https://zighang.com/seo/sitemap/sitemap-recruitment-1.xml"
+                "https://zighang.com/seo/sitemap/jobs-1.xml",
+                "https://zighang.com/seo/sitemap/jobs-2.xml"
         );
         assertThat(result.discoveredJobUrlCount()).isEqualTo(2);
         assertThat(result.jobUrls())
                 .extracting(CrawlerUrlCandidate::externalId)
                 .containsExactly(
-                        "00000000-0000-0000-0000-000000000200",
-                        "00000000-0000-0000-0000-000000000100"
+                        "00000000-0000-0000-0000-000000000100",
+                        "00000000-0000-0000-0000-000000000200"
                 );
     }
 
@@ -88,15 +88,15 @@ class SitemapCrawlServiceTest {
         httpClient.responses.put("https://zighang.com/seo/sitemap/sitemap-index.xml", new CrawlerHttpResponse(200, """
                 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                     <sitemap>
-                        <loc>https://zighang.com/seo/sitemap/sitemap-recruitment-1.xml</loc>
+                        <loc>https://zighang.com/seo/sitemap/jobs-1.xml</loc>
                     </sitemap>
                     <sitemap>
-                        <loc>https://zighang.com/seo/sitemap/sitemap-recruitment-1.xml#top</loc>
+                        <loc>https://zighang.com/seo/sitemap/jobs-1.xml#top</loc>
                     </sitemap>
                 </sitemapindex>
                 """));
 
-        httpClient.responses.put("https://zighang.com/seo/sitemap/sitemap-recruitment-1.xml", new CrawlerHttpResponse(200, """
+        httpClient.responses.put("https://zighang.com/seo/sitemap/jobs-1.xml", new CrawlerHttpResponse(200, """
                 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                     <url>
                         <loc>https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100</loc>
@@ -109,7 +109,7 @@ class SitemapCrawlServiceTest {
         assertThat(result.fetchedSitemapCount()).isEqualTo(2);
         assertThat(httpClient.requestedUrls).containsExactly(
                 "https://zighang.com/seo/sitemap/sitemap-index.xml",
-                "https://zighang.com/seo/sitemap/sitemap-recruitment-1.xml"
+                "https://zighang.com/seo/sitemap/jobs-1.xml"
         );
     }
 

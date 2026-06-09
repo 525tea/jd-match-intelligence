@@ -25,41 +25,18 @@ class SitemapDiscoveryServiceTest {
         ParsedSitemap sitemap = new ParsedSitemap(
                 SitemapType.SITEMAP_INDEX,
                 List.of(
-                        new SitemapEntry("https://jumpit.saramin.co.kr/sitemap-1.xml#top", LocalDateTime.now()),
-                        new SitemapEntry("https://jumpit.saramin.co.kr/sitemap-1.xml", LocalDateTime.now()),
+                        new SitemapEntry("https://zighang.com/seo/sitemap/jobs-1.xml#top", LocalDateTime.now()),
+                        new SitemapEntry("https://zighang.com/seo/sitemap/jobs-1.xml", LocalDateTime.now()),
                         new SitemapEntry("https://example.com/sitemap.xml", LocalDateTime.now())
-                )
-        );
-
-        SitemapDiscoveryResult result = service.discover(JobIngestionSource.JUMPIT, sitemap);
-
-        assertThat(result.hasNestedSitemaps()).isTrue();
-        assertThat(result.hasJobUrls()).isFalse();
-        assertThat(result.sitemapUrls())
-                .containsExactly("https://jumpit.saramin.co.kr/sitemap-1.xml");
-    }
-
-    @Test
-    @DisplayName("직행 sitemapindex에서는 recruitment sitemap만 최신 번호순으로 추출한다")
-    void discoverZighangRecruitmentSitemapsByLatestSequence() {
-        ParsedSitemap sitemap = new ParsedSitemap(
-                SitemapType.SITEMAP_INDEX,
-                List.of(
-                        new SitemapEntry("https://zighang.com/seo/sitemap/sitemap-company-1.xml", LocalDateTime.now()),
-                        new SitemapEntry("https://zighang.com/seo/sitemap/sitemap-recruitment-1.xml", LocalDateTime.now()),
-                        new SitemapEntry("https://zighang.com/seo/sitemap/sitemap-recruitment-248.xml", LocalDateTime.now()),
-                        new SitemapEntry("https://zighang.com/seo/sitemap/sitemap-recruitment-100.xml", LocalDateTime.now()),
-                        new SitemapEntry("https://zighang.com/seo/sitemap/sitemap-pages.xml", LocalDateTime.now())
                 )
         );
 
         SitemapDiscoveryResult result = service.discover(JobIngestionSource.ZIGHANG, sitemap);
 
-        assertThat(result.sitemapUrls()).containsExactly(
-                "https://zighang.com/seo/sitemap/sitemap-recruitment-248.xml",
-                "https://zighang.com/seo/sitemap/sitemap-recruitment-100.xml",
-                "https://zighang.com/seo/sitemap/sitemap-recruitment-1.xml"
-        );
+        assertThat(result.hasNestedSitemaps()).isTrue();
+        assertThat(result.hasJobUrls()).isFalse();
+        assertThat(result.sitemapUrls())
+                .containsExactly("https://zighang.com/seo/sitemap/jobs-1.xml");
     }
 
     @Test
@@ -129,7 +106,7 @@ class SitemapDiscoveryServiceTest {
                         "https://jumpit.saramin.co.kr",
                         "https://jumpit.saramin.co.kr/robots.txt",
                         "https://jumpit.saramin.co.kr/sitemap.xml",
-                        List.of("/position", "/sitemap"),
+                        List.of("/"),
                         List.of("/resumes", "/auth/"),
                         Duration.ofSeconds(20),
                         1000

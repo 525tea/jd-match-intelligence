@@ -1,20 +1,14 @@
 package jobflow.collector.job.ingest;
 
 import java.net.URI;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 @Service
 public class SitemapDiscoveryService {
-
-    private static final Pattern ZIGHANG_RECRUITMENT_SITEMAP_PATTERN =
-            Pattern.compile(".*/sitemap-recruitment-(\\d+)\\.xml$");
 
     private final CrawlerProperties crawlerProperties;
     private final CrawlerUrlNormalizer urlNormalizer;
@@ -40,11 +34,9 @@ public class SitemapDiscoveryService {
         Map<String, String> urls = new LinkedHashMap<>();
 
         sitemap.entries().stream()
-                .sorted(nestedSitemapComparator(source))
                 .map(SitemapEntry::loc)
                 .map(loc -> normalizeSitemapUrl(policy, loc))
                 .flatMap(Optional::stream)
-                .filter(url -> isRelevantNestedSitemap(source, url))
                 .forEach(url -> urls.putIfAbsent(url, url));
 
         return List.copyOf(urls.values());
@@ -63,36 +55,6 @@ public class SitemapDiscoveryService {
                 ));
 
         return List.copyOf(candidates.values());
-    }
-
-    private Comparator<SitemapEntry> nestedSitemapComparator(JobIngestionSource source) {
-        if (source == JobIngestionSource.ZIGHANG) {
-            return Comparator.comparingInt(this::zighangRecruitmentSitemapSequence)
-                    .reversed();
-        }
-
-        return Comparator.comparing(
-                SitemapEntry::lastModified,
-                Comparator.nullsLast(Comparator.reverseOrder())
-        );
-    }
-
-    private int zighangRecruitmentSitemapSequence(SitemapEntry entry) {
-        Matcher matcher = ZIGHANG_RECRUITMENT_SITEMAP_PATTERN.matcher(entry.loc());
-
-        if (!matcher.matches()) {
-            return -1;
-        }
-
-        return Integer.parseInt(matcher.group(1));
-    }
-
-    private boolean isRelevantNestedSitemap(JobIngestionSource source, String url) {
-        if (source != JobIngestionSource.ZIGHANG) {
-            return true;
-        }
-
-        return ZIGHANG_RECRUITMENT_SITEMAP_PATTERN.matcher(url).matches();
     }
 
     private Optional<String> normalizeSitemapUrl(CrawlerSourcePolicy policy, String rawUrl) {
