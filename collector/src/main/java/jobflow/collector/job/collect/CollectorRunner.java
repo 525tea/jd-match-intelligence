@@ -26,7 +26,16 @@ public class CollectorRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         JobIngestionSource source = collectorRunnerProperties.sourceOrDefault();
-        SitemapCrawlResult result = sitemapCrawlService.crawl(source);
+        int collectLimit = collectorRunnerProperties.collectLimitOrDefault();
+
+        log.info(
+                "Collector started. source={}, previewLimit={}, collectLimit={}",
+                source,
+                collectorRunnerProperties.previewLimitOrDefault(),
+                collectLimit
+        );
+
+        SitemapCrawlResult result = sitemapCrawlService.crawl(source, collectLimit);
 
         log.info(
                 "Collector sitemap crawl completed. source={}, fetchedSitemapCount={}, discoveredJobUrlCount={}",
@@ -40,7 +49,7 @@ public class CollectorRunner implements ApplicationRunner {
                 .forEach(this::logDiscoveredJobUrl);
 
         result.jobUrls().stream()
-                .limit(collectorRunnerProperties.collectLimitOrDefault())
+                .limit(collectLimit)
                 .map(jobPostingCollectionService::collect)
                 .forEach(this::logCollectionResult);
     }

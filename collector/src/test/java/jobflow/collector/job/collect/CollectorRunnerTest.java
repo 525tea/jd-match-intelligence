@@ -48,7 +48,7 @@ class CollectorRunnerTest {
                 "example-1"
         );
 
-        given(sitemapCrawlService.crawl(JobIngestionSource.ZIGHANG))
+        given(sitemapCrawlService.crawl(JobIngestionSource.ZIGHANG, 10))
                 .willReturn(new SitemapCrawlResult(
                         JobIngestionSource.ZIGHANG,
                         1,
@@ -63,7 +63,7 @@ class CollectorRunnerTest {
 
         runner.run(new DefaultApplicationArguments());
 
-        verify(sitemapCrawlService).crawl(JobIngestionSource.ZIGHANG);
+        verify(sitemapCrawlService).crawl(JobIngestionSource.ZIGHANG, 10);
         verify(jobPostingCollectionService).collect(candidate);
     }
 
@@ -88,7 +88,7 @@ class CollectorRunnerTest {
                 "jumpit-example-1"
         );
 
-        given(sitemapCrawlService.crawl(JobIngestionSource.JUMPIT))
+        given(sitemapCrawlService.crawl(JobIngestionSource.JUMPIT, 10))
                 .willReturn(new SitemapCrawlResult(
                         JobIngestionSource.JUMPIT,
                         1,
@@ -103,7 +103,7 @@ class CollectorRunnerTest {
 
         runner.run(new DefaultApplicationArguments());
 
-        verify(sitemapCrawlService).crawl(JobIngestionSource.JUMPIT);
+        verify(sitemapCrawlService).crawl(JobIngestionSource.JUMPIT, 10);
         verify(jobPostingCollectionService).collect(candidate);
     }
 
@@ -117,7 +117,7 @@ class CollectorRunnerTest {
                 jobPostingCollectionService
         );
 
-        given(sitemapCrawlService.crawl(JobIngestionSource.ZIGHANG))
+        given(sitemapCrawlService.crawl(JobIngestionSource.ZIGHANG, 10))
                 .willReturn(new SitemapCrawlResult(
                         JobIngestionSource.ZIGHANG,
                         0,
@@ -127,6 +127,6 @@ class CollectorRunnerTest {
 
         runner.run(new DefaultApplicationArguments());
 
-        verify(sitemapCrawlService).crawl(JobIngestionSource.ZIGHANG);
+        verify(sitemapCrawlService).crawl(JobIngestionSource.ZIGHANG, 10);
     }
 }
