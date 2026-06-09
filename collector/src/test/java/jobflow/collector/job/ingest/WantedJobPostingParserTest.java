@@ -229,4 +229,31 @@ class WantedJobPostingParserTest {
                 .isInstanceOf(JobPostingParseException.class)
                 .hasMessageContaining("Unsupported source");
     }
+
+    @Test
+    @DisplayName("원티드 due_time이 offset datetime이면 deadline으로 변환한다")
+    void parseOffsetDateTimeDeadline() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "367300",
+                "https://www.wanted.co.kr/wd/367300",
+                "https://www.wanted.co.kr/api/v4/jobs/367300",
+                """
+                        {
+                          "job": {
+                            "position": "백엔드 개발자",
+                            "due_time": "2026-07-15T23:59:00+09:00",
+                            "company": {"name": "JobFlow Labs"},
+                            "detail": {
+                              "requirements": "Spring Boot 백엔드 API 개발"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.deadlineAt()).isEqualTo(LocalDateTime.of(2026, 7, 15, 23, 59));
+    }
 }
