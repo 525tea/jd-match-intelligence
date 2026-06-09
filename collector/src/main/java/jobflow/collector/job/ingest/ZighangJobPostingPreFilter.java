@@ -58,24 +58,11 @@ public class ZighangJobPostingPreFilter implements JobPostingPreFilter {
 
         String[] parts = value.split("\\|");
 
-        if (parts.length < 3) {
+        if (parts.length < 2) {
             return "";
         }
 
-        for (int index = parts.length - 2; index >= 0; index--) {
-            String candidate = normalize(parts[index]);
-
-            if (candidate.isBlank()
-                    || "직행".equals(candidate)
-                    || candidate.contains("채용")
-                    || candidate.contains("공고")) {
-                continue;
-            }
-
-            return candidate;
-        }
-
-        return "";
+        return normalize(parts[parts.length - 1]);
     }
 
     private String firstNonBlank(String... values) {
