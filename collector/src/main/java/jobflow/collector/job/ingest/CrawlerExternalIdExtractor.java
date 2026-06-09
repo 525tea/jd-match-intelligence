@@ -23,6 +23,7 @@ public class CrawlerExternalIdExtractor {
                     .or(() -> queryParam(uri, "gi_no").filter(this::isNumber));
             case JUMPIT -> jumpitPositionId(uri);
             case ZIGHANG -> zighangRecruitmentId(uri);
+            case WANTED -> wantedJobId(uri);
         };
     }
 
@@ -45,6 +46,26 @@ public class CrawlerExternalIdExtractor {
                 && "recruitment".equals(segments[0])
                 && UUID_PATTERN.matcher(segments[1]).matches()) {
             return Optional.of(segments[1]);
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<String> wantedJobId(URI uri) {
+        String[] segments = pathSegments(uri);
+
+        if (segments.length == 2
+                && "wd".equals(segments[0])
+                && isNumber(segments[1])) {
+            return Optional.of(segments[1]);
+        }
+
+        if (segments.length == 4
+                && "api".equals(segments[0])
+                && "v4".equals(segments[1])
+                && "jobs".equals(segments[2])
+                && isNumber(segments[3])) {
+            return Optional.of(segments[3]);
         }
 
         return Optional.empty();

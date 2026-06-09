@@ -4,5 +4,6 @@ public enum JobIngestionSource {
     ZIGHANG,
     JUMPIT,
     SARAMIN,
-    JOBKOREA
+    JOBKOREA,
+    WANTED
 }
