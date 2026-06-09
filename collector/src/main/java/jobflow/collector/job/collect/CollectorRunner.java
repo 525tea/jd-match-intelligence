@@ -27,16 +27,19 @@ public class CollectorRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         JobIngestionSource source = collectorRunnerProperties.sourceOrDefault();
+        int previewLimit = collectorRunnerProperties.previewLimitOrDefault();
         int collectLimit = collectorRunnerProperties.collectLimitOrDefault();
+        int scanLimit = collectorRunnerProperties.scanLimitOrDefault();
 
         log.info(
-                "Collector started. source={}, previewLimit={}, collectLimit={}",
+                "Collector started. source={}, previewLimit={}, collectLimit={}, scanLimit={}",
                 source,
-                collectorRunnerProperties.previewLimitOrDefault(),
-                collectLimit
+                previewLimit,
+                collectLimit,
+                scanLimit
         );
 
-        SitemapCrawlResult result = sitemapCrawlService.crawl(source, collectLimit);
+        SitemapCrawlResult result = sitemapCrawlService.crawl(source, scanLimit);
 
         log.info(
                 "Collector sitemap crawl completed. source={}, fetchedSitemapCount={}, discoveredJobUrlCount={}",
@@ -46,13 +49,59 @@ public class CollectorRunner implements ApplicationRunner {
         );
 
         result.jobUrls().stream()
-                .limit(collectorRunnerProperties.previewLimitOrDefault())
+                .limit(previewLimit)
                 .forEach(this::logDiscoveredJobUrl);
 
-        result.jobUrls().stream()
-                .limit(collectLimit)
-                .map(jobPostingCollectionService::collect)
-                .forEach(this::logCollectionResult);
+        CollectionSummary summary = collectUntilLimit(result, collectLimit, scanLimit);
+
+        log.info(
+                "Collector completed. source={}, processedCount={}, collectedCount={}, skippedCount={}, failedCount={}",
+                source,
+                summary.processedCount(),
+                summary.collectedCount(),
+                summary.skippedCount(),
+                summary.failedCount()
+        );
+    }
+
+    private CollectionSummary collectUntilLimit(
+            SitemapCrawlResult result,
+            int collectLimit,
+            int scanLimit
+    ) {
+        int processedCount = 0;
+        int collectedCount = 0;
+        int skippedCount = 0;
+        int failedCount = 0;
+
+        for (CrawlerUrlCandidate candidate : result.jobUrls()) {
+            if (processedCount >= scanLimit || collectedCount >= collectLimit) {
+                break;
+            }
+
+            processedCount++;
+            JobPostingCollectionResult collectionResult = jobPostingCollectionService.collect(candidate);
+            logCollectionResult(collectionResult);
+
+            if (!collectionResult.success()) {
+                failedCount++;
+                continue;
+            }
+
+            if (collectionResult.ingestionResultType() == JobIngestionResultType.SKIPPED) {
+                skippedCount++;
+                continue;
+            }
+
+            collectedCount++;
+        }
+
+        return new CollectionSummary(
+                processedCount,
+                collectedCount,
+                skippedCount,
+                failedCount
+        );
     }
 
     private void logDiscoveredJobUrl(CrawlerUrlCandidate candidate) {
@@ -93,5 +142,13 @@ public class CollectorRunner implements ApplicationRunner {
                 result.ingestionResultType(),
                 result.duplicateCandidateCount()
         );
+    }
+
+    private record CollectionSummary(
+            int processedCount,
+            int collectedCount,
+            int skippedCount,
+            int failedCount
+    ) {
     }
 }

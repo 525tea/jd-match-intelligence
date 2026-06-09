@@ -8,12 +8,14 @@ public record CollectorRunnerProperties(
         boolean enabled,
         JobIngestionSource source,
         int previewLimit,
-        int collectLimit
+        int collectLimit,
+        int scanLimit
 ) {
 
     private static final JobIngestionSource DEFAULT_SOURCE = JobIngestionSource.ZIGHANG;
     private static final int DEFAULT_PREVIEW_LIMIT = 5;
     private static final int DEFAULT_COLLECT_LIMIT = 10;
+    private static final int DEFAULT_SCAN_LIMIT = 100;
 
     public JobIngestionSource sourceOrDefault() {
         if (source == null) {
@@ -37,5 +39,13 @@ public record CollectorRunnerProperties(
         }
 
         return collectLimit;
+    }
+
+    public int scanLimitOrDefault() {
+        if (scanLimit <= 0) {
+            return Math.max(DEFAULT_SCAN_LIMIT, collectLimitOrDefault());
+        }
+
+        return Math.max(scanLimit, collectLimitOrDefault());
     }
 }
