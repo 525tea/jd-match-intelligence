@@ -42,6 +42,61 @@ class CrawlerUrlNormalizerTest {
     }
 
     @Test
+    @DisplayName("점핏 상세 공고 URL만 후보로 정규화한다")
+    void normalizeJumpitPositionUrl() {
+        CrawlerUrlCandidate candidate = normalizer.normalize(
+                        JobIngestionSource.JUMPIT,
+                        "https://jumpit.saramin.co.kr/position/12345?utm=test"
+                )
+                .orElseThrow();
+
+        assertThat(candidate.externalId()).isEqualTo("12345");
+        assertThat(candidate.sourceUrl()).isEqualTo("https://jumpit.saramin.co.kr/position/12345?utm=test");
+        assertThat(candidate.detailUrl()).isEqualTo("https://jumpit.saramin.co.kr/position/12345");
+    }
+
+    @Test
+    @DisplayName("점핏 직무 탐색 페이지는 공고 후보에서 제외한다")
+    void ignoreJumpitPositionLandingPage() {
+        assertThat(normalizer.normalize(
+                JobIngestionSource.JUMPIT,
+                "https://jumpit.saramin.co.kr/position"
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("점핏 숫자 id가 아닌 position URL은 공고 후보에서 제외한다")
+    void ignoreJumpitNonNumericPositionUrl() {
+        assertThat(normalizer.normalize(
+                JobIngestionSource.JUMPIT,
+                "https://jumpit.saramin.co.kr/position/abc"
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("점핏 상세 path보다 깊은 URL은 공고 후보에서 제외한다")
+    void ignoreJumpitNestedPositionUrl() {
+        assertThat(normalizer.normalize(
+                JobIngestionSource.JUMPIT,
+                "https://jumpit.saramin.co.kr/position/12345/extra"
+        )).isEmpty();
+    }
+
+    @Test
+    @DisplayName("직행 상세 공고 UUID URL만 후보로 정규화한다")
+    void normalizeZighangRecruitmentUrl() {
+        CrawlerUrlCandidate candidate = normalizer.normalize(
+                        JobIngestionSource.ZIGHANG,
+                        "https://zighang.com/recruitment/c4de6576-efef-45cb-aff3-9b5e6f06fd76?utm=test"
+                )
+                .orElseThrow();
+
+        assertThat(candidate.externalId()).isEqualTo("c4de6576-efef-45cb-aff3-9b5e6f06fd76");
+        assertThat(candidate.detailUrl())
+                .isEqualTo("https://zighang.com/recruitment/c4de6576-efef-45cb-aff3-9b5e6f06fd76");
+    }
+
+    @Test
     @DisplayName("차단 path는 후보에서 제외한다")
     void normalizeDisallowedPath() {
         assertThat(normalizer.normalize(
@@ -95,8 +150,21 @@ class CrawlerUrlNormalizerTest {
                         "https://jumpit.saramin.co.kr",
                         "https://jumpit.saramin.co.kr/robots.txt",
                         "https://jumpit.saramin.co.kr/sitemap.xml",
-                        List.of("/"),
+                        List.of("/position", "/sitemap"),
                         List.of("/resumes", "/auth/"),
+                        Duration.ofSeconds(20),
+                        1000
+                )
+        );
+
+        sources.put(
+                JobIngestionSource.ZIGHANG,
+                new CrawlerProperties.SourceProperties(
+                        "https://zighang.com",
+                        "https://zighang.com/robots.txt",
+                        "https://zighang.com/seo/sitemap/sitemap-index.xml",
+                        List.of("/recruitment", "/jobs", "/job", "/recruit", "/seo/sitemap"),
+                        List.of("/api", "/short", "/join", "/menu"),
                         Duration.ofSeconds(20),
                         1000
                 )

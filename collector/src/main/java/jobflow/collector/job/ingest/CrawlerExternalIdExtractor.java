@@ -3,18 +3,51 @@ package jobflow.collector.job.ingest;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 public class CrawlerExternalIdExtractor {
+
+    private static final Pattern UUID_PATTERN = Pattern.compile(
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    );
+    private static final Pattern NUMBER_PATTERN = Pattern.compile("^\\d+$");
 
     public Optional<String> extract(JobIngestionSource source, URI uri) {
         return switch (source) {
             case SARAMIN -> queryParam(uri, "rec_idx")
-                    .or(() -> lastPathSegment(uri));
+                    .filter(this::isNumber)
+                    .or(() -> lastPathSegment(uri).filter(this::isNumber));
             case JOBKOREA -> lastPathSegment(uri)
-                    .or(() -> queryParam(uri, "GI_No"))
-                    .or(() -> queryParam(uri, "gi_no"));
-            case JUMPIT, ZIGHANG -> lastPathSegment(uri);
+                    .filter(this::isNumber)
+                    .or(() -> queryParam(uri, "GI_No").filter(this::isNumber))
+                    .or(() -> queryParam(uri, "gi_no").filter(this::isNumber));
+            case JUMPIT -> jumpitPositionId(uri);
+            case ZIGHANG -> zighangRecruitmentId(uri);
         };
+    }
+
+    private Optional<String> jumpitPositionId(URI uri) {
+        String[] segments = pathSegments(uri);
+
+        if (segments.length == 2
+                && "position".equals(segments[0])
+                && isNumber(segments[1])) {
+            return Optional.of(segments[1]);
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<String> zighangRecruitmentId(URI uri) {
+        String[] segments = pathSegments(uri);
+
+        if (segments.length == 2
+                && "recruitment".equals(segments[0])
+                && UUID_PATTERN.matcher(segments[1]).matches()) {
+            return Optional.of(segments[1]);
+        }
+
+        return Optional.empty();
     }
 
     private Optional<String> queryParam(URI uri, String name) {
@@ -34,22 +67,28 @@ public class CrawlerExternalIdExtractor {
     }
 
     private Optional<String> lastPathSegment(URI uri) {
-        String path = uri.getPath();
+        String[] segments = pathSegments(uri);
 
-        if (path == null || path.isBlank() || "/".equals(path)) {
+        if (segments.length == 0) {
             return Optional.empty();
         }
 
-        String[] segments = path.split("/");
+        return Optional.of(segments[segments.length - 1]);
+    }
 
-        for (int index = segments.length - 1; index >= 0; index--) {
-            String segment = segments[index];
+    private String[] pathSegments(URI uri) {
+        String path = uri.getPath();
 
-            if (!segment.isBlank()) {
-                return Optional.of(segment);
-            }
+        if (path == null || path.isBlank() || "/".equals(path)) {
+            return new String[0];
         }
 
-        return Optional.empty();
+        return Arrays.stream(path.split("/"))
+                .filter(segment -> !segment.isBlank())
+                .toArray(String[]::new);
+    }
+
+    private boolean isNumber(String value) {
+        return NUMBER_PATTERN.matcher(value).matches();
     }
 }

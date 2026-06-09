@@ -1,6 +1,10 @@
 package jobflow.collector.job.ingest;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
 import jobflow.collector.job.RemoteType;
@@ -12,6 +16,19 @@ import org.springframework.stereotype.Component;
 public class ZighangJobPostingParser implements JobPostingParser {
 
     private static final String CRAWLER_VERSION = "zighang-parser-0.1";
+    private static final Pattern KOREAN_DATE_PATTERN =
+            Pattern.compile("(20\\d{2})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})\\.");
+    private static final Pattern ZIGHANG_COMPANY_AND_OPENED_AT_PATTERN =
+            Pattern.compile("(.{1,80})\\|\\s*(20\\d{2})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})\\.\\s*게시\\|");
+    private static final List<String> INVALID_TITLE_KEYWORDS = List.of(
+            "직무 탐색",
+            "채용 정보"
+    );
+    private static final List<String> INVALID_COMPANY_KEYWORDS = List.of(
+            "기업 정보 보기",
+            "회사 정보 보기"
+    );
+
     private final JdJobRoleClassificationService jdJobRoleClassificationService;
 
     public ZighangJobPostingParser(JdJobRoleClassificationService jdJobRoleClassificationService) {
@@ -33,23 +50,31 @@ public class ZighangJobPostingParser implements JobPostingParser {
 
         Document document = Jsoup.parse(fetchedJobPosting.body(), fetchedJobPosting.detailUrl());
         String pageText = normalize(document.text());
-        String title = firstText(
+        String title = cleanTitle(firstValidText(
                 document,
                 "[data-testid=job-title]",
                 "h1",
                 "meta[property=og:title]"
+        ));
+        String companyName = firstNonBlank(
+                firstValidCompanyText(
+                        document,
+                        "a[href^=/company/]",
+                        "a[href*=zighang.com/company/]",
+                        "[data-testid=company-name]",
+                        "[data-testid=company]",
+                        "[class*=companyName]",
+                        "[class*=company-name]",
+                        ".company-name",
+                        ".company"
+                ),
+                inferCompanyName(pageText)
         );
-        String companyName = firstText(
-                document,
-                "[data-testid=company-name]",
-                ".company-name",
-                "meta[property=og:site_name]"
-        );
-        String description = firstText(
+        String description = firstValidText(
                 document,
                 "[data-testid=job-description]",
-                "main",
-                "body"
+                "[class*=job-description]",
+                "main"
         );
 
         validateRequired("title", title, fetchedJobPosting);
@@ -76,16 +101,16 @@ public class ZighangJobPostingParser implements JobPostingParser {
                 null,
                 null,
                 "KR",
-                null,
-                null,
+                inferRegion(pageText),
+                inferCity(pageText),
                 inferRemoteType(pageText),
                 null,
                 null,
                 "KRW",
                 false,
                 null,
-                null,
-                null,
+                inferOpenedAt(pageText),
+                inferDeadlineAt(pageText),
                 now,
                 now,
                 null,
@@ -94,12 +119,25 @@ public class ZighangJobPostingParser implements JobPostingParser {
         );
     }
 
-    private String firstText(Document document, String... selectors) {
+    private String firstValidText(Document document, String... selectors) {
         for (String selector : selectors) {
             String value = text(document, selector);
 
-            if (!value.isBlank()) {
+            if (value != null && !value.isBlank()) {
                 return value;
+            }
+        }
+
+        return "";
+    }
+
+    private String firstValidCompanyText(Document document, String... selectors) {
+        for (String selector : selectors) {
+            String value = text(document, selector);
+            String companyName = cleanCompanyName(value);
+
+            if (!companyName.isBlank()) {
+                return companyName;
             }
         }
 
@@ -122,6 +160,8 @@ public class ZighangJobPostingParser implements JobPostingParser {
             FetchedJobPosting fetchedJobPosting
     ) {
         if (value == null || value.isBlank()) {
+            Document document = Jsoup.parse(fetchedJobPosting.body(), fetchedJobPosting.detailUrl());
+
             throw new JobPostingParseException(
                     "Required field is missing. field="
                             + fieldName
@@ -129,6 +169,21 @@ public class ZighangJobPostingParser implements JobPostingParser {
                             + fetchedJobPosting.source()
                             + ", externalId="
                             + fetchedJobPosting.externalId()
+                            + ", titlePreview="
+                            + preview(firstValidText(document, "h1", "meta[property=og:title]", "title"))
+                            + ", companyPreview="
+                            + preview(firstValidText(
+                            document,
+                            "a[href^=/company/]",
+                            "a[href*=zighang.com/company/]",
+                            "[data-testid=company-name]",
+                            "[data-testid=company]",
+                            "[class*=companyName]",
+                            "[class*=company-name]",
+                            ".company-name",
+                            ".company",
+                            "meta[property=og:site_name]"
+                    ))
             );
         }
     }
@@ -181,6 +236,97 @@ public class ZighangJobPostingParser implements JobPostingParser {
         return RemoteType.ONSITE;
     }
 
+    private String inferRegion(String pageText) {
+        if (containsAny(pageText, "서울", "seoul")) {
+            return "Seoul";
+        }
+
+        if (containsAny(pageText, "경기", "성남", "판교", "분당")) {
+            return "Gyeonggi";
+        }
+
+        if (containsAny(pageText, "부산", "busan")) {
+            return "Busan";
+        }
+
+        return null;
+    }
+
+    private String inferCity(String pageText) {
+        if (containsAny(pageText, "강남")) {
+            return "Gangnam";
+        }
+
+        if (containsAny(pageText, "서초")) {
+            return "Seocho";
+        }
+
+        if (containsAny(pageText, "성동")) {
+            return "Seongdong";
+        }
+
+        if (containsAny(pageText, "판교", "분당")) {
+            return "Bundang";
+        }
+
+        return null;
+    }
+
+    private String inferCompanyName(String pageText) {
+        Matcher matcher = ZIGHANG_COMPANY_AND_OPENED_AT_PATTERN.matcher(pageText);
+
+        if (!matcher.find()) {
+            return "";
+        }
+
+        String companyName = normalize(matcher.group(1));
+
+        if (companyName.contains("#")) {
+            companyName = companyName.substring(companyName.lastIndexOf("#") + 1);
+        }
+
+        return cleanCompanyName(companyName);
+    }
+
+    private LocalDateTime inferOpenedAt(String pageText) {
+        Matcher matcher = ZIGHANG_COMPANY_AND_OPENED_AT_PATTERN.matcher(pageText);
+
+        if (!matcher.find()) {
+            return null;
+        }
+
+        LocalDate date = LocalDate.of(
+                Integer.parseInt(matcher.group(2)),
+                Integer.parseInt(matcher.group(3)),
+                Integer.parseInt(matcher.group(4))
+        );
+
+        return date.atStartOfDay();
+    }
+
+    private LocalDateTime inferDeadlineAt(String pageText) {
+        Matcher matcher = KOREAN_DATE_PATTERN.matcher(pageText);
+
+        while (matcher.find()) {
+            int end = Math.min(pageText.length(), matcher.end() + 12);
+            String dateContext = pageText.substring(matcher.start(), end);
+
+            if (!dateContext.contains("마감")) {
+                continue;
+            }
+
+            LocalDate date = LocalDate.of(
+                    Integer.parseInt(matcher.group(1)),
+                    Integer.parseInt(matcher.group(2)),
+                    Integer.parseInt(matcher.group(3))
+            );
+
+            return date.atTime(23, 59);
+        }
+
+        return null;
+    }
+
     private boolean containsAny(String text, String... keywords) {
         for (String keyword : keywords) {
             if (text.contains(keyword)) {
@@ -189,6 +335,38 @@ public class ZighangJobPostingParser implements JobPostingParser {
         }
 
         return false;
+    }
+
+    private String cleanTitle(String value) {
+        String title = normalize(value);
+
+        if (title.contains("|")) {
+            title = normalize(title.split("\\|", 2)[0]);
+        }
+
+        if (containsAny(title, INVALID_TITLE_KEYWORDS.toArray(String[]::new))) {
+            return "";
+        }
+
+        return title;
+    }
+
+    private String cleanCompanyName(String value) {
+        String companyName = normalize(value);
+
+        if (companyName.contains("|")) {
+            companyName = normalize(companyName.split("\\|", 2)[0]);
+        }
+
+        if (companyName.contains("#")) {
+            companyName = normalize(companyName.substring(companyName.lastIndexOf("#") + 1));
+        }
+
+        if (containsAny(companyName, INVALID_COMPANY_KEYWORDS.toArray(String[]::new))) {
+            return "";
+        }
+
+        return companyName;
     }
 
     private String rawData(FetchedJobPosting fetchedJobPosting, String title, String companyName) {
@@ -215,5 +393,25 @@ public class ZighangJobPostingParser implements JobPostingParser {
         }
 
         return value.replaceAll("\\s+", " ").trim();
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+
+        return "";
+    }
+
+    private String preview(String value) {
+        String normalized = normalize(value);
+
+        if (normalized.length() <= 80) {
+            return normalized;
+        }
+
+        return normalized.substring(0, 80);
     }
 }

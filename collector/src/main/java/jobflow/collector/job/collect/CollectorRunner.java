@@ -1,6 +1,7 @@
 package jobflow.collector.job.collect;
 
 import jobflow.collector.job.ingest.CrawlerUrlCandidate;
+import jobflow.collector.job.ingest.JobIngestionResultType;
 import jobflow.collector.job.ingest.JobIngestionSource;
 import jobflow.collector.job.ingest.JobPostingCollectionResult;
 import jobflow.collector.job.ingest.JobPostingCollectionService;
@@ -26,7 +27,19 @@ public class CollectorRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         JobIngestionSource source = collectorRunnerProperties.sourceOrDefault();
-        SitemapCrawlResult result = sitemapCrawlService.crawl(source);
+        int previewLimit = collectorRunnerProperties.previewLimitOrDefault();
+        int collectLimit = collectorRunnerProperties.collectLimitOrDefault();
+        int scanLimit = collectorRunnerProperties.scanLimitOrDefault();
+
+        log.info(
+                "Collector started. source={}, previewLimit={}, collectLimit={}, scanLimit={}",
+                source,
+                previewLimit,
+                collectLimit,
+                scanLimit
+        );
+
+        SitemapCrawlResult result = sitemapCrawlService.crawl(source, scanLimit);
 
         log.info(
                 "Collector sitemap crawl completed. source={}, fetchedSitemapCount={}, discoveredJobUrlCount={}",
@@ -36,13 +49,59 @@ public class CollectorRunner implements ApplicationRunner {
         );
 
         result.jobUrls().stream()
-                .limit(collectorRunnerProperties.previewLimitOrDefault())
+                .limit(previewLimit)
                 .forEach(this::logDiscoveredJobUrl);
 
-        result.jobUrls().stream()
-                .limit(collectorRunnerProperties.collectLimitOrDefault())
-                .map(jobPostingCollectionService::collect)
-                .forEach(this::logCollectionResult);
+        CollectionSummary summary = collectUntilLimit(result, collectLimit, scanLimit);
+
+        log.info(
+                "Collector completed. source={}, processedCount={}, collectedCount={}, skippedCount={}, failedCount={}",
+                source,
+                summary.processedCount(),
+                summary.collectedCount(),
+                summary.skippedCount(),
+                summary.failedCount()
+        );
+    }
+
+    private CollectionSummary collectUntilLimit(
+            SitemapCrawlResult result,
+            int collectLimit,
+            int scanLimit
+    ) {
+        int processedCount = 0;
+        int collectedCount = 0;
+        int skippedCount = 0;
+        int failedCount = 0;
+
+        for (CrawlerUrlCandidate candidate : result.jobUrls()) {
+            if (processedCount >= scanLimit || collectedCount >= collectLimit) {
+                break;
+            }
+
+            processedCount++;
+            JobPostingCollectionResult collectionResult = jobPostingCollectionService.collect(candidate);
+            logCollectionResult(collectionResult);
+
+            if (!collectionResult.success()) {
+                failedCount++;
+                continue;
+            }
+
+            if (collectionResult.ingestionResultType() == JobIngestionResultType.SKIPPED) {
+                skippedCount++;
+                continue;
+            }
+
+            collectedCount++;
+        }
+
+        return new CollectionSummary(
+                processedCount,
+                collectedCount,
+                skippedCount,
+                failedCount
+        );
     }
 
     private void logDiscoveredJobUrl(CrawlerUrlCandidate candidate) {
@@ -56,22 +115,40 @@ public class CollectorRunner implements ApplicationRunner {
     }
 
     private void logCollectionResult(JobPostingCollectionResult result) {
-        if (result.success()) {
-            log.info(
-                    "Collector job posting collected. source={}, externalId={}, resultType={}, duplicateCandidateCount={}",
+        if (!result.success()) {
+            log.warn(
+                    "Collector job posting failed. source={}, externalId={}, error={}",
                     result.candidate().source(),
                     result.candidate().externalId(),
-                    result.ingestionResultType(),
-                    result.duplicateCandidateCount()
+                    result.errorMessage()
             );
             return;
         }
 
-        log.warn(
-                "Collector job posting skipped. source={}, externalId={}, error={}",
+        if (result.ingestionResultType() == JobIngestionResultType.SKIPPED) {
+            log.info(
+                    "Collector job posting skipped. source={}, externalId={}, resultType={}",
+                    result.candidate().source(),
+                    result.candidate().externalId(),
+                    result.ingestionResultType()
+            );
+            return;
+        }
+
+        log.info(
+                "Collector job posting collected. source={}, externalId={}, resultType={}, duplicateCandidateCount={}",
                 result.candidate().source(),
                 result.candidate().externalId(),
-                result.errorMessage()
+                result.ingestionResultType(),
+                result.duplicateCandidateCount()
         );
+    }
+
+    private record CollectionSummary(
+            int processedCount,
+            int collectedCount,
+            int skippedCount,
+            int failedCount
+    ) {
     }
 }

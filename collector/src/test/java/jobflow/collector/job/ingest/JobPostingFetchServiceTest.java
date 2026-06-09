@@ -18,6 +18,9 @@ class JobPostingFetchServiceTest {
     private RobotsPolicyService robotsPolicyService;
 
     @Mock
+    private CrawlerRequestThrottle crawlerRequestThrottle;
+
+    @Mock
     private CrawlerHttpClient crawlerHttpClient;
 
     @Test
@@ -25,16 +28,17 @@ class JobPostingFetchServiceTest {
     void fetch() {
         CrawlerUrlCandidate candidate = new CrawlerUrlCandidate(
                 JobIngestionSource.ZIGHANG,
-                "https://zighang.com/jobs/example-1?utm=test",
-                "https://zighang.com/jobs/example-1",
-                "example-1"
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100?utm=test",
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100",
+                "00000000-0000-0000-0000-000000000100"
         );
         JobPostingFetchService service = new JobPostingFetchService(
                 robotsPolicyService,
+                crawlerRequestThrottle,
                 crawlerHttpClient
         );
 
-        given(crawlerHttpClient.get("https://zighang.com/jobs/example-1"))
+        given(crawlerHttpClient.get("https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100"))
                 .willReturn(new CrawlerHttpResponse(
                         200,
                         """
@@ -49,15 +53,16 @@ class JobPostingFetchServiceTest {
         FetchedJobPosting fetched = service.fetch(candidate);
 
         assertThat(fetched.source()).isEqualTo(JobIngestionSource.ZIGHANG);
-        assertThat(fetched.externalId()).isEqualTo("example-1");
-        assertThat(fetched.sourceUrl()).isEqualTo("https://zighang.com/jobs/example-1?utm=test");
-        assertThat(fetched.detailUrl()).isEqualTo("https://zighang.com/jobs/example-1");
+        assertThat(fetched.externalId()).isEqualTo("00000000-0000-0000-0000-000000000100");
+        assertThat(fetched.sourceUrl()).isEqualTo("https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100?utm=test");
+        assertThat(fetched.detailUrl()).isEqualTo("https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100");
         assertThat(fetched.body()).contains("Backend Engineer");
 
         verify(robotsPolicyService).assertAllowed(
                 JobIngestionSource.ZIGHANG,
-                "https://zighang.com/jobs/example-1"
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100"
         );
+        verify(crawlerRequestThrottle).waitUntilAllowed(JobIngestionSource.ZIGHANG);
     }
 
     @Test
@@ -65,16 +70,17 @@ class JobPostingFetchServiceTest {
     void fetchFailed() {
         CrawlerUrlCandidate candidate = new CrawlerUrlCandidate(
                 JobIngestionSource.ZIGHANG,
-                "https://zighang.com/jobs/example-1",
-                "https://zighang.com/jobs/example-1",
-                "example-1"
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100",
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100",
+                "00000000-0000-0000-0000-000000000100"
         );
         JobPostingFetchService service = new JobPostingFetchService(
                 robotsPolicyService,
+                crawlerRequestThrottle,
                 crawlerHttpClient
         );
 
-        given(crawlerHttpClient.get("https://zighang.com/jobs/example-1"))
+        given(crawlerHttpClient.get("https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100"))
                 .willReturn(new CrawlerHttpResponse(500, "server error"));
 
         assertThatThrownBy(() -> service.fetch(candidate))
@@ -83,7 +89,8 @@ class JobPostingFetchServiceTest {
 
         verify(robotsPolicyService).assertAllowed(
                 JobIngestionSource.ZIGHANG,
-                "https://zighang.com/jobs/example-1"
+                "https://zighang.com/recruitment/00000000-0000-0000-0000-000000000100"
         );
+        verify(crawlerRequestThrottle).waitUntilAllowed(JobIngestionSource.ZIGHANG);
     }
 }

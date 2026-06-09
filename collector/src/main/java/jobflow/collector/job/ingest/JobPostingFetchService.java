@@ -6,18 +6,22 @@ import org.springframework.stereotype.Service;
 public class JobPostingFetchService {
 
     private final RobotsPolicyService robotsPolicyService;
+    private final CrawlerRequestThrottle crawlerRequestThrottle;
     private final CrawlerHttpClient crawlerHttpClient;
 
     public JobPostingFetchService(
             RobotsPolicyService robotsPolicyService,
+            CrawlerRequestThrottle crawlerRequestThrottle,
             CrawlerHttpClient crawlerHttpClient
     ) {
         this.robotsPolicyService = robotsPolicyService;
+        this.crawlerRequestThrottle = crawlerRequestThrottle;
         this.crawlerHttpClient = crawlerHttpClient;
     }
 
     public FetchedJobPosting fetch(CrawlerUrlCandidate candidate) {
         robotsPolicyService.assertAllowed(candidate.source(), candidate.detailUrl());
+        crawlerRequestThrottle.waitUntilAllowed(candidate.source());
 
         CrawlerHttpResponse response = crawlerHttpClient.get(candidate.detailUrl());
 

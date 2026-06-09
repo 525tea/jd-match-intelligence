@@ -29,6 +29,10 @@ public class SitemapCrawlService {
     }
 
     public SitemapCrawlResult crawl(JobIngestionSource source) {
+        return crawl(source, Integer.MAX_VALUE);
+    }
+
+    public SitemapCrawlResult crawl(JobIngestionSource source, int targetJobUrlCount) {
         CrawlerSourcePolicy policy = crawlerProperties.policy(source);
         Queue<String> pendingSitemapUrls = new ArrayDeque<>();
         Set<String> fetchedSitemapUrls = new LinkedHashSet<>();
@@ -36,8 +40,11 @@ public class SitemapCrawlService {
 
         pendingSitemapUrls.add(policy.sitemapUrl());
 
+        int targetCount = Math.max(targetJobUrlCount, 1);
+
         while (!pendingSitemapUrls.isEmpty()
-                && fetchedSitemapUrls.size() < MAX_SITEMAP_FETCHES_PER_RUN) {
+                && fetchedSitemapUrls.size() < MAX_SITEMAP_FETCHES_PER_RUN
+                && jobUrlCandidates.size() < targetCount) {
             String sitemapUrl = pendingSitemapUrls.poll();
 
             if (fetchedSitemapUrls.contains(sitemapUrl)) {
@@ -52,9 +59,11 @@ public class SitemapCrawlService {
                     fetchedSitemap.sitemap()
             );
 
-            discoveryResult.sitemapUrls().stream()
-                    .filter(url -> !fetchedSitemapUrls.contains(url))
-                    .forEach(pendingSitemapUrls::add);
+            if (jobUrlCandidates.size() < targetCount) {
+                discoveryResult.sitemapUrls().stream()
+                        .filter(url -> !fetchedSitemapUrls.contains(url))
+                        .forEach(pendingSitemapUrls::add);
+            }
 
             discoveryResult.jobUrls()
                     .forEach(candidate -> jobUrlCandidates.putIfAbsent(
