@@ -425,20 +425,24 @@ public class JumpitJobPostingParser implements JobPostingParser {
 
     private String rawData(FetchedJobPosting fetchedJobPosting, String title, String companyName) {
         return """
-                {"source":"%s","externalId":"%s","detailUrl":"%s","title":"%s","companyName":"%s"}
+                {"source":"%s","externalId":"%s","detailUrl":"%s","title":"%s","companyName":"%s","rawBody":"%s"}
                 """.formatted(
                 fetchedJobPosting.source(),
                 escapeJson(fetchedJobPosting.externalId()),
                 escapeJson(fetchedJobPosting.detailUrl()),
                 escapeJson(title),
-                escapeJson(companyName)
+                escapeJson(companyName),
+                escapeJson(fetchedJobPosting.body())
         );
     }
 
     private String escapeJson(String value) {
         return value == null ? "" : value
                 .replace("\\", "\\\\")
-                .replace("\"", "\\\"");
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     private String normalize(String value) {

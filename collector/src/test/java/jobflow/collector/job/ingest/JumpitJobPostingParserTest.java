@@ -68,6 +68,9 @@ class JumpitJobPostingParserTest {
         assertThat(posting.deadlineAt()).isEqualTo(LocalDateTime.of(2026, 7, 31, 23, 59));
         assertThat(posting.salaryCurrency()).isEqualTo("KRW");
         assertThat(posting.rawData()).contains("12345");
+        assertThat(posting.rawData()).contains("rawBody");
+        assertThat(posting.rawData()).contains("Backend Engineer");
+        assertThat(posting.rawData()).contains("position-description");
         assertThat(posting.crawlerVersion()).isEqualTo("jumpit-parser-0.1");
         assertThat(posting.collectedAt()).isNotNull();
         assertThat(posting.lastSeenAt()).isNotNull();
