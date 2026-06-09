@@ -1,15 +1,16 @@
 package jobflow.collector.job.ingest;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
-import java.time.LocalDateTime;
 import jobflow.collector.job.CareerLevel;
 import jobflow.collector.job.EmploymentType;
 import jobflow.collector.job.JobRole;
 import jobflow.collector.job.RemoteType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ZighangJobPostingParserTest {
 
@@ -33,7 +34,7 @@ class ZighangJobPostingParserTest {
                           <body>
                             <main>
                               <h1>Backend Engineer</h1>
-                              <section class="company-name">JobFlow Labs</section>
+                              <a href="/company/company-example-1">JobFlow Labs</a> |2026. 6. 1. 게시|
                               <section data-testid="job-description">
                                 Java, Spring Boot 기반 백엔드 개발자를 채용합니다.
                                 주니어 1년 이상, 서울 성동 하이브리드 근무를 지원합니다.
@@ -64,6 +65,7 @@ class ZighangJobPostingParserTest {
         assertThat(posting.locationRegion()).isEqualTo("Seoul");
         assertThat(posting.locationCity()).isEqualTo("Seongdong");
         assertThat(posting.deadlineAt()).isEqualTo(LocalDateTime.of(2026, 7, 31, 23, 59));
+        assertThat(posting.openedAt()).isEqualTo(LocalDateTime.of(2026, 6, 1, 0, 0));
         assertThat(posting.salaryCurrency()).isEqualTo("KRW");
         assertThat(posting.rawData()).contains("00000000-0000-0000-0000-000000000100");
         assertThat(posting.crawlerVersion()).isEqualTo("zighang-parser-0.1");
