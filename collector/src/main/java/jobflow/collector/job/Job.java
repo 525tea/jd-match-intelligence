@@ -227,6 +227,10 @@ public class Job extends BaseTimeEntity {
         this.deadlineAt = deadlineAt;
     }
 
+    public void updateRole(JobRole role) {
+        this.role = role;
+    }
+
     public void close() {
         validateOpenStatus();
         this.status = JobStatus.CLOSED;

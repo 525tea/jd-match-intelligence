@@ -1,4 +1,9 @@
 package jobflow.collector.job.backfill;
 
-public class RealJobNormalizationBackfillSummary {
+public record RealJobNormalizationBackfillSummary(
+        int processedCount,
+        int roleUpdatedCount,
+        int normalizedSkillJobCount,
+        int normalizedExperienceTagJobCount
+) {
 }

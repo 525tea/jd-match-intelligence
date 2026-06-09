@@ -56,14 +56,14 @@ class JdJobRoleClassificationServiceTest {
     }
 
     @Test
-    @DisplayName("명시된 role보다 JD 텍스트 기반 분류가 더 구체적이면 보정한다")
-    void inferRoleFromTextBeforeProvidedRole() {
+    @DisplayName("명시된 role이 ETC가 아니면 자동 분류보다 우선한다")
+    void keepProvidedRoleWhenSpecific() {
         JobRole role = service.resolve(
                 JobRole.FRONTEND,
                 "Spring Boot 백엔드 API 개발"
         );
 
-        assertThat(role).isEqualTo(JobRole.BACKEND);
+        assertThat(role).isEqualTo(JobRole.FRONTEND);
     }
 
     @Test
@@ -95,6 +95,17 @@ class JdJobRoleClassificationServiceTest {
         JobRole role = service.classify(
                 "커뮤니티 매니저",
                 "사용자 커뮤니케이션과 운영"
+        );
+
+        assertThat(role).isEqualTo(JobRole.ETC);
+    }
+
+    @Test
+    @DisplayName("firmware/embedded 계열은 현재 enum 기준 ETC로 둔다")
+    void classifyFirmwareRoleAsEtc() {
+        JobRole role = service.classify(
+                "Application UI FW개발자",
+                "NVR PC SW 및 firmware 개발"
         );
 
         assertThat(role).isEqualTo(JobRole.ETC);

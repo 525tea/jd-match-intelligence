@@ -12,21 +12,21 @@ public class JdJobRoleClassificationService {
     private static final Pattern NON_WORD_PATTERN = Pattern.compile("[^a-z0-9가-힣+#.]+");
 
     public JobRole resolve(JobRole providedRole, String... texts) {
-        JobRole classifiedRole = classify(texts);
-
-        if (classifiedRole != JobRole.ETC) {
-            return classifiedRole;
-        }
-
         if (providedRole != null && providedRole != JobRole.ETC) {
             return providedRole;
         }
 
-        return JobRole.ETC;
+        return classify(texts);
     }
 
     public JobRole classify(String... texts) {
         String text = normalize(String.join(" ", nonNullTexts(texts)));
+
+        if (matchesAny(text, "firmware", "펌웨어", "embedded", "임베디드", "fw 개발", "fw개발",
+                "rtl design", "rtl", "robot controls", "robot control", "로봇 제어", "제어 엔지니어",
+                "antenna", "안테나", "phased array", "nvr", "pc sw", "web viewer")) {
+            return JobRole.ETC;
+        }
 
         if (matchesAny(text, "fullstack", "full stack", "full-stack", "풀스택")) {
             return JobRole.FULLSTACK;
@@ -67,7 +67,7 @@ public class JdJobRoleClassificationService {
             return JobRole.ML_ENGINEER;
         }
 
-        if (matchesAny(text, "ai engineer", "llm", "genai", "ai 엔지니어", "인공지능")) {
+        if (matchesAny(text, "ai engineer", "ai developer", "ai 개발자", "llm", "genai", "ai 엔지니어", "인공지능")) {
             return JobRole.AI_ENGINEER;
         }
 
@@ -84,8 +84,7 @@ public class JdJobRoleClassificationService {
         }
 
         if (matchesAny(text, "software engineer", "software developer", "소프트웨어 엔지니어", "소프트웨어 개발자",
-                "sw engineer", "sw 개발", "fw 개발", "firmware", "펌웨어", "application 개발", "application기능",
-                "application ui", "web viewer", "pc sw", "controls engineer", "control engineer", "제어 엔지니어")) {
+                "sw engineer", "sw 개발", "application 개발", "application기능", "application ui")) {
             return JobRole.FULLSTACK;
         }
 

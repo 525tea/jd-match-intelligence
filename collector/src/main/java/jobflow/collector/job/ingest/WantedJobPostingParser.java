@@ -2,6 +2,7 @@ package jobflow.collector.job.ingest;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -324,6 +325,18 @@ public class WantedJobPostingParser implements JobPostingParser {
 
         try {
             return LocalDate.parse(dueTime).atTime(23, 59);
+        } catch (DateTimeParseException ignored) {
+            // Try datetime formats below.
+        }
+
+        try {
+            return OffsetDateTime.parse(dueTime).toLocalDateTime();
+        } catch (DateTimeParseException ignored) {
+            // Try local datetime format below.
+        }
+
+        try {
+            return LocalDateTime.parse(dueTime);
         } catch (DateTimeParseException exception) {
             return null;
         }
