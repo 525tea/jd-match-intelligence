@@ -36,14 +36,56 @@ public class ZighangJobPostingPreFilter implements JobPostingPreFilter {
     @Override
     public boolean shouldSkip(FetchedJobPosting fetchedJobPosting) {
         Document document = Jsoup.parse(fetchedJobPosting.body(), fetchedJobPosting.detailUrl());
-        String categorySignal = normalize(String.join(" ",
-                document.select("meta[property=og:title]").attr("content"),
-                document.select("meta[name=keywords]").attr("content"),
-                document.title()
-        ));
+        String sourceCategory = firstNonBlank(
+                extractCategory(document.select("meta[property=og:title]").attr("content")),
+                extractCategory(document.title())
+        );
+
+        if (sourceCategory.isBlank()) {
+            return true;
+        }
 
         return TARGET_CATEGORY_KEYWORDS.stream()
-                .noneMatch(categorySignal::contains);
+                .noneMatch(sourceCategory::contains);
+    }
+
+    private String extractCategory(String titleLikeValue) {
+        String value = normalize(titleLikeValue);
+
+        if (value.isBlank() || !value.contains("|")) {
+            return "";
+        }
+
+        String[] parts = value.split("\\|");
+
+        if (parts.length < 3) {
+            return "";
+        }
+
+        for (int index = parts.length - 2; index >= 0; index--) {
+            String candidate = normalize(parts[index]);
+
+            if (candidate.isBlank()
+                    || "직행".equals(candidate)
+                    || candidate.contains("채용")
+                    || candidate.contains("공고")) {
+                continue;
+            }
+
+            return candidate;
+        }
+
+        return "";
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+
+        return "";
     }
 
     private String normalize(String value) {

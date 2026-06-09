@@ -21,7 +21,7 @@ class ZighangJobPostingPreFilterTest {
                         <html>
                           <head>
                             <meta property="og:title" content="백엔드 개발자 | JobFlow Labs | IT_개발 | 직행">
-                            <meta name="keywords" content="백엔드 개발자, IT_개발, 직행">
+                            <meta name="keywords" content="직행, 채용, 공고">
                             <title>백엔드 개발자 | JobFlow Labs | IT_개발 | 직행</title>
                           </head>
                           <body>
@@ -46,11 +46,36 @@ class ZighangJobPostingPreFilterTest {
                         <html>
                           <head>
                             <meta property="og:title" content="인사전략담당자모집 | 넷마블 | 인사_노무_HRD_총무 | 직행">
-                            <meta name="keywords" content="인사전략담당자모집, 인사_노무_HRD_총무, 직행">
+                            <meta name="keywords" content="직행, 채용, 공고, IT_개발">
                             <title>인사전략담당자모집 | 넷마블 | 인사_노무_HRD_총무 | 직행</title>
                           </head>
                           <body>
                             <h1>인사전략담당자모집</h1>
+                          </body>
+                        </html>
+                        """
+        );
+
+        assertThat(preFilter.shouldSkip(fetched)).isTrue();
+    }
+
+    @Test
+    @DisplayName("직행 해외영업 카테고리 공고는 meta keywords에 IT가 있어도 skip한다")
+    void skipSalesCategoryEvenIfMetaKeywordsContainIt() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.ZIGHANG,
+                "21c5a888-0933-455a-b2c5-9d2a389e7475",
+                "https://zighang.com/recruitment/21c5a888-0933-455a-b2c5-9d2a389e7475",
+                "https://zighang.com/recruitment/21c5a888-0933-455a-b2c5-9d2a389e7475",
+                """
+                        <html>
+                          <head>
+                            <meta property="og:title" content="해외 화학제품/원료 해외영업직 채용 | 에스알티상사 | 영업_해외영업 | 직행">
+                            <meta name="keywords" content="직행, 채용, 공고, IT_개발">
+                            <title>해외 화학제품/원료 해외영업직 채용 | 에스알티상사 | 영업_해외영업 | 직행</title>
+                          </head>
+                          <body>
+                            <h1>해외 화학제품/원료 해외영업직 채용</h1>
                           </body>
                         </html>
                         """
