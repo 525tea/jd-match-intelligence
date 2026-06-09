@@ -81,6 +81,7 @@ class JobSkillNormalizationServiceTest {
                 .containsExactly("Spring Boot", "Kubernetes");
 
         verify(jobSkillRepository).deleteByJobId(1L);
+        verify(jobSkillRepository).flush();
         verify(jobSkillRepository).saveAll(org.mockito.ArgumentMatchers.anyList());
     }
 
@@ -101,6 +102,7 @@ class JobSkillNormalizationServiceTest {
         assertThat(jobSkills).isEmpty();
 
         verify(jobSkillRepository).deleteByJobId(1L);
+        verify(jobSkillRepository).flush();
     }
 
     private Job createJob(Long id) {

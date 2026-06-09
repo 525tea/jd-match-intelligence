@@ -85,6 +85,7 @@ class JobExperienceTagNormalizationServiceTest {
                 .containsExactly("HIGH_TRAFFIC", "CI_CD");
 
         verify(jobExperienceTagRepository).deleteByJobId(1L);
+        verify(jobExperienceTagRepository).flush();
         verify(jobExperienceTagRepository).saveAll(org.mockito.ArgumentMatchers.anyList());
     }
 
@@ -105,6 +106,7 @@ class JobExperienceTagNormalizationServiceTest {
         assertThat(jobExperienceTags).isEmpty();
 
         verify(jobExperienceTagRepository).deleteByJobId(1L);
+        verify(jobExperienceTagRepository).flush();
     }
 
     private Job createJob(Long id) {
