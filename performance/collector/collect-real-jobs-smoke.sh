@@ -14,6 +14,12 @@ echo "PREVIEW_LIMIT=${PREVIEW_LIMIT}"
 echo "SCAN_LIMIT=${SCAN_LIMIT}"
 echo "PROFILE=${PROFILE}"
 
+if [[ "${SOURCE}" == "SARAMIN" && -z "${SARAMIN_ACCESS_KEY:-}" ]]; then
+  echo "SARAMIN_ACCESS_KEY is required when SOURCE=SARAMIN." >&2
+  echo "Saramin API key approval is still a prerequisite for real Saramin collection smoke." >&2
+  exit 1
+fi
+
 cd "$(dirname "$0")/../../collector"
 
 ./gradlew bootRun \
