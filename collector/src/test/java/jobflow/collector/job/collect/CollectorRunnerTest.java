@@ -1,5 +1,6 @@
 package jobflow.collector.job.collect;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -10,6 +11,8 @@ import jobflow.collector.job.ingest.JobIngestionResultType;
 import jobflow.collector.job.ingest.JobIngestionSource;
 import jobflow.collector.job.ingest.JobPostingCollectionResult;
 import jobflow.collector.job.ingest.JobPostingCollectionService;
+import jobflow.collector.job.ingest.SaraminJobCollectionService;
+import jobflow.collector.job.ingest.SaraminJobCollectionSummary;
 import jobflow.collector.job.ingest.SitemapCrawlResult;
 import jobflow.collector.job.ingest.SitemapCrawlService;
 import jobflow.collector.job.ingest.WantedJobUrlDiscoveryService;
@@ -30,6 +33,9 @@ class CollectorRunnerTest {
     private WantedJobUrlDiscoveryService wantedJobUrlDiscoveryService;
 
     @Mock
+    private SaraminJobCollectionService saraminJobCollectionService;
+
+    @Mock
     private JobPostingCollectionService jobPostingCollectionService;
 
     @Test
@@ -46,6 +52,7 @@ class CollectorRunnerTest {
                 properties,
                 sitemapCrawlService,
                 wantedJobUrlDiscoveryService,
+                saraminJobCollectionService,
                 jobPostingCollectionService
         );
         CrawlerUrlCandidate firstCandidate = zighangCandidate("00000000-0000-0000-0000-000000000100");
@@ -90,6 +97,7 @@ class CollectorRunnerTest {
                 properties,
                 sitemapCrawlService,
                 wantedJobUrlDiscoveryService,
+                saraminJobCollectionService,
                 jobPostingCollectionService
         );
         CrawlerUrlCandidate firstCandidate = jumpitCandidate("54111922");
@@ -123,6 +131,7 @@ class CollectorRunnerTest {
                 properties,
                 sitemapCrawlService,
                 wantedJobUrlDiscoveryService,
+                saraminJobCollectionService,
                 jobPostingCollectionService
         );
 
@@ -153,6 +162,7 @@ class CollectorRunnerTest {
                 properties,
                 sitemapCrawlService,
                 wantedJobUrlDiscoveryService,
+                saraminJobCollectionService,
                 jobPostingCollectionService
         );
         CrawlerUrlCandidate firstCandidate = wantedCandidate("367044");
@@ -172,6 +182,35 @@ class CollectorRunnerTest {
         verify(sitemapCrawlService, never()).crawl(JobIngestionSource.WANTED, 10);
         verify(jobPostingCollectionService).collect(firstCandidate);
         verify(jobPostingCollectionService, never()).collect(secondCandidate);
+    }
+
+    @Test
+    @DisplayName("SARAMIN source는 sitemap이나 HTML fetch 없이 API collection service로 수집한다")
+    void runSaraminWithApiCollection() {
+        CollectorRunnerProperties properties = new CollectorRunnerProperties(
+                true,
+                JobIngestionSource.SARAMIN,
+                5,
+                20,
+                50
+        );
+        CollectorRunner runner = new CollectorRunner(
+                properties,
+                sitemapCrawlService,
+                wantedJobUrlDiscoveryService,
+                saraminJobCollectionService,
+                jobPostingCollectionService
+        );
+
+        given(saraminJobCollectionService.collect(20, 50))
+                .willReturn(new SaraminJobCollectionSummary(20, 20, 15, 5, 0));
+
+        runner.run(new DefaultApplicationArguments());
+
+        verify(saraminJobCollectionService).collect(20, 50);
+        verify(wantedJobUrlDiscoveryService, never()).discover(50);
+        verify(sitemapCrawlService, never()).crawl(JobIngestionSource.SARAMIN, 50);
+        verify(jobPostingCollectionService, never()).collect(any());
     }
 
     private CrawlerUrlCandidate zighangCandidate(String externalId) {
