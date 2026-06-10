@@ -144,6 +144,104 @@ class JdSkillNormalizationServiceTest {
     }
 
     @Test
+    @DisplayName("실제 공고의 embedded/robotics long-tail skill 표현을 정규화한다")
+    void normalizeRealJobEmbeddedSkillAliases() {
+        JdSkillNormalizationService service = new JdSkillNormalizationService(
+                skillRepository,
+                skillAliasRepository
+        );
+        Skill c = Skill.create("C", "c", SkillCategory.LANGUAGE);
+        Skill cpp = Skill.create("C++", "c++", SkillCategory.LANGUAGE);
+        Skill rtos = Skill.create("RTOS", "rtos", SkillCategory.INFRA);
+        Skill ros = Skill.create("ROS", "ros", SkillCategory.FRAMEWORK);
+
+        given(skillRepository.findAllByOrderByNameAsc())
+                .willReturn(List.of(c, cpp, rtos, ros));
+        given(skillAliasRepository.findByEnabledTrueOrderByNormalizedAliasAsc())
+                .willReturn(List.of(
+                        SkillAlias.create(rtos, "Firmware", "firmware", BigDecimal.valueOf(0.9500)),
+                        SkillAlias.create(rtos, "펌웨어", "펌웨어", BigDecimal.valueOf(0.9500))
+                ));
+
+        List<NormalizedSkillMatch> matches = service.normalize(
+                "ROS 기반 로봇 제어와 C/C++ 펌웨어 개발 경험"
+        );
+
+        assertThat(matches)
+                .extracting(match -> match.skill().getName())
+                .containsExactly("C", "C++", "ROS", "RTOS");
+    }
+
+    @Test
+    @DisplayName("실제 공고의 web/database/tool alias를 정규화한다")
+    void normalizeRealJobWebAndToolAliases() {
+        JdSkillNormalizationService service = new JdSkillNormalizationService(
+                skillRepository,
+                skillAliasRepository
+        );
+        Skill node = Skill.create("Node.js", "node.js", SkillCategory.FRAMEWORK);
+        Skill postgres = Skill.create("PostgreSQL", "postgresql", SkillCategory.DATABASE);
+        Skill react = Skill.create("React", "react", SkillCategory.FRAMEWORK);
+        Skill sapErp = Skill.create("SAP ERP", "sap erp", SkillCategory.TOOL);
+        Skill softwareEngineering = Skill.create(
+                "Software Engineering",
+                "software engineering",
+                SkillCategory.METHODOLOGY
+        );
+
+        given(skillRepository.findAllByOrderByNameAsc())
+                .willReturn(List.of(node, postgres, react, sapErp, softwareEngineering));
+        given(skillAliasRepository.findByEnabledTrueOrderByNormalizedAliasAsc())
+                .willReturn(List.of(
+                        SkillAlias.create(node, "Node", "node", BigDecimal.valueOf(0.9000)),
+                        SkillAlias.create(postgres, "Postgres", "postgres", BigDecimal.valueOf(0.9500)),
+                        SkillAlias.create(react, "React.js", "react.js", BigDecimal.valueOf(0.9500)),
+                        SkillAlias.create(sapErp, "ERP", "erp", BigDecimal.valueOf(0.8500)),
+                        SkillAlias.create(softwareEngineering, "S/W", "s w", BigDecimal.valueOf(0.8000))
+                ));
+
+        List<NormalizedSkillMatch> matches = service.normalize(
+                "Node 기반 S/W 개발과 React.js, Postgres, ERP 운영 경험"
+        );
+
+        assertThat(matches)
+                .extracting(match -> match.skill().getName())
+                .containsExactly("Node.js", "PostgreSQL", "React", "SAP ERP", "Software Engineering");
+    }
+
+    @Test
+    @DisplayName("실제 공고의 security/network/hardware skill 표현을 정규화한다")
+    void normalizeRealJobSecurityNetworkHardwareAliases() {
+        JdSkillNormalizationService service = new JdSkillNormalizationService(
+                skillRepository,
+                skillAliasRepository
+        );
+        Skill cissp = Skill.create("CISSP", "cissp", SkillCategory.METHODOLOGY);
+        Skill isms = Skill.create("ISMS", "isms", SkillCategory.METHODOLOGY);
+        Skill network = Skill.create("Network", "network", SkillCategory.INFRA);
+        Skill rf = Skill.create("RF", "rf", SkillCategory.ETC);
+        Skill spectrumAnalyzer = Skill.create("Spectrum Analyzer", "spectrum analyzer", SkillCategory.TOOL);
+        Skill tcpIp = Skill.create("TCP/IP", "tcp/ip", SkillCategory.INFRA);
+
+        given(skillRepository.findAllByOrderByNameAsc())
+                .willReturn(List.of(cissp, isms, network, rf, spectrumAnalyzer, tcpIp));
+        given(skillAliasRepository.findByEnabledTrueOrderByNormalizedAliasAsc())
+                .willReturn(List.of(
+                        SkillAlias.create(network, "네트워크", "네트워크", BigDecimal.valueOf(0.9500)),
+                        SkillAlias.create(tcpIp, "TCP IP", "tcp ip", BigDecimal.valueOf(0.9500)),
+                        SkillAlias.create(spectrumAnalyzer, "Spectrum", "spectrum", BigDecimal.valueOf(0.8500))
+                ));
+
+        List<NormalizedSkillMatch> matches = service.normalize(
+                "ISMS, CISSP 기반 네트워크 보안과 TCP/IP, RF Spectrum analyzer 사용 경험"
+        );
+
+        assertThat(matches)
+                .extracting(match -> match.skill().getName())
+                .containsExactly("CISSP", "ISMS", "Network", "RF", "Spectrum Analyzer", "TCP/IP");
+    }
+
+    @Test
     @DisplayName("빈 텍스트는 repository를 조회하지 않고 빈 결과를 반환한다")
     void normalizeBlankText() {
         JdSkillNormalizationService service = new JdSkillNormalizationService(
