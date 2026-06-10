@@ -50,6 +50,34 @@ WITH target_jobs AS (
              ROUND(SUM(CASE WHEN location_region IS NULL OR location_region = '' THEN 1 ELSE 0 END) / COUNT(*) * 100, 2) AS missing_location_region_rate
          FROM target_jobs
          GROUP BY source
+     ),
+     wanted_deadline_source AS (
+         SELECT
+             'WANTED' AS source,
+             SUM(CASE WHEN j.deadline_at IS NULL THEN 1 ELSE 0 END) AS missing_deadline_count,
+             ROUND(SUM(CASE WHEN j.deadline_at IS NULL THEN 1 ELSE 0 END) / COUNT(*) * 100, 2) AS missing_deadline_rate,
+             SUM(CASE
+                     WHEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(j.raw_data, '$.job.due_time')), 'null') IS NULL
+                          OR NULLIF(JSON_UNQUOTE(JSON_EXTRACT(j.raw_data, '$.job.due_time')), 'null') = ''
+                         THEN 1
+                     ELSE 0
+                 END) AS raw_due_time_missing_count,
+             ROUND(SUM(CASE
+                           WHEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(j.raw_data, '$.job.due_time')), 'null') IS NULL
+                                OR NULLIF(JSON_UNQUOTE(JSON_EXTRACT(j.raw_data, '$.job.due_time')), 'null') = ''
+                               THEN 1
+                           ELSE 0
+                       END) / COUNT(*) * 100, 2) AS raw_due_time_missing_rate,
+             SUM(CASE
+                     WHEN j.deadline_at IS NULL
+                          AND NULLIF(JSON_UNQUOTE(JSON_EXTRACT(j.raw_data, '$.job.due_time')), 'null') IS NOT NULL
+                          AND NULLIF(JSON_UNQUOTE(JSON_EXTRACT(j.raw_data, '$.job.due_time')), 'null') <> ''
+                         THEN 1
+                     ELSE 0
+                 END) AS parser_missed_deadline_count
+         FROM jobs j
+         WHERE j.source = 'WANTED'
+           AND j.id >= @min_id
      )
 SELECT
     source,
@@ -114,6 +142,16 @@ FROM (
                 30, 60, 'GT',
                 'deadlineAt 누락 공고 비율'
          FROM summary
+         UNION ALL
+         SELECT source, 'wanted_raw_due_time_missing_rate', raw_due_time_missing_rate,
+                30, 60, 'GT',
+                'WANTED raw JSON job.due_time 자체가 비어 있는 공고 비율'
+         FROM wanted_deadline_source
+         UNION ALL
+         SELECT source, 'wanted_parser_missed_deadline_count', parser_missed_deadline_count,
+                0, 0, 'COUNT_GT_ZERO',
+                'WANTED raw due_time은 있는데 deadlineAt 파싱에 실패한 공고 수'
+         FROM wanted_deadline_source
          UNION ALL
          SELECT source, 'missing_location_region_rate', missing_location_region_rate,
                 10, 25, 'GT',
