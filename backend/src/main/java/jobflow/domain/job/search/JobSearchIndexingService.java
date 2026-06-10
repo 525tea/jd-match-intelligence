@@ -1,5 +1,7 @@
 package jobflow.domain.job.search;
 
+import java.util.ArrayList;
+import java.util.List;
 import jobflow.domain.job.Job;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -21,7 +23,28 @@ public class JobSearchIndexingService {
         JobSearchDocument document = jobSearchDocumentMapper.toDocument(job);
         return elasticsearchOperations.save(
                 document,
-                IndexCoordinates.of(jobSearchProperties.indexName())
+                indexCoordinates()
         );
+    }
+
+    public List<JobSearchDocument> indexAll(List<Job> jobs) {
+        jobSearchIndexService.createIndexIfMissing();
+
+        List<JobSearchDocument> documents = jobs.stream()
+                .map(jobSearchDocumentMapper::toDocument)
+                .toList();
+
+        Iterable<JobSearchDocument> savedDocuments = elasticsearchOperations.save(
+                documents,
+                indexCoordinates()
+        );
+
+        List<JobSearchDocument> result = new ArrayList<>();
+        savedDocuments.forEach(result::add);
+        return result;
+    }
+
+    private IndexCoordinates indexCoordinates() {
+        return IndexCoordinates.of(jobSearchProperties.indexName());
     }
 }
