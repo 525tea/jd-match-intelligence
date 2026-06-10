@@ -5,6 +5,8 @@ import jobflow.collector.job.ingest.JobIngestionResultType;
 import jobflow.collector.job.ingest.JobIngestionSource;
 import jobflow.collector.job.ingest.JobPostingCollectionResult;
 import jobflow.collector.job.ingest.JobPostingCollectionService;
+import jobflow.collector.job.ingest.SaraminJobCollectionService;
+import jobflow.collector.job.ingest.SaraminJobCollectionSummary;
 import jobflow.collector.job.ingest.SitemapCrawlResult;
 import jobflow.collector.job.ingest.SitemapCrawlService;
 import jobflow.collector.job.ingest.WantedJobUrlDiscoveryService;
@@ -25,6 +27,7 @@ public class CollectorRunner implements ApplicationRunner {
     private final CollectorRunnerProperties collectorRunnerProperties;
     private final SitemapCrawlService sitemapCrawlService;
     private final WantedJobUrlDiscoveryService wantedJobUrlDiscoveryService;
+    private final SaraminJobCollectionService saraminJobCollectionService;
     private final JobPostingCollectionService jobPostingCollectionService;
 
     @Override
@@ -42,6 +45,11 @@ public class CollectorRunner implements ApplicationRunner {
                 scanLimit
         );
 
+        if (source == JobIngestionSource.SARAMIN) {
+            collectSaramin(collectLimit, scanLimit);
+            return;
+        }
+
         List<CrawlerUrlCandidate> jobUrls = discoverJobUrls(source, scanLimit);
 
         jobUrls.stream()
@@ -56,6 +64,20 @@ public class CollectorRunner implements ApplicationRunner {
                 summary.processedCount(),
                 summary.collectedCount(),
                 summary.skippedCount(),
+                summary.failedCount()
+        );
+    }
+
+    private void collectSaramin(int collectLimit, int scanLimit) {
+        SaraminJobCollectionSummary summary = saraminJobCollectionService.collect(collectLimit, scanLimit);
+
+        log.info(
+                "Collector completed. source={}, processedCount={}, collectedCount={}, createdCount={}, updatedCount={}, failedCount={}",
+                JobIngestionSource.SARAMIN,
+                summary.processedCount(),
+                summary.collectedCount(),
+                summary.createdCount(),
+                summary.updatedCount(),
                 summary.failedCount()
         );
     }
