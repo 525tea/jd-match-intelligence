@@ -7,5 +7,6 @@ public enum SkillCategory {
     INFRA,
     CLOUD,
     TOOL,
-    METHODOLOGY
+    METHODOLOGY,
+    ETC
 }
