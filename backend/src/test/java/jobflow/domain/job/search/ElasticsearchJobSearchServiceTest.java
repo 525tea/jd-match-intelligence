@@ -41,6 +41,7 @@ class ElasticsearchJobSearchServiceTest {
     private final JobSearchProperties jobSearchProperties = new JobSearchProperties(
             "http://localhost:9200",
             "jobflow-jobs",
+            "jobflow-jobs-v1",
             false
     );
 

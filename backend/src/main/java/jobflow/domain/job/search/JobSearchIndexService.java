@@ -16,7 +16,7 @@ public class JobSearchIndexService {
     private final JobSearchIndexDefinition jobSearchIndexDefinition;
 
     public boolean createIndexIfMissing() {
-        IndexOperations indexOperations = indexOperations();
+        IndexOperations indexOperations = physicalIndexOperations();
 
         if (exists(indexOperations)) {
             return false;
@@ -29,7 +29,7 @@ public class JobSearchIndexService {
     }
 
     public boolean indexExists() {
-        return exists(indexOperations());
+        return exists(physicalIndexOperations());
     }
 
     private boolean exists(IndexOperations indexOperations) {
@@ -60,9 +60,9 @@ public class JobSearchIndexService {
         return false;
     }
 
-    private IndexOperations indexOperations() {
+    private IndexOperations physicalIndexOperations() {
         return elasticsearchOperations.indexOps(
-                IndexCoordinates.of(jobSearchProperties.indexName())
+                IndexCoordinates.of(jobSearchProperties.physicalIndexName())
         );
     }
 }

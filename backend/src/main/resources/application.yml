@@ -22,6 +22,7 @@ app:
     elasticsearch:
       url: ${ELASTICSEARCH_URL:http://localhost:9200}
       index-name: jobflow-jobs
+      physical-index-name: ${ELASTICSEARCH_JOBS_INDEX:jobflow-jobs-v1}
       initialize-on-startup: false
 
   jwt:

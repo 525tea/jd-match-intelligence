@@ -1,5 +1,10 @@
 package jobflow.domain.job.search;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,11 +14,6 @@ import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.IndexOperations;
 import org.springframework.data.elasticsearch.core.document.Document;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class JobSearchIndexServiceTest {
@@ -27,13 +27,14 @@ class JobSearchIndexServiceTest {
     private final JobSearchProperties jobSearchProperties = new JobSearchProperties(
             "http://localhost:9200",
             "jobflow-jobs",
+            "jobflow-jobs-v1",
             false
     );
 
     private final JobSearchIndexDefinition jobSearchIndexDefinition = new JobSearchIndexDefinition();
 
     @Test
-    @DisplayName("검색 index가 없으면 settings와 mapping으로 생성한다")
+    @DisplayName("검색 physical index가 없으면 settings와 mapping으로 생성한다")
     void createIndexIfMissing() {
         JobSearchIndexService service = new JobSearchIndexService(
                 elasticsearchOperations,
@@ -41,7 +42,7 @@ class JobSearchIndexServiceTest {
                 jobSearchIndexDefinition
         );
 
-        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs")))
+        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs-v1")))
                 .willReturn(indexOperations);
         given(indexOperations.exists()).willReturn(false);
 
@@ -54,7 +55,7 @@ class JobSearchIndexServiceTest {
     }
 
     @Test
-    @DisplayName("검색 index가 이미 있으면 생성하지 않는다")
+    @DisplayName("검색 physical index가 이미 있으면 생성하지 않는다")
     void skipExistingIndex() {
         JobSearchIndexService service = new JobSearchIndexService(
                 elasticsearchOperations,
@@ -62,7 +63,7 @@ class JobSearchIndexServiceTest {
                 jobSearchIndexDefinition
         );
 
-        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs")))
+        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs-v1")))
                 .willReturn(indexOperations);
         given(indexOperations.exists()).willReturn(true);
 
@@ -75,7 +76,7 @@ class JobSearchIndexServiceTest {
     }
 
     @Test
-    @DisplayName("검색 index 존재 확인이 빈 응답 오류로 실패하면 index를 생성한다")
+    @DisplayName("검색 physical index 존재 확인이 빈 응답 오류로 실패하면 index를 생성한다")
     void createIndexWhenExistsCheckFailsWithEmptyResponse() {
         JobSearchIndexService service = new JobSearchIndexService(
                 elasticsearchOperations,
@@ -83,7 +84,7 @@ class JobSearchIndexServiceTest {
                 jobSearchIndexDefinition
         );
 
-        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs")))
+        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs-v1")))
                 .willReturn(indexOperations);
         given(indexOperations.exists())
                 .willThrow(new RuntimeException(
@@ -99,7 +100,7 @@ class JobSearchIndexServiceTest {
     }
 
     @Test
-    @DisplayName("검색 index 존재 여부를 조회한다")
+    @DisplayName("검색 physical index 존재 여부를 조회한다")
     void indexExists() {
         JobSearchIndexService service = new JobSearchIndexService(
                 elasticsearchOperations,
@@ -107,7 +108,7 @@ class JobSearchIndexServiceTest {
                 jobSearchIndexDefinition
         );
 
-        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs")))
+        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs-v1")))
                 .willReturn(indexOperations);
         given(indexOperations.exists()).willReturn(true);
 
