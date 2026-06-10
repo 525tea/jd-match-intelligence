@@ -84,6 +84,18 @@ WITH keyword_candidates AS (
     SELECT 'Shell', 'shell' UNION ALL
     SELECT 'MATLAB', 'matlab' UNION ALL
     SELECT 'Simulink', 'simulink' UNION ALL
+    SELECT 'Network', 'network' UNION ALL
+    SELECT 'TCP/IP', 'tcp/ip' UNION ALL
+    SELECT 'BGP', 'bgp' UNION ALL
+    SELECT 'OSPF', 'ospf' UNION ALL
+    SELECT 'SSH', 'ssh' UNION ALL
+    SELECT 'Apache', 'apache' UNION ALL
+    SELECT 'DBMS', 'dbms' UNION ALL
+    SELECT 'ISMS', 'isms' UNION ALL
+    SELECT 'CISSP', 'cissp' UNION ALL
+    SELECT 'RF', 'rf' UNION ALL
+    SELECT 'Spectrum Analyzer', 'spectrum analyzer' UNION ALL
+    SELECT 'Network Analyzer', 'network analyzer' UNION ALL
     SELECT 'ROS', 'ros' UNION ALL
     SELECT 'ROS2', 'ros2' UNION ALL
     SELECT 'RTOS', 'rtos' UNION ALL

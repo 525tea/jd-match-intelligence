@@ -117,6 +117,37 @@ class JdSkillNormalizationServiceTest {
     }
 
     @Test
+    @DisplayName("collector JD 텍스트에서 security/network/hardware skill 표현을 정규화한다")
+    void normalizeRealJobSecurityNetworkHardwareAliases() {
+        JdSkillNormalizationService service = new JdSkillNormalizationService(
+                skillRepository,
+                skillAliasRepository
+        );
+        Skill isms = Skill.create("ISMS", "isms", SkillCategory.METHODOLOGY);
+        Skill network = Skill.create("Network", "network", SkillCategory.INFRA);
+        Skill rf = Skill.create("RF", "rf", SkillCategory.ETC);
+        Skill spectrumAnalyzer = Skill.create("Spectrum Analyzer", "spectrum analyzer", SkillCategory.TOOL);
+        Skill tcpIp = Skill.create("TCP/IP", "tcp/ip", SkillCategory.INFRA);
+
+        given(skillRepository.findAllByOrderByNameAsc())
+                .willReturn(List.of(isms, network, rf, spectrumAnalyzer, tcpIp));
+        given(skillAliasRepository.findByEnabledTrueOrderByNormalizedAliasAsc())
+                .willReturn(List.of(
+                        SkillAlias.create(network, "네트워크", "네트워크", BigDecimal.valueOf(0.9500)),
+                        SkillAlias.create(tcpIp, "TCP IP", "tcp ip", BigDecimal.valueOf(0.9500)),
+                        SkillAlias.create(spectrumAnalyzer, "Spectrum", "spectrum", BigDecimal.valueOf(0.8500))
+                ));
+
+        List<NormalizedSkillMatch> matches = service.normalize(
+                "ISMS 기반 네트워크 보안과 TCP/IP, RF Spectrum analyzer 사용 경험"
+        );
+
+        assertThat(matches)
+                .extracting(match -> match.skill().getName())
+                .containsExactly("ISMS", "Network", "RF", "Spectrum Analyzer", "TCP/IP");
+    }
+
+    @Test
     @DisplayName("collector JD 텍스트가 비어 있으면 repository를 조회하지 않는다")
     void normalizeBlankText() {
         JdSkillNormalizationService service = new JdSkillNormalizationService(

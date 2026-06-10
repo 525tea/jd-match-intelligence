@@ -210,6 +210,38 @@ class JdSkillNormalizationServiceTest {
     }
 
     @Test
+    @DisplayName("실제 공고의 security/network/hardware skill 표현을 정규화한다")
+    void normalizeRealJobSecurityNetworkHardwareAliases() {
+        JdSkillNormalizationService service = new JdSkillNormalizationService(
+                skillRepository,
+                skillAliasRepository
+        );
+        Skill cissp = Skill.create("CISSP", "cissp", SkillCategory.METHODOLOGY);
+        Skill isms = Skill.create("ISMS", "isms", SkillCategory.METHODOLOGY);
+        Skill network = Skill.create("Network", "network", SkillCategory.INFRA);
+        Skill rf = Skill.create("RF", "rf", SkillCategory.ETC);
+        Skill spectrumAnalyzer = Skill.create("Spectrum Analyzer", "spectrum analyzer", SkillCategory.TOOL);
+        Skill tcpIp = Skill.create("TCP/IP", "tcp/ip", SkillCategory.INFRA);
+
+        given(skillRepository.findAllByOrderByNameAsc())
+                .willReturn(List.of(cissp, isms, network, rf, spectrumAnalyzer, tcpIp));
+        given(skillAliasRepository.findByEnabledTrueOrderByNormalizedAliasAsc())
+                .willReturn(List.of(
+                        SkillAlias.create(network, "네트워크", "네트워크", BigDecimal.valueOf(0.9500)),
+                        SkillAlias.create(tcpIp, "TCP IP", "tcp ip", BigDecimal.valueOf(0.9500)),
+                        SkillAlias.create(spectrumAnalyzer, "Spectrum", "spectrum", BigDecimal.valueOf(0.8500))
+                ));
+
+        List<NormalizedSkillMatch> matches = service.normalize(
+                "ISMS, CISSP 기반 네트워크 보안과 TCP/IP, RF Spectrum analyzer 사용 경험"
+        );
+
+        assertThat(matches)
+                .extracting(match -> match.skill().getName())
+                .containsExactly("CISSP", "ISMS", "Network", "RF", "Spectrum Analyzer", "TCP/IP");
+    }
+
+    @Test
     @DisplayName("빈 텍스트는 repository를 조회하지 않고 빈 결과를 반환한다")
     void normalizeBlankText() {
         JdSkillNormalizationService service = new JdSkillNormalizationService(

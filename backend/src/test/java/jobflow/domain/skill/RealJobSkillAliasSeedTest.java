@@ -45,6 +45,11 @@ class RealJobSkillAliasSeedTest {
                 new ClassPathResource("db/migration/V9__add_real_job_skill_aliases.sql")
         );
         populator.execute(dataSource);
+
+        ResourceDatabasePopulator securityNetworkPopulator = new ResourceDatabasePopulator(
+                new ClassPathResource("db/migration/V10__add_security_network_skill_aliases.sql")
+        );
+        securityNetworkPopulator.execute(dataSource);
     }
 
     @Test
@@ -78,6 +83,23 @@ class RealJobSkillAliasSeedTest {
         assertAlias("erp", "sap erp");
         assertAlias("s w", "software engineering");
         assertAlias("소프트웨어 개발", "software engineering");
+    }
+
+    @Test
+    @DisplayName("security/network/hardware 계열 seed와 alias가 생성된다")
+    void seedSecurityNetworkHardwareSkills() {
+        assertSkillSeed("network", "Network", SkillCategory.INFRA);
+        assertSkillSeed("tcp/ip", "TCP/IP", SkillCategory.INFRA);
+        assertSkillSeed("bgp", "BGP", SkillCategory.INFRA);
+        assertSkillSeed("isms", "ISMS", SkillCategory.METHODOLOGY);
+        assertSkillSeed("cissp", "CISSP", SkillCategory.METHODOLOGY);
+        assertSkillSeed("rf", "RF", SkillCategory.ETC);
+        assertSkillSeed("spectrum analyzer", "Spectrum Analyzer", SkillCategory.TOOL);
+
+        assertAlias("네트워크", "network");
+        assertAlias("tcp ip", "tcp/ip");
+        assertAlias("apache", "apache http server");
+        assertAlias("정보보호 인증", "isms");
     }
 
     private void assertSkillSeed(String normalizedName, String name, SkillCategory category) {
