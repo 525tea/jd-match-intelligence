@@ -121,6 +121,65 @@ class JdExperienceTagNormalizationServiceTest {
     }
 
     @Test
+    @DisplayName("실제 공고에서 자주 등장한 experience phrase를 정규화한다")
+    void normalizeRealJobExperiencePhrases() {
+        JdExperienceTagNormalizationService service =
+                new JdExperienceTagNormalizationService(jdPhraseTagMappingRepository);
+
+        ExperienceTagCode performance = createExperienceTagCode("PERFORMANCE", "성능 최적화");
+        ExperienceTagCode testing = createExperienceTagCode("TESTING", "테스트");
+        ExperienceTagCode reliability = createExperienceTagCode("RELIABILITY", "안정성");
+        ExperienceTagCode cloudInfra = createExperienceTagCode("CLOUD_INFRA", "클라우드/인프라");
+        ExperienceTagCode security = createExperienceTagCode("SECURITY", "보안");
+
+        given(jdPhraseTagMappingRepository.findByEnabledTrueOrderByNormalizedPhraseAsc())
+                .willReturn(List.of(
+                        JdPhraseTagMapping.create(
+                                "최적화",
+                                "최적화",
+                                performance,
+                                BigDecimal.valueOf(0.8500)
+                        ),
+                        JdPhraseTagMapping.create(
+                                "시뮬레이션",
+                                "시뮬레이션",
+                                testing,
+                                BigDecimal.valueOf(0.8500)
+                        ),
+                        JdPhraseTagMapping.create(
+                                "기술 지원",
+                                "기술 지원",
+                                reliability,
+                                BigDecimal.valueOf(0.8000)
+                        ),
+                        JdPhraseTagMapping.create(
+                                "시스템 통합",
+                                "시스템 통합",
+                                cloudInfra,
+                                BigDecimal.valueOf(0.8500)
+                        ),
+                        JdPhraseTagMapping.create(
+                                "보안 요구사항",
+                                "보안 요구사항",
+                                security,
+                                BigDecimal.valueOf(0.8500)
+                        )
+                ));
+
+        List<NormalizedExperienceTagMatch> matches = service.normalize(
+                "모델 코드 설계와 최적화, 시뮬레이션 환경 구축",
+                "시스템 통합 이후 기술 지원을 수행하고 보안 요구사항을 분석"
+        );
+
+        assertThat(matches)
+                .extracting(match -> match.tagCode().getCode())
+                .containsExactly("CLOUD_INFRA", "PERFORMANCE", "RELIABILITY", "SECURITY", "TESTING");
+        assertThat(matches)
+                .extracting(NormalizedExperienceTagMatch::sourcePhrase)
+                .containsExactly("시스템 통합", "최적화", "기술 지원", "보안 요구사항", "시뮬레이션");
+    }
+
+    @Test
     @DisplayName("빈 텍스트는 repository를 조회하지 않고 빈 결과를 반환한다")
     void normalizeBlankText() {
         JdExperienceTagNormalizationService service =
