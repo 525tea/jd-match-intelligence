@@ -28,28 +28,19 @@ class RealJobSkillAliasSeedTest {
 
     @BeforeEach
     void setUp() {
-        jdbcTemplate.execute("DELETE FROM skill_aliases");
-        jdbcTemplate.execute("DELETE FROM skills");
-
-        skillRepository.save(Skill.create("Node.js", "node.js", SkillCategory.FRAMEWORK));
-        skillRepository.save(Skill.create("PostgreSQL", "postgresql", SkillCategory.DATABASE));
-        skillRepository.save(Skill.create("Oracle Database", "oracle database", SkillCategory.DATABASE));
-        skillRepository.save(Skill.create("Kubernetes", "kubernetes", SkillCategory.INFRA));
-        skillRepository.flush();
-
+        jdbcTemplate.execute("ALTER TABLE experience_tag_codes ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE jd_phrase_tag_mapping ALTER COLUMN enabled SET DEFAULT TRUE");
+        jdbcTemplate.execute("ALTER TABLE jd_phrase_tag_mapping ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP");
         jdbcTemplate.execute("ALTER TABLE skills ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP");
         jdbcTemplate.execute("ALTER TABLE skill_aliases ALTER COLUMN enabled SET DEFAULT TRUE");
         jdbcTemplate.execute("ALTER TABLE skill_aliases ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP");
 
         ResourceDatabasePopulator populator = new ResourceDatabasePopulator(
-                new ClassPathResource("db/migration/V9__add_real_job_skill_aliases.sql")
-        );
-        populator.execute(dataSource);
-
-        ResourceDatabasePopulator securityNetworkPopulator = new ResourceDatabasePopulator(
+                new ClassPathResource("db/migration/V2__seed_skill_and_experience_tags.sql"),
+                new ClassPathResource("db/migration/V9__add_real_job_skill_aliases.sql"),
                 new ClassPathResource("db/migration/V10__add_security_network_skill_aliases.sql")
         );
-        securityNetworkPopulator.execute(dataSource);
+        populator.execute(dataSource);
     }
 
     @Test
