@@ -9,11 +9,25 @@ import org.springframework.stereotype.Component;
 public class JobSearchIndexDefinition {
 
     private static final String ANALYZER_NAME = "jobflow_korean_tech";
+    private static final String TECH_STACK_CHAR_FILTER_NAME = "jobflow_tech_stack_normalizer";
     private static final String SYNONYM_FILTER_NAME = "jobflow_tech_synonym";
 
     public Map<String, Object> settings() {
         return mapOf(
                 "analysis", mapOf(
+                        "char_filter", mapOf(
+                                TECH_STACK_CHAR_FILTER_NAME, mapOf(
+                                        "type", "mapping",
+                                        "mappings", List.of(
+                                                "ASP.NET => aspnet",
+                                                "Objective-C => objectivec",
+                                                "Node.js => nodejs",
+                                                ".NET => dotnet",
+                                                "C++ => cplusplus",
+                                                "C# => csharp"
+                                        )
+                                )
+                        ),
                         "filter", mapOf(
                                 SYNONYM_FILTER_NAME, mapOf(
                                         "type", "synonym",
@@ -31,6 +45,7 @@ public class JobSearchIndexDefinition {
                                 ANALYZER_NAME, mapOf(
                                         "type", "custom",
                                         "tokenizer", "nori_tokenizer",
+                                        "char_filter", List.of(TECH_STACK_CHAR_FILTER_NAME),
                                         "filter", List.of(
                                                 "lowercase",
                                                 SYNONYM_FILTER_NAME

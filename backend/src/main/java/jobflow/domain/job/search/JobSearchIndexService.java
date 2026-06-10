@@ -4,6 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.IndexOperations;
 import org.springframework.data.elasticsearch.core.document.Document;
+import org.springframework.data.elasticsearch.core.index.AliasAction;
+import org.springframework.data.elasticsearch.core.index.AliasActionParameters;
+import org.springframework.data.elasticsearch.core.index.AliasActions;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
 import org.springframework.stereotype.Service;
 
@@ -16,20 +19,32 @@ public class JobSearchIndexService {
     private final JobSearchIndexDefinition jobSearchIndexDefinition;
 
     public boolean createIndexIfMissing() {
-        IndexOperations indexOperations = indexOperations();
+        IndexOperations indexOperations = physicalIndexOperations();
+        boolean created = false;
 
-        if (exists(indexOperations)) {
-            return false;
+        if (!exists(indexOperations)) {
+            indexOperations.create(jobSearchIndexDefinition.settings());
+            indexOperations.putMapping(Document.from(jobSearchIndexDefinition.mapping()));
+            created = true;
         }
 
-        indexOperations.create(jobSearchIndexDefinition.settings());
-        indexOperations.putMapping(Document.from(jobSearchIndexDefinition.mapping()));
+        ensureAlias(indexOperations);
 
-        return true;
+        return created;
     }
 
     public boolean indexExists() {
-        return exists(indexOperations());
+        return exists(physicalIndexOperations());
+    }
+
+    private void ensureAlias(IndexOperations indexOperations) {
+        AliasActionParameters parameters = AliasActionParameters.builder()
+                .withIndices(jobSearchProperties.physicalIndexName())
+                .withAliases(jobSearchProperties.indexName())
+                .withIsWriteIndex(true)
+                .build();
+
+        indexOperations.alias(new AliasActions(new AliasAction.Add(parameters)));
     }
 
     private boolean exists(IndexOperations indexOperations) {
@@ -60,9 +75,9 @@ public class JobSearchIndexService {
         return false;
     }
 
-    private IndexOperations indexOperations() {
+    private IndexOperations physicalIndexOperations() {
         return elasticsearchOperations.indexOps(
-                IndexCoordinates.of(jobSearchProperties.indexName())
+                IndexCoordinates.of(jobSearchProperties.physicalIndexName())
         );
     }
 }

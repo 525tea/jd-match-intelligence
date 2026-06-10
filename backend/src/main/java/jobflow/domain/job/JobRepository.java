@@ -8,11 +8,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import jobflow.domain.analytics.JobMarketStatsAggregate;
+import org.springframework.data.domain.Pageable;
 
 @Repository("jobDomainRepository")
 public interface JobRepository extends JpaRepository<Job, Long> {
 
     List<Job> findAllByOrderByCreatedAtDesc();
+
+    List<Job> findByIdGreaterThanOrderByIdAsc(Long id, Pageable pageable);
 
     List<Job> findByStatusAndDeadlineAtBefore(JobStatus status, LocalDateTime deadlineAt);
 

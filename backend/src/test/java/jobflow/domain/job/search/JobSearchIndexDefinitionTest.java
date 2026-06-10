@@ -12,21 +12,37 @@ class JobSearchIndexDefinitionTest {
     private final JobSearchIndexDefinition definition = new JobSearchIndexDefinition();
 
     @Test
-    @DisplayName("nori tokenizer와 기술 용어 synonym filter를 포함한 analyzer 설정을 만든다")
+    @DisplayName("nori tokenizer와 기술 용어 char filter/synonym filter를 포함한 analyzer 설정을 만든다")
     void settings() {
         Map<String, Object> settings = definition.settings();
 
         Map<String, Object> analysis = getMap(settings, "analysis");
         Map<String, Object> analyzers = getMap(analysis, "analyzer");
+        Map<String, Object> charFilters = getMap(analysis, "char_filter");
         Map<String, Object> filters = getMap(analysis, "filter");
 
         Map<String, Object> analyzer = getMap(analyzers, "jobflow_korean_tech");
+        Map<String, Object> techStackCharFilter = getMap(charFilters, "jobflow_tech_stack_normalizer");
         Map<String, Object> synonymFilter = getMap(filters, "jobflow_tech_synonym");
 
         assertThat(analyzer)
                 .containsEntry("type", "custom")
                 .containsEntry("tokenizer", "nori_tokenizer")
+                .containsEntry("char_filter", List.of("jobflow_tech_stack_normalizer"))
                 .containsEntry("filter", List.of("lowercase", "jobflow_tech_synonym"));
+
+        assertThat(techStackCharFilter)
+                .containsEntry("type", "mapping");
+
+        assertThat((List<String>) techStackCharFilter.get("mappings"))
+                .contains(
+                        "ASP.NET => aspnet",
+                        "Objective-C => objectivec",
+                        "Node.js => nodejs",
+                        ".NET => dotnet",
+                        "C++ => cplusplus",
+                        "C# => csharp"
+                );
 
         assertThat(synonymFilter)
                 .containsEntry("type", "synonym");

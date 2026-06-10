@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record JobSearchProperties(
         String url,
         String indexName,
+        String physicalIndexName,
         boolean initializeOnStartup
 ) {
 }

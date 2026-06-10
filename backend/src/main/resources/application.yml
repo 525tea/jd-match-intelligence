@@ -22,7 +22,10 @@ app:
     elasticsearch:
       url: ${ELASTICSEARCH_URL:http://localhost:9200}
       index-name: jobflow-jobs
+      physical-index-name: ${ELASTICSEARCH_JOBS_INDEX:jobflow-jobs-v1}
       initialize-on-startup: false
+      reindex-on-startup: ${ELASTICSEARCH_REINDEX_ON_STARTUP:false}
+      reindex-batch-size: ${ELASTICSEARCH_REINDEX_BATCH_SIZE:100}
 
   jwt:
     secret: ${JWT_SECRET:}
