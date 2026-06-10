@@ -256,4 +256,31 @@ class WantedJobPostingParserTest {
 
         assertThat(posting.deadlineAt()).isEqualTo(LocalDateTime.of(2026, 7, 15, 23, 59));
     }
+
+    @Test
+    @DisplayName("원티드 due_time이 null이면 deadline을 비워둔다")
+    void keepNullDeadlineWhenDueTimeIsNull() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "366702",
+                "https://www.wanted.co.kr/wd/366702",
+                "https://www.wanted.co.kr/api/v4/jobs/366702",
+                """
+                        {
+                          "job": {
+                            "position": "Perception Researcher",
+                            "due_time": null,
+                            "company": {"name": "로아이"},
+                            "detail": {
+                              "requirements": "Python 또는 C++ 기반 perception 알고리즘 구현 경험"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.deadlineAt()).isNull();
+    }
 }
