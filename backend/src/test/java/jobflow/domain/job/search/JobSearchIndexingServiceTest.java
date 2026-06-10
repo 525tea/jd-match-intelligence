@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.mapping.IndexCoordinates;
+import org.springframework.data.elasticsearch.core.IndexOperations;
 
 @ExtendWith(MockitoExtension.class)
 class JobSearchIndexingServiceTest {
@@ -26,6 +27,9 @@ class JobSearchIndexingServiceTest {
 
     @Mock
     private JobSearchDocumentMapper jobSearchDocumentMapper;
+
+    @Mock
+    private IndexOperations indexOperations;
 
     @Mock
     private Job job;
@@ -90,6 +94,25 @@ class JobSearchIndexingServiceTest {
         verify(jobSearchDocumentMapper).toDocument(job);
         verify(jobSearchDocumentMapper).toDocument(anotherJob);
         verify(elasticsearchOperations).save(documents, IndexCoordinates.of("jobflow-jobs"));
+    }
+
+    @Test
+    @DisplayName("검색 alias index를 refresh한다")
+    void refresh() {
+        JobSearchIndexingService service = new JobSearchIndexingService(
+                elasticsearchOperations,
+                jobSearchProperties,
+                jobSearchIndexService,
+                jobSearchDocumentMapper
+        );
+
+        given(elasticsearchOperations.indexOps(IndexCoordinates.of("jobflow-jobs")))
+                .willReturn(indexOperations);
+
+        service.refresh();
+
+        verify(elasticsearchOperations).indexOps(IndexCoordinates.of("jobflow-jobs"));
+        verify(indexOperations).refresh();
     }
 
     private JobSearchDocument document(String id) {

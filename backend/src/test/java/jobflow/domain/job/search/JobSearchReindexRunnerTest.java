@@ -50,5 +50,6 @@ class JobSearchReindexRunnerTest {
         verify(jobRepository).findByIdGreaterThanOrderByIdAsc(3L, PageRequest.of(0, 2));
         verify(jobSearchIndexingService).indexAll(List.of(firstJob, secondJob));
         verify(jobSearchIndexingService).indexAll(List.of(thirdJob));
+        verify(jobSearchIndexingService).refresh();
     }
 }

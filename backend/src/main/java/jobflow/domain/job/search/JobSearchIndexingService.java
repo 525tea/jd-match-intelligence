@@ -44,6 +44,11 @@ public class JobSearchIndexingService {
         return result;
     }
 
+    public void refresh() {
+        elasticsearchOperations.indexOps(indexCoordinates())
+                .refresh();
+    }
+
     private IndexCoordinates indexCoordinates() {
         return IndexCoordinates.of(jobSearchProperties.indexName());
     }

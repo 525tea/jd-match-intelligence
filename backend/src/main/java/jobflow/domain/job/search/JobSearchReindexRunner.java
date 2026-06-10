@@ -56,6 +56,8 @@ public class JobSearchReindexRunner implements ApplicationRunner {
             );
         }
 
+        jobSearchIndexingService.refresh();
+
         log.info("Job search reindex completed. indexedCount={}", indexedCount);
     }
 }
