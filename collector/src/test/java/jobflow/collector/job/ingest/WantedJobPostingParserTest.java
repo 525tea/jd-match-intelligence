@@ -283,4 +283,32 @@ class WantedJobPostingParserTest {
 
         assertThat(posting.deadlineAt()).isNull();
     }
+
+    @Test
+    @DisplayName("원티드 경력 범위의 첫 숫자 뒤에 년이 있어도 경력 범위로 변환한다")
+    void inferExperienceRangeWithYearUnitBeforeSeparator() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "367410",
+                "https://www.wanted.co.kr/wd/367410",
+                "https://www.wanted.co.kr/api/v4/jobs/367410",
+                """
+                        {
+                          "job": {
+                            "position": "AI 에이전트 및 백엔드 엔지니어",
+                            "company": {"name": "아이제라"},
+                            "detail": {
+                              "requirements": "경력: 관련 백엔드 또는 AI 엔지니어링 경력 3년 ~ 7년 Python FastAPI 경험"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.careerLevel()).isEqualTo(CareerLevel.JUNIOR);
+        assertThat(posting.minExperienceYears()).isEqualTo(3);
+        assertThat(posting.maxExperienceYears()).isEqualTo(7);
+    }
 }

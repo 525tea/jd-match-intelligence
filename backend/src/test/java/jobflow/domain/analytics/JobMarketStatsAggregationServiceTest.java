@@ -88,6 +88,48 @@ class JobMarketStatsAggregationServiceTest {
         assertThat(midStats.getOpenJobCount()).isEqualTo(1);
     }
 
+    @Test
+    @DisplayName("같은 월 시장 통계 재집계 시 기존 집계를 교체한다")
+    void rerunMonthlyJobMarketStatsAggregation() {
+        String suffix = UUID.randomUUID().toString();
+        LocalDate periodStart = currentPeriodStart();
+        jobRepository.save(createJob(
+                "market-service-rerun-backend-1-" + suffix,
+                JobRole.BACKEND,
+                CareerLevel.ANY,
+                "Seoul",
+                RemoteType.ONSITE
+        ));
+        jobRepository.save(createJob(
+                "market-service-rerun-backend-2-" + suffix,
+                JobRole.BACKEND,
+                CareerLevel.ANY,
+                "Seoul",
+                RemoteType.ONSITE
+        ));
+        jobRepository.flush();
+
+        JobMarketStatsAggregationResult firstResult =
+                jobMarketStatsAggregationService.aggregateMonthly(periodStart);
+        JobMarketStatsAggregationResult secondResult =
+                jobMarketStatsAggregationService.aggregateMonthly(periodStart);
+
+        List<JobMarketStats> stats = jobMarketStatsRepository
+                .findByPeriodTypeAndPeriodStartAndRoleOrderByJobCountDesc(
+                        AnalyticsPeriodType.MONTHLY,
+                        periodStart,
+                        JobRole.BACKEND
+                );
+
+        assertThat(firstResult.savedCount()).isEqualTo(1);
+        assertThat(secondResult.savedCount()).isEqualTo(1);
+        assertThat(stats).hasSize(1);
+
+        JobMarketStats backendStats = findStats(stats, CareerLevel.ANY, "Seoul", "ONSITE");
+        assertThat(backendStats.getJobCount()).isEqualTo(2);
+        assertThat(backendStats.getOpenJobCount()).isEqualTo(2);
+    }
+
     private JobMarketStats findStats(
             List<JobMarketStats> stats,
             CareerLevel careerLevel,

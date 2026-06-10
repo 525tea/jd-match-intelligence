@@ -24,10 +24,11 @@ public class WantedJobPostingParser implements JobPostingParser {
 
     private static final String CRAWLER_VERSION = "wanted-parser-0.1";
     private static final int ROLE_DETAIL_MAX_LENGTH = 100;
+    private static final int MAX_REASONABLE_EXPERIENCE_YEARS = 80;
     private static final Pattern EXPERIENCE_RANGE_PATTERN =
-            Pattern.compile("(?:경력\\s*)?(\\d+)\\s*[~\\-–]\\s*(\\d+)\\s*년");
+            Pattern.compile("(?:경력\\s*:?)?\\s*(\\d+)\\s*년?\\s*[~\\-–]\\s*(\\d+)\\s*년");
     private static final Pattern EXPERIENCE_MIN_PATTERN =
-            Pattern.compile("(?:경력\\s*)?(\\d+)\\s*년\\s*이상");
+            Pattern.compile("(?:경력\\s*:?)?\\s*(\\d+)\\s*년\\s*이상");
 
     private final ObjectMapper objectMapper;
     private final JdJobRoleClassificationService jdJobRoleClassificationService;
@@ -196,20 +197,25 @@ public class WantedJobPostingParser implements JobPostingParser {
     private ExperienceRange inferExperienceRange(String pageText) {
         Matcher rangeMatcher = EXPERIENCE_RANGE_PATTERN.matcher(pageText);
 
-        if (rangeMatcher.find()) {
-            return new ExperienceRange(
-                    Integer.parseInt(rangeMatcher.group(1)),
-                    Integer.parseInt(rangeMatcher.group(2))
-            );
+        while (rangeMatcher.find()) {
+            Integer min = parseExperienceYear(rangeMatcher.group(1));
+            Integer max = parseExperienceYear(rangeMatcher.group(2));
+
+            if (min == null || max == null || min > max) {
+                continue;
+            }
+
+            return new ExperienceRange(min, max);
         }
 
         Matcher minMatcher = EXPERIENCE_MIN_PATTERN.matcher(pageText);
 
-        if (minMatcher.find()) {
-            return new ExperienceRange(
-                    Integer.parseInt(minMatcher.group(1)),
-                    null
-            );
+        while (minMatcher.find()) {
+            Integer min = parseExperienceYear(minMatcher.group(1));
+
+            if (min != null) {
+                return new ExperienceRange(min, null);
+            }
         }
 
         if (containsAny(pageText, "경력 무관", "신입 가능")) {
@@ -217,6 +223,16 @@ public class WantedJobPostingParser implements JobPostingParser {
         }
 
         return new ExperienceRange(null, null);
+    }
+
+    private Integer parseExperienceYear(String value) {
+        int year = Integer.parseInt(value);
+
+        if (year < 0 || year > MAX_REASONABLE_EXPERIENCE_YEARS) {
+            return null;
+        }
+
+        return year;
     }
 
     private EmploymentType inferEmploymentType(String pageText) {

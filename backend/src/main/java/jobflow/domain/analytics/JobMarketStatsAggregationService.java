@@ -28,6 +28,7 @@ public class JobMarketStatsAggregationService {
                 AnalyticsPeriodType.MONTHLY,
                 periodStart
         );
+        jobMarketStatsRepository.flush();
 
         List<JobMarketStats> stats = aggregates.stream()
                 .map(aggregate -> toJobMarketStats(periodStart, aggregate))
