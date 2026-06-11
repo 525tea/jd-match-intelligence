@@ -116,6 +116,7 @@ class JobSkillIndexQueryServiceTest {
         assertThat(strongMatchSummary.matchedPreferredSkillCount()).isZero();
         assertThat(strongMatchSummary.missingRequiredSkillCount()).isZero();
         assertThat(strongMatchSummary.requiredMatchRate()).isEqualTo(1.0);
+        assertThat(strongMatchSummary.matchScore()).isEqualTo(70.0);
 
         assertThat(weakMatchSummary.requiredSkillCount()).isEqualTo(1);
         assertThat(weakMatchSummary.matchedRequiredSkillCount()).isZero();
@@ -123,6 +124,7 @@ class JobSkillIndexQueryServiceTest {
         assertThat(weakMatchSummary.matchedPreferredSkillCount()).isZero();
         assertThat(weakMatchSummary.missingRequiredSkillCount()).isEqualTo(1);
         assertThat(weakMatchSummary.requiredMatchRate()).isEqualTo(0.0);
+        assertThat(weakMatchSummary.matchScore()).isEqualTo(-3.0);
     }
 
     @Test
@@ -156,6 +158,8 @@ class JobSkillIndexQueryServiceTest {
         assertThat(summary.requiredSkillCount()).isEqualTo(1);
         assertThat(summary.matchedRequiredSkillCount()).isZero();
         assertThat(summary.missingRequiredSkillCount()).isEqualTo(1);
+        assertThat(summary.requiredMatchRate()).isEqualTo(0.0);
+        assertThat(summary.matchScore()).isEqualTo(-3.0);
     }
 
     private Skill saveSkill(
