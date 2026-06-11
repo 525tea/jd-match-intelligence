@@ -2,7 +2,6 @@ package jobflow.domain.analytics;
 
 import jobflow.domain.job.JobRole;
 import jobflow.domain.job.RequirementType;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -38,60 +37,7 @@ public interface JobSkillIndexRepository extends JpaRepository<JobSkillIndex, Lo
                     WHEN jsi.requirementType = jobflow.domain.job.RequirementType.PREFERRED
                      AND jsi.skill.id IN :skillIds
                     THEN 1 ELSE 0
-                END),
-                (
-                    SUM(CASE
-                        WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                         AND jsi.skill.id IN :skillIds
-                        THEN 1 ELSE 0
-                    END) * 10.0
-                    + CASE
-                        WHEN SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                            THEN 1 ELSE 0
-                        END) = 0
-                        THEN 0.0
-                        ELSE SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                             AND jsi.skill.id IN :skillIds
-                            THEN 1 ELSE 0
-                        END) * 50.0 / SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                            THEN 1 ELSE 0
-                        END)
-                      END
-                    + SUM(CASE
-                        WHEN jsi.requirementType = jobflow.domain.job.RequirementType.PREFERRED
-                         AND jsi.skill.id IN :skillIds
-                        THEN 1 ELSE 0
-                    END) * 3.0
-                    + CASE
-                        WHEN SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.PREFERRED
-                            THEN 1 ELSE 0
-                        END) = 0
-                        THEN 0.0
-                        ELSE SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.PREFERRED
-                             AND jsi.skill.id IN :skillIds
-                            THEN 1 ELSE 0
-                        END) * 10.0 / SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.PREFERRED
-                            THEN 1 ELSE 0
-                        END)
-                      END
-                    - (
-                        SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                            THEN 1 ELSE 0
-                        END)
-                        - SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                             AND jsi.skill.id IN :skillIds
-                            THEN 1 ELSE 0
-                        END)
-                    ) * 3.0
-                )
+                END)
             )
             FROM JobSkillIndex jsi
             WHERE jsi.job.status = jobflow.domain.job.JobStatus.OPEN
@@ -107,59 +53,6 @@ public interface JobSkillIndexRepository extends JpaRepository<JobSkillIndex, Lo
                 THEN 1 ELSE 0
             END) > 0
             ORDER BY
-                (
-                    SUM(CASE
-                        WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                         AND jsi.skill.id IN :skillIds
-                        THEN 1 ELSE 0
-                    END) * 10.0
-                    + CASE
-                        WHEN SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                            THEN 1 ELSE 0
-                        END) = 0
-                        THEN 0.0
-                        ELSE SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                             AND jsi.skill.id IN :skillIds
-                            THEN 1 ELSE 0
-                        END) * 50.0 / SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                            THEN 1 ELSE 0
-                        END)
-                      END
-                    + SUM(CASE
-                        WHEN jsi.requirementType = jobflow.domain.job.RequirementType.PREFERRED
-                         AND jsi.skill.id IN :skillIds
-                        THEN 1 ELSE 0
-                    END) * 3.0
-                    + CASE
-                        WHEN SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.PREFERRED
-                            THEN 1 ELSE 0
-                        END) = 0
-                        THEN 0.0
-                        ELSE SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.PREFERRED
-                             AND jsi.skill.id IN :skillIds
-                            THEN 1 ELSE 0
-                        END) * 10.0 / SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.PREFERRED
-                            THEN 1 ELSE 0
-                        END)
-                      END
-                    - (
-                        SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                            THEN 1 ELSE 0
-                        END)
-                        - SUM(CASE
-                            WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                             AND jsi.skill.id IN :skillIds
-                            THEN 1 ELSE 0
-                        END)
-                    ) * 3.0
-                ) DESC,
                 SUM(CASE
                     WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
                      AND jsi.skill.id IN :skillIds
@@ -169,7 +62,6 @@ public interface JobSkillIndexRepository extends JpaRepository<JobSkillIndex, Lo
             """)
     List<JobSkillMatchSummary> findOpenJobSkillMatchSummaries(
             @Param("skillIds") Collection<Long> skillIds,
-            @Param("targetRoles") Collection<JobRole> targetRoles,
-            Pageable pageable
+            @Param("targetRoles") Collection<JobRole> targetRoles
     );
 }

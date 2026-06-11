@@ -12,8 +12,7 @@ public record JobSkillMatchSummary(
         Long requiredSkillCount,
         Long matchedRequiredSkillCount,
         Long preferredSkillCount,
-        Long matchedPreferredSkillCount,
-        Double matchScore
+        Long matchedPreferredSkillCount
 ) {
 
     public long missingRequiredSkillCount() {
@@ -36,5 +35,29 @@ public record JobSkillMatchSummary(
             return null;
         }
         return matchedPreferredSkillCount / (double) preferredSkillCount;
+    }
+
+    public double matchScore() {
+        return matchedRequiredSkillCount * 10.0
+                + requiredMatchScore()
+                + matchedPreferredSkillCount * 3.0
+                + preferredMatchScore()
+                - missingRequiredSkillCount() * 3.0;
+    }
+
+    private double requiredMatchScore() {
+        Double matchRate = requiredMatchRate();
+        if (matchRate == null) {
+            return 0.0;
+        }
+        return matchRate * 50.0;
+    }
+
+    private double preferredMatchScore() {
+        Double matchRate = preferredMatchRate();
+        if (matchRate == null) {
+            return 0.0;
+        }
+        return matchRate * 10.0;
     }
 }

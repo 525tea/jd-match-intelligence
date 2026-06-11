@@ -1,12 +1,12 @@
 package jobflow.domain.analytics;
 
 import jobflow.domain.job.JobRole;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -40,9 +40,13 @@ public class JobSkillIndexQueryService {
 
         return jobSkillIndexRepository.findOpenJobSkillMatchSummaries(
                 normalizedSkillIds,
-                normalizedTargetRoles,
-                PageRequest.of(0, normalizedLimit)
-        );
+                normalizedTargetRoles
+        ).stream()
+                .sorted(Comparator.comparingDouble(JobSkillMatchSummary::matchScore).reversed()
+                        .thenComparing(JobSkillMatchSummary::matchedRequiredSkillCount, Comparator.reverseOrder())
+                        .thenComparing(JobSkillMatchSummary::jobId, Comparator.reverseOrder()))
+                .limit(normalizedLimit)
+                .toList();
     }
 
     private List<Long> normalizeSkillIds(Collection<Long> skillIds) {
