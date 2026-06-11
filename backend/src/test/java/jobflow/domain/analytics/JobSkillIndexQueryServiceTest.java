@@ -2,9 +2,11 @@ package jobflow.domain.analytics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import jobflow.domain.analytics.dto.JobSkillMatchResponse;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.EmploymentType;
 import jobflow.domain.job.Job;
@@ -160,6 +162,52 @@ class JobSkillIndexQueryServiceTest {
         assertThat(summary.missingRequiredSkillCount()).isEqualTo(1);
         assertThat(summary.requiredMatchRate()).isEqualTo(0.0);
         assertThat(summary.matchScore()).isEqualTo(-3.0);
+    }
+
+    @Test
+    @DisplayName("갭 분석 API에서 재사용할 수 있는 매칭 응답 DTO를 생성한다")
+    void findTopOpenJobMatchResponses() {
+        String suffix = UUID.randomUUID().toString();
+
+        Skill java = saveSkill("Response Java", "response-java", SkillCategory.LANGUAGE, suffix);
+        Skill spring = saveSkill("Response Spring", "response-spring", SkillCategory.FRAMEWORK, suffix);
+        Skill redis = saveSkill("Response Redis", "response-redis", SkillCategory.INFRA, suffix);
+
+        Job job = jobRepository.save(createJob(
+                "query-response-match-" + suffix,
+                "Java Spring 백엔드 개발자",
+                JobRole.BACKEND
+        ));
+        jobSkillRepository.save(JobSkill.create(job, java, RequirementType.REQUIRED));
+        jobSkillRepository.save(JobSkill.create(job, spring, RequirementType.REQUIRED));
+        jobSkillRepository.save(JobSkill.create(job, redis, RequirementType.PREFERRED));
+
+        jobRepository.flush();
+        jobSkillRepository.flush();
+
+        jobSkillIndexRebuildService.rebuild();
+
+        List<JobSkillMatchResponse> responses = jobSkillIndexQueryService.findTopOpenJobMatchResponses(
+                List.of(java.getId(), spring.getId()),
+                List.of(JobRole.BACKEND),
+                10
+        );
+
+        JobSkillMatchResponse response = responses.stream()
+                .filter(candidate -> candidate.jobId().equals(job.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(response.role()).isEqualTo(JobRole.BACKEND);
+        assertThat(response.requiredSkillCount()).isEqualTo(2);
+        assertThat(response.matchedRequiredSkillCount()).isEqualTo(2);
+        assertThat(response.missingRequiredSkillCount()).isZero();
+        assertThat(response.requiredMatchRate()).isEqualByComparingTo(BigDecimal.valueOf(100.00));
+        assertThat(response.preferredSkillCount()).isEqualTo(1);
+        assertThat(response.matchedPreferredSkillCount()).isZero();
+        assertThat(response.missingPreferredSkillCount()).isEqualTo(1);
+        assertThat(response.preferredMatchRate()).isEqualByComparingTo(BigDecimal.ZERO.setScale(2));
+        assertThat(response.matchScore()).isEqualByComparingTo(BigDecimal.valueOf(70.00));
     }
 
     private Skill saveSkill(

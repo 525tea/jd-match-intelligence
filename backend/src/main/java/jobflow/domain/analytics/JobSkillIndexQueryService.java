@@ -1,5 +1,6 @@
 package jobflow.domain.analytics;
 
+import jobflow.domain.analytics.dto.JobSkillMatchResponse;
 import jobflow.domain.job.JobRole;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,17 @@ public class JobSkillIndexQueryService {
                         .thenComparing(JobSkillMatchSummary::matchedRequiredSkillCount, Comparator.reverseOrder())
                         .thenComparing(JobSkillMatchSummary::jobId, Comparator.reverseOrder()))
                 .limit(normalizedLimit)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<JobSkillMatchResponse> findTopOpenJobMatchResponses(
+            Collection<Long> skillIds,
+            Collection<JobRole> targetRoles,
+            int limit
+    ) {
+        return findTopOpenJobMatches(skillIds, targetRoles, limit).stream()
+                .map(JobSkillMatchResponse::from)
                 .toList();
     }
 
