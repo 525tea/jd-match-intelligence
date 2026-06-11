@@ -1,5 +1,6 @@
 package jobflow.domain.analytics;
 
+import jobflow.domain.job.JobRole;
 import jobflow.domain.job.RequirementType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,8 +19,8 @@ public interface JobSkillIndexRepository extends JpaRepository<JobSkillIndex, Lo
                 jsi.job.id,
                 jsi.job.title,
                 jsi.job.companyName,
-                jsi.role,
-                jsi.careerLevel,
+                jsi.job.role,
+                jsi.job.careerLevel,
                 SUM(CASE
                     WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
                     THEN 1 ELSE 0
@@ -40,13 +41,14 @@ public interface JobSkillIndexRepository extends JpaRepository<JobSkillIndex, Lo
                 END)
             )
             FROM JobSkillIndex jsi
-            WHERE jsi.jobStatus = jobflow.domain.job.JobStatus.OPEN
+            WHERE jsi.job.status = jobflow.domain.job.JobStatus.OPEN
+              AND jsi.job.role IN :targetRoles
             GROUP BY
                 jsi.job.id,
                 jsi.job.title,
                 jsi.job.companyName,
-                jsi.role,
-                jsi.careerLevel
+                jsi.job.role,
+                jsi.job.careerLevel
             ORDER BY
                 SUM(CASE
                     WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
@@ -66,6 +68,7 @@ public interface JobSkillIndexRepository extends JpaRepository<JobSkillIndex, Lo
             """)
     List<JobSkillMatchSummary> findOpenJobSkillMatchSummaries(
             @Param("skillIds") Collection<Long> skillIds,
+            @Param("targetRoles") Collection<JobRole> targetRoles,
             Pageable pageable
     );
 }

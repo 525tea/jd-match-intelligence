@@ -61,7 +61,8 @@ class JobSkillIndexQueryServiceTest {
 
         Job strongMatchJob = jobRepository.save(createJob(
                 "query-strong-match-" + suffix,
-                "Java Spring 백엔드 개발자"
+                "Java Spring 백엔드 개발자",
+                JobRole.BACKEND
         ));
         jobSkillRepository.save(JobSkill.create(strongMatchJob, java, RequirementType.REQUIRED));
         jobSkillRepository.save(JobSkill.create(strongMatchJob, spring, RequirementType.REQUIRED));
@@ -69,10 +70,20 @@ class JobSkillIndexQueryServiceTest {
 
         Job weakMatchJob = jobRepository.save(createJob(
                 "query-weak-match-" + suffix,
-                "Kotlin 백엔드 개발자"
+                "Kotlin 백엔드 개발자",
+                JobRole.BACKEND
         ));
         jobSkillRepository.save(JobSkill.create(weakMatchJob, kotlin, RequirementType.REQUIRED));
         jobSkillRepository.save(JobSkill.create(weakMatchJob, redis, RequirementType.PREFERRED));
+
+        Job outOfTargetRoleJob = jobRepository.save(createJob(
+                "query-frontend-match-" + suffix,
+                "Java Spring 프론트엔드 개발자",
+                JobRole.FRONTEND
+        ));
+        jobSkillRepository.save(JobSkill.create(outOfTargetRoleJob, java, RequirementType.REQUIRED));
+        jobSkillRepository.save(JobSkill.create(outOfTargetRoleJob, spring, RequirementType.REQUIRED));
+        jobSkillRepository.save(JobSkill.create(outOfTargetRoleJob, redis, RequirementType.PREFERRED));
 
         jobRepository.flush();
         jobSkillRepository.flush();
@@ -81,6 +92,7 @@ class JobSkillIndexQueryServiceTest {
 
         List<JobSkillMatchSummary> summaries = jobSkillIndexQueryService.findTopOpenJobMatches(
                 List.of(java.getId(), spring.getId()),
+                List.of(JobRole.BACKEND),
                 10
         );
 
@@ -94,6 +106,9 @@ class JobSkillIndexQueryServiceTest {
                 .orElseThrow();
 
         assertThat(summaries.indexOf(strongMatchSummary)).isLessThan(summaries.indexOf(weakMatchSummary));
+        assertThat(summaries)
+                .extracting(JobSkillMatchSummary::jobId)
+                .doesNotContain(outOfTargetRoleJob.getId());
 
         assertThat(strongMatchSummary.requiredSkillCount()).isEqualTo(2);
         assertThat(strongMatchSummary.matchedRequiredSkillCount()).isEqualTo(2);
@@ -118,7 +133,8 @@ class JobSkillIndexQueryServiceTest {
         Skill java = saveSkill("Empty Java", "empty-java", SkillCategory.LANGUAGE, suffix);
         Job job = jobRepository.save(createJob(
                 "query-empty-skill-" + suffix,
-                "Java 백엔드 개발자"
+                "Java 백엔드 개발자",
+                JobRole.BACKEND
         ));
         jobSkillRepository.save(JobSkill.create(job, java, RequirementType.REQUIRED));
 
@@ -155,7 +171,7 @@ class JobSkillIndexQueryServiceTest {
         ));
     }
 
-    private Job createJob(String externalId, String title) {
+    private Job createJob(String externalId, String title, JobRole role) {
         return Job.create(
                 "GAP_INDEX_QUERY_TEST",
                 externalId,
@@ -163,8 +179,8 @@ class JobSkillIndexQueryServiceTest {
                 "JobFlow",
                 "자격요건 Java Spring 우대사항 Redis",
                 "https://example.com/jobs/" + externalId,
-                JobRole.BACKEND,
-                "Backend",
+                role,
+                role.name(),
                 CareerLevel.JUNIOR,
                 1,
                 3,
