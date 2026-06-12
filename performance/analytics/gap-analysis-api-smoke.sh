@@ -123,6 +123,25 @@ if [[ "${job_match_count}" -eq 0 ]]; then
   exit 1
 fi
 
+missing_detail_count="$(
+  echo "${response}" | jq '
+    [
+      .data.jobMatches[]
+      | select(
+          (.matchedRequiredSkills | type) != "array"
+          or (.missingRequiredSkills | type) != "array"
+          or (.matchedPreferredSkills | type) != "array"
+          or (.missingPreferredSkills | type) != "array"
+        )
+    ]
+    | length
+  '
+)"
+if [[ "${missing_detail_count}" -ne 0 ]]; then
+  echo "Gap analysis API smoke failed: skill gap detail fields are missing."
+  exit 1
+fi
+
 echo
 echo "### Match Summary"
 echo "${response}" | jq -r '
@@ -139,7 +158,11 @@ echo "${response}" | jq -r '
       .matchedPreferredSkillCount,
       .missingPreferredSkillCount,
       .preferredMatchRate,
-      .matchScore
+      .matchScore,
+      (.matchedRequiredSkills | join(", ")),
+      (.missingRequiredSkills | join(", ")),
+      (.matchedPreferredSkills | join(", ")),
+      (.missingPreferredSkills | join(", "))
     ]
   | @tsv
 '
