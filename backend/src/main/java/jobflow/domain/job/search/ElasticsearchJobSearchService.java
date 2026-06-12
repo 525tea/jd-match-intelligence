@@ -21,6 +21,8 @@ public class ElasticsearchJobSearchService {
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
     private static final float EXPANSION_BOOST = 0.05f;
+    private static final String DEADLINE_AT_FIELD = "deadlineAt";
+    private static final String CREATED_AT_FIELD = "createdAt";
 
     private final ElasticsearchOperations elasticsearchOperations;
     private final JobSearchProperties jobSearchProperties;
@@ -38,9 +40,10 @@ public class ElasticsearchJobSearchService {
                 .withQuery(q -> q.functionScore(fs -> fs
                         .query(searchQuery(normalizedKeyword, expandedKeywords))
                         .functions(f -> f
+                                .filter(existsQuery(DEADLINE_AT_FIELD))
                                 .weight(1.4)
                                 .gauss(g -> g.date(d -> d
-                                        .field("deadlineAt")
+                                        .field(DEADLINE_AT_FIELD)
                                         .placement(p -> p
                                                 .origin("now")
                                                 .scale(Time.of(t -> t.time("14d")))
@@ -52,7 +55,7 @@ public class ElasticsearchJobSearchService {
                         .functions(f -> f
                                 .weight(1.2)
                                 .gauss(g -> g.date(d -> d
-                                        .field("createdAt")
+                                        .field(CREATED_AT_FIELD)
                                         .placement(p -> p
                                                 .origin("now")
                                                 .scale(Time.of(t -> t.time("30d")))
@@ -128,6 +131,10 @@ public class ElasticsearchJobSearchService {
                         "industry"
                 )
         ));
+    }
+
+    private Query existsQuery(String field) {
+        return Query.of(q -> q.exists(e -> e.field(field)));
     }
 
     private int normalizeLimit(int limit) {
