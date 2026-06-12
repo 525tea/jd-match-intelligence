@@ -136,6 +136,7 @@ WITH user_skill_names AS (
                  ) AS match_score
          FROM match_summary ms
          WHERE ms.required_skill_count > 0
+            OR ms.preferred_skill_count > 0
      )
 SELECT
     s.source,
