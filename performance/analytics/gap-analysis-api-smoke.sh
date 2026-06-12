@@ -82,10 +82,14 @@ JSON
 }
 
 target_role_args=()
+target_role_json_array="[]"
 IFS=',' read -ra target_role_array <<< "${TARGET_ROLES}"
 for role in "${target_role_array[@]}"; do
   if [[ -n "${role}" ]]; then
     target_role_args+=(--data-urlencode "targetRoles=${role}")
+    target_role_json_array="$(
+      jq --compact-output --arg role "${role}" '. + [$role]' <<< "${target_role_json_array}"
+    )"
   fi
 done
 
@@ -139,6 +143,45 @@ missing_detail_count="$(
 )"
 if [[ "${missing_detail_count}" -ne 0 ]]; then
   echo "Gap analysis API smoke failed: skill gap detail fields are missing."
+  exit 1
+fi
+
+unexpected_role_count="$(
+  echo "${response}" | jq --argjson targetRoles "${target_role_json_array}" '
+    [
+      .data.jobMatches[]
+      | select((.role as $role | $targetRoles | index($role)) == null)
+    ]
+    | length
+  '
+)"
+if [[ "${unexpected_role_count}" -ne 0 ]]; then
+  echo "Gap analysis API smoke failed: response contains role outside TARGET_ROLES."
+  echo "Allowed TARGET_ROLES=${TARGET_ROLES}"
+  echo "${response}" | jq -r '
+    .data.jobMatches[]
+    | [.jobId, .title, .role]
+    | @tsv
+  '
+  exit 1
+fi
+
+meaningful_gap_detail_count="$(
+  echo "${response}" | jq '
+    [
+      .data.jobMatches[]
+      | select(
+          ((.matchedRequiredSkills | length)
+          + (.missingRequiredSkills | length)
+          + (.matchedPreferredSkills | length)
+          + (.missingPreferredSkills | length)) > 0
+        )
+    ]
+    | length
+  '
+)"
+if [[ "${meaningful_gap_detail_count}" -eq 0 ]]; then
+  echo "Gap analysis API smoke failed: all skill gap detail lists are empty."
   exit 1
 fi
 
