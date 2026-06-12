@@ -1,6 +1,7 @@
 package jobflow.domain.gap;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
@@ -130,6 +131,48 @@ class GapAnalysisControllerTest {
     }
 
     @Test
+    @DisplayName("필수 또는 우대 스킬 bucket이 비어 있으면 match rate를 null로 반환한다")
+    void analyzeProjectSkillGapWithEmptyRequirementBucket() throws Exception {
+        setAuthentication();
+        GapAnalysisResponse response = new GapAnalysisResponse(
+                10L,
+                List.of(1L, 2L, 3L),
+                List.of(
+                        jobSkillMatchResponseWithEmptyRequiredBucket(),
+                        jobSkillMatchResponseWithEmptyPreferredBucket()
+                )
+        );
+        given(gapAnalysisService.analyzeProjectSkillGap(
+                1L,
+                10L,
+                List.of(JobRole.BACKEND),
+                5
+        )).willReturn(response);
+
+        mockMvc.perform(get("/gap-analysis/projects/{userProjectId}", 10L)
+                        .param("targetRoles", "BACKEND")
+                        .param("limit", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.jobMatches", hasSize(2)))
+                .andExpect(jsonPath("$.data.jobMatches[0].requiredSkillCount").value(0))
+                .andExpect(jsonPath("$.data.jobMatches[0].requiredMatchRate").value(nullValue()))
+                .andExpect(jsonPath("$.data.jobMatches[0].preferredSkillCount").value(1))
+                .andExpect(jsonPath("$.data.jobMatches[0].preferredMatchRate").value(100.00))
+                .andExpect(jsonPath("$.data.jobMatches[1].requiredSkillCount").value(1))
+                .andExpect(jsonPath("$.data.jobMatches[1].requiredMatchRate").value(100.00))
+                .andExpect(jsonPath("$.data.jobMatches[1].preferredSkillCount").value(0))
+                .andExpect(jsonPath("$.data.jobMatches[1].preferredMatchRate").value(nullValue()));
+
+        verify(gapAnalysisService).analyzeProjectSkillGap(
+                1L,
+                10L,
+                List.of(JobRole.BACKEND),
+                5
+        );
+    }
+
+    @Test
     @DisplayName("프로젝트 갭 분석 대상 프로젝트가 없으면 404 ErrorResponse를 반환한다")
     void analyzeProjectSkillGapWithMissingProject() throws Exception {
         setAuthentication();
@@ -243,6 +286,52 @@ class GapAnalysisControllerTest {
                 List.of("Kubernetes"),
                 List.of("Docker"),
                 List.of("Kafka")
+        );
+    }
+
+    private JobSkillMatchResponse jobSkillMatchResponseWithEmptyRequiredBucket() {
+        return new JobSkillMatchResponse(
+                101L,
+                "Redis 우대 백엔드 개발자",
+                "JobFlow",
+                JobRole.BACKEND,
+                CareerLevel.JUNIOR,
+                0,
+                0,
+                0,
+                null,
+                1,
+                1,
+                0,
+                BigDecimal.valueOf(100.00),
+                BigDecimal.valueOf(13.00),
+                List.of(),
+                List.of(),
+                List.of("Redis"),
+                List.of()
+        );
+    }
+
+    private JobSkillMatchResponse jobSkillMatchResponseWithEmptyPreferredBucket() {
+        return new JobSkillMatchResponse(
+                102L,
+                "Java 필수 백엔드 개발자",
+                "JobFlow",
+                JobRole.BACKEND,
+                CareerLevel.JUNIOR,
+                1,
+                1,
+                0,
+                BigDecimal.valueOf(100.00),
+                0,
+                0,
+                0,
+                null,
+                BigDecimal.valueOf(60.00),
+                List.of("Java"),
+                List.of(),
+                List.of(),
+                List.of()
         );
     }
 }
