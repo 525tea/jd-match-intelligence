@@ -1,6 +1,7 @@
 package jobflow.domain.project.analysis;
 
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -26,6 +27,7 @@ public class ProjectBuildFileAnalysisService {
     private final RepositoryFileClient repositoryFileClient;
     private final BuildFileSkillAnalyzer buildFileSkillAnalyzer;
 
+    @Autowired
     public ProjectBuildFileAnalysisService(RepositoryFileClient repositoryFileClient) {
         this(repositoryFileClient, BuildFileSkillAnalyzer.defaultAnalyzer());
     }

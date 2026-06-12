@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import jobflow.domain.project.UserProject;
@@ -24,6 +25,7 @@ import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.EntityNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.ArgumentCaptor;
 
 class ProjectBuildFileSkillImportServiceTest {
@@ -89,13 +91,13 @@ class ProjectBuildFileSkillImportServiceTest {
                 .willReturn(Optional.of(userProject));
         given(projectBuildFileAnalysisService.analyze(repositoryRef))
                 .willReturn(analysisResult);
-        given(skillRepository.findByNameIn(any()))
+        given(skillRepository.findByNameIn(ArgumentMatchers.<Collection<String>>any()))
                 .willReturn(List.of(java, springBoot));
         given(userProjectAnalysisRepository.findMaxAnalysisVersionByUserProjectId(userProjectId))
                 .willReturn(2);
         given(userProjectAnalysisRepository.save(any(UserProjectAnalysis.class)))
                 .willAnswer(invocation -> invocation.getArgument(0));
-        given(userProjectSkillRepository.saveAll(any()))
+        given(userProjectSkillRepository.saveAll(ArgumentMatchers.<Iterable<UserProjectSkill>>any()))
                 .willAnswer(invocation -> {
                     Iterable<UserProjectSkill> projectSkills = invocation.getArgument(0);
                     projectSkills.forEach(savedProjectSkills::add);
@@ -123,7 +125,7 @@ class ProjectBuildFileSkillImportServiceTest {
         assertThat(analysisCaptor.getValue().getModelVersion()).isEqualTo("build-file-static-v1");
         assertThat(analysisCaptor.getValue().getRawAnalysis()).contains("\"repository\":\"525tea/jobflow\"");
 
-        verify(userProjectSkillRepository).saveAll(any());
+        verify(userProjectSkillRepository).saveAll(ArgumentMatchers.<Iterable<UserProjectSkill>>any());
         assertThat(savedProjectSkills)
                 .extracting(projectSkill -> projectSkill.getSkill().getName())
                 .containsExactly("Java", "Spring Boot");
