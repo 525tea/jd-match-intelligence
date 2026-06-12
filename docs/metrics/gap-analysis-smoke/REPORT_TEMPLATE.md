@@ -106,6 +106,7 @@ The smoke script fails when any of these conditions are true:
 | detail fields | one of skill detail fields is missing or not an array |
 | target role filter | response contains role outside `TARGET_ROLES` |
 | meaningful gap detail | all skill detail lists are empty |
+| match rate nullability | required/preferred match rate nullability does not match skill bucket counts |
 | missing project guard | missing project request does not return `404` / `USER_PROJECT_NOT_FOUND` |
 
 ## Result Summary
@@ -118,6 +119,7 @@ The smoke script fails when any of these conditions are true:
 | top preferred match rate | TODO |
 | response contains target role only | TODO |
 | response contains matched/missing skill details | TODO |
+| match rate nullability is valid | TODO |
 | missing project status | TODO |
 | missing project error code | TODO |
 
@@ -141,6 +143,7 @@ PASS criteria:
 - missing project request returns `404` with `USER_PROJECT_NOT_FOUND`
 - returned matches are restricted to requested target roles
 - response includes matched/missing required/preferred skill details
+- match rate is `null` only when the corresponding required/preferred skill bucket is empty
 
 ## Open Risks
 
