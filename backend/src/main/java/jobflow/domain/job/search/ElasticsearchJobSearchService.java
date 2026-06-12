@@ -31,7 +31,7 @@ public class ElasticsearchJobSearchService {
             return List.of();
         }
 
-        List<String> expandedKeywords = jobSearchQueryExpansionService.expand(normalizedKeyword);
+        List<String> expandedKeywords = expandKeyword(normalizedKeyword);
 
         NativeQuery query = NativeQuery.builder()
                 .withQuery(q -> q.functionScore(fs -> fs
@@ -91,6 +91,14 @@ public class ElasticsearchJobSearchService {
             );
             return b.minimumShouldMatch("0");
         }));
+    }
+
+    private List<String> expandKeyword(String keyword) {
+        if (!jobSearchProperties.queryExpansionEnabled()) {
+            return List.of();
+        }
+
+        return jobSearchQueryExpansionService.expand(keyword);
     }
 
     private Query primaryKeywordQuery(String keyword) {

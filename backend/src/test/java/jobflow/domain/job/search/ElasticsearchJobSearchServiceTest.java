@@ -45,7 +45,8 @@ class ElasticsearchJobSearchServiceTest {
             "http://localhost:9200",
             "jobflow-jobs",
             "jobflow-jobs-v1",
-            false
+            false,
+            true
     );
 
     @Test
@@ -140,6 +141,50 @@ class ElasticsearchJobSearchServiceTest {
                 .extracting(query -> query.multiMatch().boost())
                 .containsExactly(0.25f, 0.25f);
         assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("query expansion이 꺼져 있으면 co-occurrence 후보를 조회하지 않는다")
+    void searchWithoutQueryExpansion() {
+        JobSearchProperties disabledExpansionProperties = new JobSearchProperties(
+                "http://localhost:9200",
+                "jobflow-jobs",
+                "jobflow-jobs-v1",
+                false,
+                false
+        );
+        ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
+                elasticsearchOperations,
+                disabledExpansionProperties,
+                jobSearchQueryExpansionService
+        );
+        JobSearchDocument document = document();
+
+        given(elasticsearchOperations.search(
+                any(NativeQuery.class),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        )).willReturn(searchHits);
+        given(searchHits.stream()).willReturn(Stream.of(searchHit));
+        given(searchHit.getContent()).willReturn(document);
+        given(searchHit.getScore()).willReturn(2.5f);
+
+        List<JobSearchResult> results = service.search(" Redis ", 10);
+
+        assertThat(results).hasSize(1);
+
+        ArgumentCaptor<NativeQuery> queryCaptor = ArgumentCaptor.forClass(NativeQuery.class);
+        verify(elasticsearchOperations).search(
+                queryCaptor.capture(),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        );
+        verify(jobSearchQueryExpansionService, never()).expand(any());
+
+        Query searchQuery = queryCaptor.getValue().getQuery().functionScore().query();
+
+        assertThat(searchQuery.isMultiMatch()).isTrue();
+        assertThat(searchQuery.multiMatch().query()).isEqualTo("Redis");
     }
 
     @Test
