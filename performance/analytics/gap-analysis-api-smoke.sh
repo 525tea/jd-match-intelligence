@@ -195,6 +195,44 @@ if [[ "${meaningful_gap_detail_count}" -eq 0 ]]; then
   exit 1
 fi
 
+invalid_match_rate_count="$(
+  echo "${response}" | jq '
+    [
+      .data.jobMatches[]
+      | select(
+          (.requiredSkillCount == 0 and .requiredMatchRate != null)
+          or (.requiredSkillCount > 0 and .requiredMatchRate == null)
+          or (.preferredSkillCount == 0 and .preferredMatchRate != null)
+          or (.preferredSkillCount > 0 and .preferredMatchRate == null)
+        )
+    ]
+    | length
+  '
+)"
+if [[ "${invalid_match_rate_count}" -ne 0 ]]; then
+  echo "Gap analysis API smoke failed: match rate nullability does not match skill bucket counts."
+  echo "${response}" | jq -r '
+    .data.jobMatches[]
+    | select(
+        (.requiredSkillCount == 0 and .requiredMatchRate != null)
+        or (.requiredSkillCount > 0 and .requiredMatchRate == null)
+        or (.preferredSkillCount == 0 and .preferredMatchRate != null)
+        or (.preferredSkillCount > 0 and .preferredMatchRate == null)
+      )
+    | [
+        .jobId,
+        .title,
+        .role,
+        .requiredSkillCount,
+        (.requiredMatchRate // "null"),
+        .preferredSkillCount,
+        (.preferredMatchRate // "null")
+      ]
+    | @tsv
+  '
+  exit 1
+fi
+
 echo
 echo "### Match Summary"
 match_summary="$(
