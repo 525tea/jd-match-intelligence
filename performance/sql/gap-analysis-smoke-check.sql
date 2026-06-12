@@ -6,6 +6,8 @@
 -- - smoke 프로젝트 skill snapshot이 비어 있지 않은지 확인한다.
 -- - gap-analysis API가 사용할 job_skill_index가 real source 기준으로 준비됐는지 확인한다.
 
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 SELECT
     u.id AS user_id,
     u.email,

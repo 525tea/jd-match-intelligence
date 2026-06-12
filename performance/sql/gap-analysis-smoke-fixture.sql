@@ -5,6 +5,8 @@
 -- - smoke 사용자 비밀번호는 Jobflow-gap-smoke-123! 이다.
 -- - 이 fixture는 smoke 전용 user_project external_id만 upsert한다.
 
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 SET @gap_smoke_email := 'gap-smoke@example.com';
 SET @gap_smoke_password_hash := '$2a$10$HHAwSJEeNZkHEFPiEG49hOgkXbWuFB2oBbR.EvpCZoIRAUurSmVYq';
 SET @gap_smoke_project_external_id := 'gap-analysis-smoke-project';

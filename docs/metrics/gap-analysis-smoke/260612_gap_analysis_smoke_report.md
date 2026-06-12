@@ -56,7 +56,7 @@ Actual fixture result:
 
 | user_project_id | analysis_id | user_project_skill_count | user_project_skills |
 | ---: | ---: | ---: | --- |
-| TODO | TODO | TODO | TODO |
+| 1 | 1 | 8 | AWS, Docker, Git, Java, MySQL, Redis, Spring Boot, Spring Framework |
 
 Expected index result:
 
@@ -71,21 +71,28 @@ Actual index result:
 
 | source | open_job_count | indexed_open_job_count | required_indexed_open_job_count | preferred_indexed_open_job_count | indexed_skill_count |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| JUMPIT | TODO | TODO | TODO | TODO | TODO |
-| WANTED | TODO | TODO | TODO | TODO | TODO |
+| JUMPIT | 149 | 126 | 106 | 72 | 585 |
+| WANTED | 155 | 142 | 127 | 98 | 776 |
 
 Actual target role bucket result:
 
 | source | indexed_target_role_job_count | required_bucket_job_count | preferred_bucket_job_count | preferred_only_job_count | required_only_job_count | both_bucket_job_count |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| JUMPIT | TODO | TODO | TODO | TODO | TODO | TODO |
-| WANTED | TODO | TODO | TODO | TODO | TODO | TODO |
+| JUMPIT | 38 | 35 | 28 | 3 | 10 | 25 |
+| WANTED | 59 | 54 | 44 | 5 | 15 | 39 |
 
 Preferred-only samples:
 
 | source | job_id | external_id | title | company_name | role | career_level | required_skill_count | preferred_skill_count | original_url |
 | --- | ---: | --- | --- | --- | --- | --- | ---: | ---: | --- |
-| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| WANTED | 346 | 366748 | 통합로그관리 SW 기술지원 엔지니어 | 브레인즈컴퍼니 | BACKEND | MID | 0 | 6 | https://www.wanted.co.kr/wd/366748 |
+| WANTED | 276 | 367162 | [반도체장비제조_국내_중견] 반도체 장비 데이터 분석 및 예지진단 SW 개발자 | 히든스카우트(헤드헌팅) | SOFTWARE_ENGINEER | JUNIOR | 0 | 6 | https://www.wanted.co.kr/wd/367162 |
+| WANTED | 427 | 367430 | 위성 시험 장비 S/W개발 | 솔탑 | BACKEND | NEWCOMER | 0 | 4 | https://www.wanted.co.kr/wd/367430 |
+| WANTED | 453 | 366684 | IT Support Engineer (5년 이상) | 제이와이피엔터테인먼트(JYP) | DEVOPS | MID | 0 | 2 | https://www.wanted.co.kr/wd/366684 |
+| WANTED | 338 | 366809 | 백엔드 엔지니어_7년 이상 | 풀림 | BACKEND | MID | 0 | 1 | https://www.wanted.co.kr/wd/366809 |
+| JUMPIT | 219 | 54111871 | [AI Vision Engineer] YOLO 기반 다회용기 인식·계수·검수 시스템 개발 담당(경력) | 써큘러랩스 | BACKEND | JUNIOR | 0 | 1 | https://jumpit.saramin.co.kr/position/54111871 |
+| JUMPIT | 218 | 54111887 | [AI Vision Engineer] YOLO 기반 다회용기 인식·계수·검수 시스템 개발 담당 | 써큘러랩스 | BACKEND | NEWCOMER | 0 | 1 | https://jumpit.saramin.co.kr/position/54111887 |
+| JUMPIT | 205 | 54118057 | ML Systems Runtime Engineer [신입] | 보스반도체 | BACKEND | NEWCOMER | 0 | 1 | https://jumpit.saramin.co.kr/position/54118057 |
 
 ## API Smoke Command
 
@@ -128,16 +135,16 @@ The smoke script fails when any of these conditions are true:
 
 | Metric | Actual |
 | --- | ---: |
-| job match count | TODO |
-| job match count <= limit | TODO |
-| top match score | TODO |
-| top required match rate | TODO |
-| top preferred match rate | TODO |
-| response contains target role only | TODO |
-| response contains matched/missing skill details | TODO |
-| match rate nullability is valid | TODO |
-| missing project status | TODO |
-| missing project error code | TODO |
+| job match count | 10 |
+| job match count <= limit | PASS |
+| top match score | 92.67 |
+| top required match rate | 100.00 |
+| top preferred match rate | 66.67 |
+| response contains target role only | PASS |
+| response contains matched/missing skill details | PASS |
+| match rate nullability is valid | PASS |
+| missing project status | 404 |
+| missing project error code | USER_PROJECT_NOT_FOUND |
 
 ## Top Match Samples
 
@@ -145,11 +152,15 @@ Paste the first rows from `gap-analysis-match-summary.tsv`.
 
 | job_id | title | role | required_match_rate | preferred_match_rate | match_score | matched_required_skills | missing_required_skills | matched_preferred_skills | missing_preferred_skills |
 | ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- | --- |
-| TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
+| 267 | 백엔드 개발자 (Java/팀원) | BACKEND | 100.00 | 66.67 | 92.67 | Java, Spring Boot, Spring Framework |  | AWS, Git | Jenkins |
+| 350 | 구인구직 플랫폼 풀스택 개발자 (5년 이상) | FULLSTACK | 50.00 | 0.00 | 81.00 | AWS, Docker, Git, Java, MySQL, Redis, Spring Boot, Spring Framework | Flutter, Hibernate, JavaScript, Linux, MariaDB, QueryDSL, Spring Security, TypeScript |  | ISMS, React |
+| 18 | 백엔드 성능 개선 엔지니어 | BACKEND | 100.00 | 100.00 | 73.00 | Spring Boot |  | MySQL |  |
+| 16 | 백엔드 플랫폼 개발자 | BACKEND | 100.00 | 100.00 | 73.00 | Spring Boot |  | Redis |  |
+| 184 | 웹어플리케이션 백엔드 개발자(2년↑) | BACKEND | 66.67 | 25.00 | 72.83 | Java, MySQL, Spring Boot, Spring Framework | Linux, Oracle Database | Docker | Hibernate, Kubernetes, Python |
 
 ## Decision
 
-TODO: PASS or FAIL.
+PASS.
 
 PASS criteria:
 
