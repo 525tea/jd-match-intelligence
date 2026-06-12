@@ -101,6 +101,32 @@ class GapAnalysisControllerTest {
     }
 
     @Test
+    @DisplayName("targetRoles와 limit을 생략하면 전체 role 대상 기본 limit 20으로 조회한다")
+    void analyzeProjectSkillGapWithDefaultQueryParams() throws Exception {
+        setAuthentication();
+        GapAnalysisResponse response = gapAnalysisResponse();
+        given(gapAnalysisService.analyzeProjectSkillGap(
+                1L,
+                10L,
+                null,
+                20
+        )).willReturn(response);
+
+        mockMvc.perform(get("/gap-analysis/projects/{userProjectId}", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.userProjectId").value(10))
+                .andExpect(jsonPath("$.data.jobMatches", hasSize(1)));
+
+        verify(gapAnalysisService).analyzeProjectSkillGap(
+                1L,
+                10L,
+                null,
+                20
+        );
+    }
+
+    @Test
     @DisplayName("프로젝트 갭 분석 limit이 1보다 작으면 400 ErrorResponse를 반환한다")
     void analyzeProjectSkillGapWithTooSmallLimit() throws Exception {
         setAuthentication();
