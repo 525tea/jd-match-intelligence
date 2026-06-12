@@ -36,6 +36,7 @@ class MySqlFullTextJobSearchServiceTest {
         assertThat(results.getFirst().id()).isEqualTo(1L);
         assertThat(results.getFirst().title()).isEqualTo("백엔드 개발자");
         assertThat(results.getFirst().score()).isEqualTo(0.42);
+        assertThat(results.getFirst().source()).isEqualTo("WANTED");
 
         verify(jobRepository).searchOpenJobsByFullText("백엔드", 20);
     }
@@ -128,6 +129,11 @@ class MySqlFullTextJobSearchServiceTest {
             @Override
             public Double getScore() {
                 return 0.42;
+            }
+
+            @Override
+            public String getSource() {
+                return "WANTED";
             }
         };
     }

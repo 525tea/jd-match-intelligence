@@ -726,6 +726,7 @@ class JobServiceTest {
     private JobSearchResult jobSearchResult() {
         return new JobSearchResult(
                 1L,
+                "WANTED",
                 "백엔드 개발자",
                 "JobFlow",
                 JobRole.BACKEND,

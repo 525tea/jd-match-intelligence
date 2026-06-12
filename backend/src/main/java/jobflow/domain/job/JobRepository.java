@@ -60,6 +60,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             value = """
                 SELECT
                     id AS id,
+                    source AS source,
                     title AS title,
                     company_name AS companyName,
                     role AS role,

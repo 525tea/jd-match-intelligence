@@ -417,6 +417,7 @@ class JobControllerTest {
     private JobSearchResponse jobSearchResponse() {
         return new JobSearchResponse(
                 1L,
+                "WANTED",
                 "백엔드 개발자",
                 "JobFlow",
                 JobRole.BACKEND,

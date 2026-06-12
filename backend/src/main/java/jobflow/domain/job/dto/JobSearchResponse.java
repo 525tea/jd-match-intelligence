@@ -10,6 +10,7 @@ import jobflow.domain.job.RemoteType;
 
 public record JobSearchResponse(
         Long id,
+        String source,
         String title,
         String companyName,
         JobRole role,
@@ -26,6 +27,7 @@ public record JobSearchResponse(
     public static JobSearchResponse from(JobSearchProjection projection) {
         return new JobSearchResponse(
                 projection.getId(),
+                projection.getSource(),
                 projection.getTitle(),
                 projection.getCompanyName(),
                 JobRole.valueOf(projection.getRole()),

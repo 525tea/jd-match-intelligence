@@ -4,6 +4,7 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 LIMIT="${LIMIT:-5}"
+ALLOWED_SOURCES="${ALLOWED_SOURCES:-}"
 
 csv_escape() {
   local value="$1"
@@ -43,6 +44,16 @@ contains_keyword() {
   return 1
 }
 
+is_allowed_source() {
+  local source="$1"
+
+  if [[ -z "${ALLOWED_SOURCES}" ]]; then
+    return 0
+  fi
+
+  contains_csv_value "${ALLOWED_SOURCES}" "${source}"
+}
+
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required to run this script."
   exit 1
@@ -62,15 +73,16 @@ QUERIES=(
   "쿠버네티스 플랫폼|DEVOPS,SYSTEM_NETWORK|kubernetes,k8s,쿠버네티스,플랫폼,devops,인프라"
   "C++ 개발자|SOFTWARE_ENGINEER,EMBEDDED_SOFTWARE,ROBOT_SOFTWARE,GAME_CLIENT,HARDWARE_ENGINEER|c++,cplusplus,임베디드,로봇,게임,소프트웨어"
   "Node.js 백엔드|BACKEND,FULLSTACK|node,node.js,nodejs,백엔드,backend"
-  "데이터 엔지니어|DATA_ENGINEER|데이터 엔지니어,data engineer,kafka,spark,etl"
+  "데이터 엔지니어|DATA_ENGINEER,DATA_SCIENTIST,DATA_ANALYST,DEVOPS|데이터 엔지니어,data engineer,데이터 플랫폼,데이터과학,데이터 사이언티스트,데이터 분석가,kafka,spark,etl"
   "AI 엔지니어|AI_ENGINEER,ML_ENGINEER,GENERATIVE_AI,LLM,COMPUTER_VISION,AI_RESEARCHER|ai,ml,llm,머신러닝,인공지능,딥러닝"
   "보안 엔지니어|SECURITY,SYSTEM_NETWORK|보안,security,network,네트워크"
 )
 
-printf "query,rank,id,title,company_name,role,score,relevant\n"
+printf "query,rank,id,source,title,company_name,role,score,relevant\n"
 
 total_hits=0
 total_relevant=0
+filtered_out=0
 
 for query_config in "${QUERIES[@]}"; do
   IFS='|' read -r query expected_roles expected_keywords <<< "${query_config}"
@@ -88,10 +100,11 @@ for query_config in "${QUERIES[@]}"; do
   fi
 
   row_count="$(echo "${response}" | jq '.data | length')"
+  emitted_rank=0
 
   for (( index = 0; index < row_count; index++ )); do
-    rank=$((index + 1))
     id="$(echo "${response}" | jq -r ".data[${index}].id")"
+    source="$(echo "${response}" | jq -r ".data[${index}].source // \"\"")"
     title="$(echo "${response}" | jq -r ".data[${index}].title")"
     company_name="$(echo "${response}" | jq -r ".data[${index}].companyName")"
     role="$(echo "${response}" | jq -r ".data[${index}].role")"
@@ -99,6 +112,12 @@ for query_config in "${QUERIES[@]}"; do
     location_city="$(echo "${response}" | jq -r ".data[${index}].locationCity // \"\"")"
     score="$(echo "${response}" | jq -r ".data[${index}].score")"
 
+    if ! is_allowed_source "${source}"; then
+      filtered_out=$((filtered_out + 1))
+      continue
+    fi
+
+    emitted_rank=$((emitted_rank + 1))
     haystack="${title} ${company_name} ${location_region} ${location_city}"
     relevant="false"
 
@@ -109,10 +128,11 @@ for query_config in "${QUERIES[@]}"; do
 
     total_hits=$((total_hits + 1))
 
-    printf "%s,%s,%s,%s,%s,%s,%s,%s\n" \
+    printf "%s,%s,%s,%s,%s,%s,%s,%s,%s\n" \
       "$(csv_escape "${query}")" \
-      "${rank}" \
+      "${emitted_rank}" \
       "${id}" \
+      "${source}" \
       "$(csv_escape "${title}")" \
       "$(csv_escape "${company_name}")" \
       "${role}" \
@@ -128,5 +148,5 @@ else
 fi
 
 echo
-echo "summary,total_hits,total_relevant,precision_at_${LIMIT}"
-echo "summary,${total_hits},${total_relevant},${precision}"
+echo "summary,total_hits,total_relevant,precision_at_${LIMIT},filtered_out,allowed_sources"
+echo "summary,${total_hits},${total_relevant},${precision},${filtered_out},$(csv_escape "${ALLOWED_SOURCES:-ALL}")"
