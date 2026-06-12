@@ -2,6 +2,7 @@ package jobflow.domain.gap;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,7 +15,9 @@ import jobflow.domain.analytics.dto.JobSkillMatchResponse;
 import jobflow.domain.gap.dto.GapAnalysisResponse;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.JobRole;
+import jobflow.global.error.ErrorCode;
 import jobflow.global.error.GlobalExceptionHandler;
+import jobflow.global.error.exception.EntityNotFoundException;
 import jobflow.global.security.JwtAuthenticationFilter;
 import jobflow.global.security.UserPrincipal;
 import org.junit.jupiter.api.AfterEach;
@@ -124,6 +127,25 @@ class GapAnalysisControllerTest {
                 null,
                 20
         );
+    }
+
+    @Test
+    @DisplayName("프로젝트 갭 분석 대상 프로젝트가 없으면 404 ErrorResponse를 반환한다")
+    void analyzeProjectSkillGapWithMissingProject() throws Exception {
+        setAuthentication();
+        willThrow(new EntityNotFoundException(ErrorCode.USER_PROJECT_NOT_FOUND))
+                .given(gapAnalysisService)
+                .analyzeProjectSkillGap(1L, 999L, List.of(JobRole.BACKEND), 5);
+
+        mockMvc.perform(get("/gap-analysis/projects/{userProjectId}", 999L)
+                        .param("targetRoles", "BACKEND")
+                        .param("limit", "5"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("USER_PROJECT_NOT_FOUND"))
+                .andExpect(jsonPath("$.error.message").value("사용자 프로젝트를 찾을 수 없습니다."));
+
+        verify(gapAnalysisService).analyzeProjectSkillGap(1L, 999L, List.of(JobRole.BACKEND), 5);
     }
 
     @Test
