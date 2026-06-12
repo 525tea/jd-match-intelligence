@@ -6,11 +6,22 @@ BASE_URL="${BASE_URL:-http://localhost:8080}"
 LIMIT="${LIMIT:-5}"
 FETCH_LIMIT="${FETCH_LIMIT:-20}"
 ALLOWED_SOURCES="${ALLOWED_SOURCES:-}"
+RUN_LABEL="${RUN_LABEL:-search-precision}"
+OUTPUT_FILE="${OUTPUT_FILE:-}"
 
 csv_escape() {
   local value="$1"
   value="${value//\"/\"\"}"
   printf '"%s"' "${value}"
+}
+
+emit() {
+  local line="$1"
+
+  printf "%s\n" "${line}"
+  if [[ -n "${OUTPUT_FILE}" ]]; then
+    printf "%s\n" "${line}" >> "${OUTPUT_FILE}"
+  fi
 }
 
 contains_csv_value() {
@@ -55,6 +66,11 @@ is_allowed_source() {
   contains_csv_value "${ALLOWED_SOURCES}" "${source}"
 }
 
+if [[ -n "${OUTPUT_FILE}" ]]; then
+  mkdir -p "$(dirname "${OUTPUT_FILE}")"
+  : > "${OUTPUT_FILE}"
+fi
+
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required to run this script."
   exit 1
@@ -89,7 +105,7 @@ QUERIES=(
   "보안 엔지니어|SECURITY,SYSTEM_NETWORK|보안,security,network,네트워크"
 )
 
-printf "query,rank,id,source,title,company_name,role,score,relevant\n"
+emit "run_label,query,rank,id,source,title,company_name,role,score,relevant"
 
 total_hits=0
 total_relevant=0
@@ -144,16 +160,7 @@ for query_config in "${QUERIES[@]}"; do
 
     total_hits=$((total_hits + 1))
 
-    printf "%s,%s,%s,%s,%s,%s,%s,%s,%s\n" \
-      "$(csv_escape "${query}")" \
-      "${emitted_rank}" \
-      "${id}" \
-      "${source}" \
-      "$(csv_escape "${title}")" \
-      "$(csv_escape "${company_name}")" \
-      "${role}" \
-      "${score}" \
-      "${relevant}"
+    emit "$(csv_escape "${RUN_LABEL}"),$(csv_escape "${query}"),${emitted_rank},${id},${source},$(csv_escape "${title}"),$(csv_escape "${company_name}"),${role},${score},${relevant}"
   done
 
   if [[ "${emitted_rank}" -lt "${LIMIT}" ]]; then
@@ -167,6 +174,6 @@ else
   precision="$(awk -v relevant="${total_relevant}" -v total="${total_hits}" 'BEGIN { printf "%.4f", relevant / total }')"
 fi
 
-echo
-echo "summary,total_hits,total_relevant,precision_at_${LIMIT},filtered_out,short_query_count,allowed_sources,fetch_limit"
-echo "summary,${total_hits},${total_relevant},${precision},${filtered_out},${short_query_count},$(csv_escape "${ALLOWED_SOURCES:-ALL}"),${FETCH_LIMIT}"
+emit ""
+emit "summary,run_label,total_hits,total_relevant,precision_at_${LIMIT},filtered_out,short_query_count,allowed_sources,fetch_limit"
+emit "summary,$(csv_escape "${RUN_LABEL}"),${total_hits},${total_relevant},${precision},${filtered_out},${short_query_count},$(csv_escape "${ALLOWED_SOURCES:-ALL}"),${FETCH_LIMIT}"
