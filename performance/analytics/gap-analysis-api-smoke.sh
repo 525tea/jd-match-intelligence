@@ -136,6 +136,11 @@ if [[ "${job_match_count}" -eq 0 ]]; then
   echo "Gap analysis API smoke failed: jobMatches is empty."
   exit 1
 fi
+if [[ "${job_match_count}" -gt "${LIMIT}" ]]; then
+  echo "Gap analysis API smoke failed: jobMatches exceeds LIMIT."
+  echo "LIMIT=${LIMIT}, job_match_count=${job_match_count}"
+  exit 1
+fi
 
 missing_detail_count="$(
   echo "${response}" | jq '
