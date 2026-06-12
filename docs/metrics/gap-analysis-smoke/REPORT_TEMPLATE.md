@@ -21,7 +21,7 @@ This report records whether the gap-analysis API can connect these pieces end to
 | User | `gap-smoke@example.com` |
 | Project external id | `gap-analysis-smoke-project` |
 | Target roles | `BACKEND,FULLSTACK,SOFTWARE_ENGINEER,DEVOPS` |
-| Limit | `10` |
+| Limit | `10` (`1..50`) |
 | Missing project check | `true` |
 | Missing project id | `999999999` |
 | Fixture SQL | `performance/sql/gap-analysis-smoke-fixture.sql` |

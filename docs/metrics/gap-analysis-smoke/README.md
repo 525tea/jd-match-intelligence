@@ -19,6 +19,7 @@ The smoke script verifies:
 
 - non-empty `jobMatches`
 - `jobMatches.length <= LIMIT`
+- `LIMIT` is an integer from 1 to 50
 - response roles are inside `TARGET_ROLES`
 - matched/missing required/preferred skill detail arrays exist
 - required/preferred match rates are `null` only when the matching skill bucket is empty
