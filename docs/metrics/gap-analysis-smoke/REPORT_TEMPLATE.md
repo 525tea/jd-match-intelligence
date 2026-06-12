@@ -103,6 +103,7 @@ The smoke script fails when any of these conditions are true:
 | --- | --- |
 | API success | `.success != true` |
 | non-empty result | `.data.jobMatches` is empty |
+| limit contract | `.data.jobMatches.length` exceeds requested `LIMIT` |
 | detail fields | one of skill detail fields is missing or not an array |
 | target role filter | response contains role outside `TARGET_ROLES` |
 | meaningful gap detail | all skill detail lists are empty |
@@ -114,6 +115,7 @@ The smoke script fails when any of these conditions are true:
 | Metric | Actual |
 | --- | ---: |
 | job match count | TODO |
+| job match count <= limit | TODO |
 | top match score | TODO |
 | top required match rate | TODO |
 | top preferred match rate | TODO |
@@ -140,6 +142,7 @@ PASS criteria:
 - fixture project has 8 project skills
 - `job_skill_index` has indexed real JUMPIT/WANTED open jobs
 - gap-analysis API returns non-empty matches
+- gap-analysis API returns no more than requested `LIMIT`
 - missing project request returns `404` with `USER_PROJECT_NOT_FOUND`
 - returned matches are restricted to requested target roles
 - response includes matched/missing required/preferred skill details
