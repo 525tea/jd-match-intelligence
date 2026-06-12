@@ -131,6 +131,33 @@ The smoke script fails when any of these conditions are true:
 | match rate nullability | required/preferred match rate nullability does not match skill bucket counts |
 | missing project guard | missing project request does not return `404` / `USER_PROJECT_NOT_FOUND` |
 
+## Final DB Match Baseline
+
+This section records the final DB Console baseline after the gap-analysis query/scoring hardening.
+It uses `performance/sql/job-skill-index-match-smoke.sql` to verify that `job_skill_index` can produce explainable required/preferred hit-miss rows before the API response layer formats them.
+
+The SQL baseline verifies:
+
+- required and preferred skills are scored separately
+- matched and missing skill names are explainable per job
+- jobs without a required or preferred bucket keep the corresponding match rate nullable
+- the resulting `match_score` is derived from required/preferred match rates, not from a single flat skill count
+
+Top DB baseline rows:
+
+| source | job_id | external_id | title | role | required_match_rate | preferred_match_rate | match_score | matched_required_skills | missing_required_skills | matched_preferred_skills | missing_preferred_skills |
+| --- | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- | --- |
+| WANTED | 267 | 367233 | 백엔드 개발자 (Java/팀원) | BACKEND | 100.00 | 66.67 | 90.00 | Java, Spring Boot, Spring Framework |  | AWS, Git | Jenkins |
+| WANTED | 441 | 367362 | [Senior] Software Engineer | FRONTEND | 100.00 | 14.29 | 74.29 | AWS |  | Redis | FastAPI, Next.js, Python, React, Tailwind CSS, Terraform |
+| JUMPIT | 201 | 54118135 | 개발매니저(PM) | PM | 100.00 | 0.00 | 70.00 | Spring Boot |  |  | React |
+| WANTED | 431 | 367407 | 더아파트팀 세무회계파트 백엔드 개발자 | BACKEND | 40.00 | 100.00 | 58.00 | Java, Spring Boot | MyBatis, Oracle Database, SQL | Git |  |
+| JUMPIT | 184 | 54124332 | 웹어플리케이션 백엔드 개발자(2년↑) | BACKEND | 66.67 | 25.00 | 54.17 | Java, MySQL, Spring Boot, Spring Framework | Linux, Oracle Database | Docker | Hibernate, Kubernetes, Python |
+| WANTED | 293 | 367080 | Python 백엔드 개발자 1~5년 | BACKEND | 33.33 | 100.00 | 53.33 | Git | Python, REST API | Docker |  |
+| WANTED | 426 | 367434 | .Net 개발자 | BACKEND | 50.00 | 50.00 | 50.00 | Java | C# | Git | Software Engineering |
+| JUMPIT | 155 | 54124188 | Back-End 경력사원 채용 | BACKEND | 50.00 | 42.86 | 47.86 | Git, Java, MySQL, Spring Boot | Hibernate, Linux, MariaDB, QueryDSL | AWS, Docker, Redis | Kafka, Kubernetes, RabbitMQ, Spring Security |
+| WANTED | 340 | 366799 | Data Infra Engineer | BACKEND | 66.67 | 0.00 | 46.67 | Docker, Java | Python |  | Apache HTTP Server, Kafka, MongoDB |
+| WANTED | 344 | 366775 | 백엔드개발 (Predict) | BACKEND | 50.00 | 33.33 | 45.00 | Java, MySQL, Spring Boot | Jira, Linux, Notion | Docker | Kubernetes, MSA |
+
 ## Result Summary
 
 | Metric | Actual |
@@ -181,3 +208,4 @@ PASS criteria:
 | project skill snapshot is fixture-based | Smoke uses deterministic static skill list | replace with real GitHub analysis sample in W5 |
 | missing project smoke uses a high synthetic id | Smoke verifies not-found guard, not cross-user ownership with another real account | add cross-user ownership fixture when multi-user smoke data is introduced |
 | required/preferred extraction depends on JD section parsing | Current index separates sections but quality varies by source text | keep measuring required/preferred distribution |
+| raw smoke files are local-only | Public report records key rows and decisions; generated JSON/TSV remains ignored | regenerate raw files locally when rerunning API smoke |
