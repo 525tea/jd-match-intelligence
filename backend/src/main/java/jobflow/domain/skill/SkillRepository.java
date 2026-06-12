@@ -1,5 +1,6 @@
 package jobflow.domain.skill;
 
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -14,6 +15,8 @@ public interface SkillRepository extends JpaRepository<Skill, Long> {
     boolean existsByNormalizedNameAndIdNot(String normalizedName, Long id);
 
     List<Skill> findAllByOrderByNameAsc();
+
+    List<Skill> findByNameIn(Collection<String> names);
 
     List<Skill> findByCategoryOrderByNameAsc(SkillCategory category);
 
