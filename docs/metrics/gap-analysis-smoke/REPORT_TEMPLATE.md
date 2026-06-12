@@ -7,6 +7,7 @@ This report records whether the gap-analysis API can connect these pieces end to
 - latest user project skill snapshot
 - `job_skill_index` required/preferred skill index
 - target role filtering
+- user project ownership/not-found guard
 - match score ranking
 - matched/missing skill detail response
 
@@ -21,6 +22,8 @@ This report records whether the gap-analysis API can connect these pieces end to
 | Project external id | `gap-analysis-smoke-project` |
 | Target roles | `BACKEND,FULLSTACK,SOFTWARE_ENGINEER,DEVOPS` |
 | Limit | `10` |
+| Missing project check | `true` |
+| Missing project id | `999999999` |
 | Fixture SQL | `performance/sql/gap-analysis-smoke-fixture.sql` |
 | Check SQL | `performance/sql/gap-analysis-smoke-check.sql` |
 | Smoke script | `performance/analytics/gap-analysis-api-smoke.sh` |
@@ -77,6 +80,8 @@ BASE_URL=http://localhost:8080 \
 USER_PROJECT_ID=<user_project_id> \
 LIMIT=10 \
 TARGET_ROLES=BACKEND,FULLSTACK,SOFTWARE_ENGINEER,DEVOPS \
+EXPECT_MISSING_PROJECT_CHECK=true \
+MISSING_PROJECT_ID=999999999 \
 OUTPUT_DIR=docs/metrics/gap-analysis-smoke \
 bash performance/analytics/gap-analysis-api-smoke.sh
 ```
@@ -85,6 +90,7 @@ Expected result:
 
 ```text
 Gap analysis API smoke completed.
+### GET /gap-analysis/projects/999999999 should return USER_PROJECT_NOT_FOUND
 Saved response: docs/metrics/gap-analysis-smoke/gap-analysis-api-response.json
 Saved match summary: docs/metrics/gap-analysis-smoke/gap-analysis-match-summary.tsv
 ```
@@ -100,6 +106,7 @@ The smoke script fails when any of these conditions are true:
 | detail fields | one of skill detail fields is missing or not an array |
 | target role filter | response contains role outside `TARGET_ROLES` |
 | meaningful gap detail | all skill detail lists are empty |
+| missing project guard | missing project request does not return `404` / `USER_PROJECT_NOT_FOUND` |
 
 ## Result Summary
 
@@ -111,6 +118,8 @@ The smoke script fails when any of these conditions are true:
 | top preferred match rate | TODO |
 | response contains target role only | TODO |
 | response contains matched/missing skill details | TODO |
+| missing project status | TODO |
+| missing project error code | TODO |
 
 ## Top Match Samples
 
@@ -129,6 +138,7 @@ PASS criteria:
 - fixture project has 8 project skills
 - `job_skill_index` has indexed real JUMPIT/WANTED open jobs
 - gap-analysis API returns non-empty matches
+- missing project request returns `404` with `USER_PROJECT_NOT_FOUND`
 - returned matches are restricted to requested target roles
 - response includes matched/missing required/preferred skill details
 
@@ -138,4 +148,5 @@ PASS criteria:
 | --- | --- | --- |
 | match score weights are heuristic | Smoke verifies ordering and explainability, not final ranking quality | tune with labeled fixture after W5 matching engine |
 | project skill snapshot is fixture-based | Smoke uses deterministic static skill list | replace with real GitHub analysis sample in W5 |
+| missing project smoke uses a high synthetic id | Smoke verifies not-found guard, not cross-user ownership with another real account | add cross-user ownership fixture when multi-user smoke data is introduced |
 | required/preferred extraction depends on JD section parsing | Current index separates sections but quality varies by source text | keep measuring required/preferred distribution |
