@@ -13,6 +13,7 @@ NAME="${NAME:-Gap Smoke}"
 USER_PROJECT_ID="${USER_PROJECT_ID:-}"
 LIMIT="${LIMIT:-10}"
 TARGET_ROLES="${TARGET_ROLES:-BACKEND,FULLSTACK,SOFTWARE_ENGINEER,DEVOPS}"
+OUTPUT_DIR="${OUTPUT_DIR:-}"
 
 if [[ -z "${USER_PROJECT_ID}" ]]; then
   echo "USER_PROJECT_ID is required."
@@ -98,6 +99,9 @@ echo "EMAIL=${EMAIL}"
 echo "USER_PROJECT_ID=${USER_PROJECT_ID}"
 echo "LIMIT=${LIMIT}"
 echo "TARGET_ROLES=${TARGET_ROLES}"
+if [[ -n "${OUTPUT_DIR}" ]]; then
+  echo "OUTPUT_DIR=${OUTPUT_DIR}"
+fi
 echo
 
 signup
@@ -187,7 +191,8 @@ fi
 
 echo
 echo "### Match Summary"
-echo "${response}" | jq -r '
+match_summary="$(
+  echo "${response}" | jq -r '
   .data.jobMatches[]
   | [
       .jobId,
@@ -208,6 +213,26 @@ echo "${response}" | jq -r '
       (.missingPreferredSkills | join(", "))
     ]
   | @tsv
-'
+  '
+)"
+
+echo "${match_summary}"
+
+if [[ -n "${OUTPUT_DIR}" ]]; then
+  mkdir -p "${OUTPUT_DIR}"
+
+  response_path="${OUTPUT_DIR}/gap-analysis-api-response.json"
+  summary_path="${OUTPUT_DIR}/gap-analysis-match-summary.tsv"
+
+  echo "${response}" | jq > "${response_path}"
+  {
+    printf "job_id\ttitle\trole\trequired_skill_count\tmatched_required_skill_count\tmissing_required_skill_count\trequired_match_rate\tpreferred_skill_count\tmatched_preferred_skill_count\tmissing_preferred_skill_count\tpreferred_match_rate\tmatch_score\tmatched_required_skills\tmissing_required_skills\tmatched_preferred_skills\tmissing_preferred_skills\n"
+    echo "${match_summary}"
+  } > "${summary_path}"
+
+  echo
+  echo "Saved response: ${response_path}"
+  echo "Saved match summary: ${summary_path}"
+fi
 
 echo "Gap analysis API smoke completed."
