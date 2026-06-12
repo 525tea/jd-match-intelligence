@@ -14,6 +14,8 @@ USER_PROJECT_ID="${USER_PROJECT_ID:-}"
 LIMIT="${LIMIT:-10}"
 TARGET_ROLES="${TARGET_ROLES:-BACKEND,FULLSTACK,SOFTWARE_ENGINEER,DEVOPS}"
 OUTPUT_DIR="${OUTPUT_DIR:-}"
+EXPECT_MISSING_PROJECT_CHECK="${EXPECT_MISSING_PROJECT_CHECK:-true}"
+MISSING_PROJECT_ID="${MISSING_PROJECT_ID:-999999999}"
 
 if [[ -z "${USER_PROJECT_ID}" ]]; then
   echo "USER_PROJECT_ID is required."
@@ -99,6 +101,10 @@ echo "EMAIL=${EMAIL}"
 echo "USER_PROJECT_ID=${USER_PROJECT_ID}"
 echo "LIMIT=${LIMIT}"
 echo "TARGET_ROLES=${TARGET_ROLES}"
+echo "EXPECT_MISSING_PROJECT_CHECK=${EXPECT_MISSING_PROJECT_CHECK}"
+if [[ "${EXPECT_MISSING_PROJECT_CHECK}" == "true" ]]; then
+  echo "MISSING_PROJECT_ID=${MISSING_PROJECT_ID}"
+fi
 if [[ -n "${OUTPUT_DIR}" ]]; then
   echo "OUTPUT_DIR=${OUTPUT_DIR}"
 fi
@@ -233,6 +239,35 @@ if [[ -n "${OUTPUT_DIR}" ]]; then
   echo
   echo "Saved response: ${response_path}"
   echo "Saved match summary: ${summary_path}"
+fi
+
+if [[ "${EXPECT_MISSING_PROJECT_CHECK}" == "true" ]]; then
+  echo
+  echo "### GET /gap-analysis/projects/${MISSING_PROJECT_ID} should return USER_PROJECT_NOT_FOUND"
+
+  missing_response_file="$(mktemp)"
+  missing_status="$(
+    curl --show-error --silent --output "${missing_response_file}" --write-out "%{http_code}" --get \
+      "${BASE_URL}/gap-analysis/projects/${MISSING_PROJECT_ID}" \
+      --header "Authorization: Bearer ${access_token}" \
+      --data-urlencode "limit=5" \
+      --data-urlencode "targetRoles=BACKEND"
+  )"
+
+  cat "${missing_response_file}" | jq
+
+  missing_success="$(jq -r '.success' "${missing_response_file}")"
+  missing_error_code="$(jq -r '.error.code' "${missing_response_file}")"
+
+  if [[ "${missing_status}" != "404" || "${missing_success}" != "false" || "${missing_error_code}" != "USER_PROJECT_NOT_FOUND" ]]; then
+    echo "Gap analysis missing project smoke failed."
+    echo "Expected status=404 success=false error.code=USER_PROJECT_NOT_FOUND"
+    echo "Actual status=${missing_status} success=${missing_success} error.code=${missing_error_code}"
+    rm -f "${missing_response_file}"
+    exit 1
+  fi
+
+  rm -f "${missing_response_file}"
 fi
 
 echo "Gap analysis API smoke completed."
