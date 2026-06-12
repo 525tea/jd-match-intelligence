@@ -94,6 +94,9 @@ class ElasticsearchJobSearchServiceTest {
         assertThat(capturedQuery.functionScore().query().multiMatch().query()).isEqualTo("백엔드");
         assertThat(capturedQuery.functionScore().query().multiMatch().operator()).isNull();
         assertThat(capturedQuery.functionScore().functions()).hasSize(2);
+        assertThat(capturedQuery.functionScore().functions().getFirst().filter().exists().field())
+                .isEqualTo("deadlineAt");
+        assertThat(capturedQuery.functionScore().functions().get(1).filter()).isNull();
         assertThat(capturedQuery.functionScore().scoreMode()).isEqualTo(FunctionScoreMode.Sum);
         assertThat(capturedQuery.functionScore().boostMode()).isEqualTo(FunctionBoostMode.Sum);
     }
@@ -147,6 +150,47 @@ class ElasticsearchJobSearchServiceTest {
                 .extracting(query -> query.multiMatch().boost())
                 .containsExactly(0.05f, 0.05f);
         assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("deadlineAt이 있는 공고만 마감 임박 boost 대상이 된다")
+    void searchAppliesDeadlineBoostOnlyWhenDeadlineExists() {
+        ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
+                elasticsearchOperations,
+                jobSearchProperties,
+                jobSearchQueryExpansionService
+        );
+        JobSearchDocument document = document();
+
+        given(jobSearchQueryExpansionService.expand("WANTED"))
+                .willReturn(List.of());
+        given(elasticsearchOperations.search(
+                any(NativeQuery.class),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        )).willReturn(searchHits);
+        given(searchHits.stream()).willReturn(Stream.of(searchHit));
+        given(searchHit.getContent()).willReturn(document);
+        given(searchHit.getScore()).willReturn(1.5f);
+
+        List<JobSearchResult> results = service.search(" WANTED ", 10);
+
+        assertThat(results).hasSize(1);
+
+        ArgumentCaptor<NativeQuery> queryCaptor = ArgumentCaptor.forClass(NativeQuery.class);
+        verify(elasticsearchOperations).search(
+                queryCaptor.capture(),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        );
+
+        Query capturedQuery = queryCaptor.getValue().getQuery();
+
+        assertThat(capturedQuery.functionScore().functions()).hasSize(2);
+        assertThat(capturedQuery.functionScore().functions().getFirst().filter().exists().field())
+                .isEqualTo("deadlineAt");
+        assertThat(capturedQuery.functionScore().functions().getFirst().gauss().date().field())
+                .isEqualTo("deadlineAt");
     }
 
     @Test
