@@ -217,6 +217,59 @@ class JobSkillIndexQueryServiceTest {
         assertThat(response.missingPreferredSkills()).containsExactly(redis.getName());
     }
 
+    @Test
+    @DisplayName("필수 또는 우대 스킬이 없는 공고의 match rate는 null로 반환한다")
+    void findTopOpenJobMatchResponsesWithMissingRequirementBucket() {
+        String suffix = UUID.randomUUID().toString();
+
+        Skill redis = saveSkill("Bucket Redis", "bucket-redis", SkillCategory.INFRA, suffix);
+        Skill java = saveSkill("Bucket Java", "bucket-java", SkillCategory.LANGUAGE, suffix);
+
+        Job preferredOnlyJob = jobRepository.save(createJob(
+                "query-preferred-only-" + suffix,
+                "Redis 우대 백엔드 개발자",
+                JobRole.BACKEND
+        ));
+        jobSkillRepository.save(JobSkill.create(preferredOnlyJob, redis, RequirementType.PREFERRED));
+
+        Job requiredOnlyJob = jobRepository.save(createJob(
+                "query-required-only-" + suffix,
+                "Java 필수 백엔드 개발자",
+                JobRole.BACKEND
+        ));
+        jobSkillRepository.save(JobSkill.create(requiredOnlyJob, java, RequirementType.REQUIRED));
+
+        jobRepository.flush();
+        jobSkillRepository.flush();
+
+        jobSkillIndexRebuildService.rebuild();
+
+        List<JobSkillMatchResponse> responses = jobSkillIndexQueryService.findTopOpenJobMatchResponses(
+                List.of(redis.getId(), java.getId()),
+                List.of(JobRole.BACKEND),
+                10
+        );
+
+        JobSkillMatchResponse preferredOnlyResponse = responses.stream()
+                .filter(response -> response.jobId().equals(preferredOnlyJob.getId()))
+                .findFirst()
+                .orElseThrow();
+        JobSkillMatchResponse requiredOnlyResponse = responses.stream()
+                .filter(response -> response.jobId().equals(requiredOnlyJob.getId()))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(preferredOnlyResponse.requiredSkillCount()).isZero();
+        assertThat(preferredOnlyResponse.requiredMatchRate()).isNull();
+        assertThat(preferredOnlyResponse.preferredSkillCount()).isEqualTo(1);
+        assertThat(preferredOnlyResponse.preferredMatchRate()).isEqualByComparingTo(BigDecimal.valueOf(100.00));
+
+        assertThat(requiredOnlyResponse.requiredSkillCount()).isEqualTo(1);
+        assertThat(requiredOnlyResponse.requiredMatchRate()).isEqualByComparingTo(BigDecimal.valueOf(100.00));
+        assertThat(requiredOnlyResponse.preferredSkillCount()).isZero();
+        assertThat(requiredOnlyResponse.preferredMatchRate()).isNull();
+    }
+
     private Skill saveSkill(
             String namePrefix,
             String normalizedPrefix,

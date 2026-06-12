@@ -50,10 +50,6 @@ public interface JobSkillIndexRepository extends JpaRepository<JobSkillIndex, Lo
                 jsi.job.companyName,
                 jsi.job.role,
                 jsi.job.careerLevel
-            HAVING SUM(CASE
-                WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
-                THEN 1 ELSE 0
-            END) > 0
             ORDER BY
                 SUM(CASE
                     WHEN jsi.requirementType = jobflow.domain.job.RequirementType.REQUIRED
