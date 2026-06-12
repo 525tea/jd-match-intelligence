@@ -2,6 +2,7 @@ package jobflow.domain.job.search;
 
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionBoostMode;
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreMode;
+import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -91,6 +92,7 @@ class ElasticsearchJobSearchServiceTest {
         assertThat(capturedQuery.isFunctionScore()).isTrue();
         assertThat(capturedQuery.functionScore().query().isMultiMatch()).isTrue();
         assertThat(capturedQuery.functionScore().query().multiMatch().query()).isEqualTo("백엔드");
+        assertThat(capturedQuery.functionScore().query().multiMatch().operator()).isNull();
         assertThat(capturedQuery.functionScore().functions()).hasSize(2);
         assertThat(capturedQuery.functionScore().scoreMode()).isEqualTo(FunctionScoreMode.Sum);
         assertThat(capturedQuery.functionScore().boostMode()).isEqualTo(FunctionBoostMode.Sum);
@@ -133,13 +135,17 @@ class ElasticsearchJobSearchServiceTest {
         assertThat(searchQuery.isBool()).isTrue();
         assertThat(searchQuery.bool().must()).hasSize(1);
         assertThat(searchQuery.bool().must().getFirst().multiMatch().query()).isEqualTo("Redis");
+        assertThat(searchQuery.bool().must().getFirst().multiMatch().operator()).isNull();
         assertThat(searchQuery.bool().should()).hasSize(2);
         assertThat(searchQuery.bool().should())
                 .extracting(query -> query.multiMatch().query())
                 .containsExactly("Spring Boot", "Kafka");
         assertThat(searchQuery.bool().should())
+                .extracting(query -> query.multiMatch().operator())
+                .containsExactly(Operator.And, Operator.And);
+        assertThat(searchQuery.bool().should())
                 .extracting(query -> query.multiMatch().boost())
-                .containsExactly(0.25f, 0.25f);
+                .containsExactly(0.05f, 0.05f);
         assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
     }
 
@@ -185,6 +191,7 @@ class ElasticsearchJobSearchServiceTest {
 
         assertThat(searchQuery.isMultiMatch()).isTrue();
         assertThat(searchQuery.multiMatch().query()).isEqualTo("Redis");
+        assertThat(searchQuery.multiMatch().operator()).isNull();
     }
 
     @Test

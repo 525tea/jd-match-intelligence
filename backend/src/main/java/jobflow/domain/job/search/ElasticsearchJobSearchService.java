@@ -3,6 +3,7 @@ package jobflow.domain.job.search;
 import co.elastic.clients.elasticsearch._types.Time;
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionBoostMode;
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreMode;
+import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -19,7 +20,7 @@ public class ElasticsearchJobSearchService {
 
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
-    private static final float EXPANSION_BOOST = 0.25f;
+    private static final float EXPANSION_BOOST = 0.05f;
 
     private final ElasticsearchOperations elasticsearchOperations;
     private final JobSearchProperties jobSearchProperties;
@@ -119,11 +120,11 @@ public class ElasticsearchJobSearchService {
     private Query expansionKeywordQuery(String keyword) {
         return Query.of(q -> q.multiMatch(m -> m
                 .query(keyword)
+                .operator(Operator.And)
                 .boost(EXPANSION_BOOST)
                 .fields(
                         "description",
                         "roleDetail^1.5",
-                        "title^0.5",
                         "industry"
                 )
         ));
