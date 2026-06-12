@@ -45,14 +45,17 @@ class JobExpirationServiceFlowTest {
     @DisplayName("마감 시간이 지난 OPEN 공고만 EXPIRED로 변경하고 outbox event를 저장한다")
     void expireOnlyOverdueOpenJobs() {
         Job overdueOpenJob = jobRepository.save(createJob(
+                "MANUAL",
                 "overdue-open",
                 LocalDateTime.of(2026, 6, 4, 11, 59)
         ));
         Job futureOpenJob = jobRepository.save(createJob(
+                "MANUAL",
                 "future-open",
                 LocalDateTime.of(2026, 6, 4, 12, 1)
         ));
         Job overdueClosedJob = jobRepository.save(createJob(
+                "MANUAL",
                 "overdue-closed",
                 LocalDateTime.of(2026, 6, 4, 11, 0)
         ));
@@ -91,9 +94,48 @@ class JobExpirationServiceFlowTest {
     }
 
     @Test
+    @DisplayName("WANTED 원천 deadline이 없는 OPEN 공고는 자동 만료하지 않는다")
+    void doNotExpireWantedOpenJobsWithoutDeadline() {
+        Job wantedJobWithoutDeadline = jobRepository.save(createJob(
+                "WANTED",
+                "wanted-no-deadline",
+                null
+        ));
+        Job overdueJumpitJob = jobRepository.save(createJob(
+                "JUMPIT",
+                "jumpit-overdue",
+                LocalDateTime.of(2026, 6, 4, 11, 59)
+        ));
+
+        jobRepository.flush();
+
+        int expiredCount = jobExpirationService.expireOverdueJobs();
+
+        assertThat(expiredCount).isEqualTo(1);
+        assertThat(wantedJobWithoutDeadline.getStatus()).isEqualTo(JobStatus.OPEN);
+        assertThat(overdueJumpitJob.getStatus()).isEqualTo(JobStatus.EXPIRED);
+
+        verify(outboxEventService, never()).save(
+                eq("JOB"),
+                eq(wantedJobWithoutDeadline.getId()),
+                eq("JOB_EXPIRED"),
+                any(),
+                eq("job.events")
+        );
+        verify(outboxEventService).save(
+                eq("JOB"),
+                eq(overdueJumpitJob.getId()),
+                eq("JOB_EXPIRED"),
+                any(),
+                eq("job.events")
+        );
+    }
+
+    @Test
     @DisplayName("만료 대상이 없으면 아무 공고도 변경하지 않는다")
     void doNothingWhenNoOverdueOpenJobs() {
         Job futureOpenJob = jobRepository.save(createJob(
+                "MANUAL",
                 "future-open",
                 LocalDateTime.of(2026, 6, 4, 12, 1)
         ));
@@ -108,9 +150,9 @@ class JobExpirationServiceFlowTest {
         verify(outboxEventService, never()).save(any(), any(), any(), any(), any());
     }
 
-    private Job createJob(String externalId, LocalDateTime deadlineAt) {
+    private Job createJob(String source, String externalId, LocalDateTime deadlineAt) {
         return Job.create(
-                "MANUAL",
+                source,
                 externalId,
                 "백엔드 개발자",
                 "JobFlow",
