@@ -9,9 +9,20 @@ BASE_URL=http://localhost:8080 \
 USER_PROJECT_ID=<user_project_id> \
 LIMIT=10 \
 TARGET_ROLES=BACKEND,FULLSTACK,SOFTWARE_ENGINEER,DEVOPS \
+EXPECT_MISSING_PROJECT_CHECK=true \
+MISSING_PROJECT_ID=999999999 \
 OUTPUT_DIR=docs/metrics/gap-analysis-smoke \
 bash performance/analytics/gap-analysis-api-smoke.sh
 ```
+
+The smoke script verifies:
+
+- non-empty `jobMatches`
+- `jobMatches.length <= LIMIT`
+- response roles are inside `TARGET_ROLES`
+- matched/missing required/preferred skill detail arrays exist
+- required/preferred match rates are `null` only when the matching skill bucket is empty
+- missing project requests return `404` with `USER_PROJECT_NOT_FOUND`
 
 Generated files:
 
@@ -21,3 +32,5 @@ gap-analysis-match-summary.tsv
 ```
 
 These generated files are local verification artifacts and are intentionally ignored by git. Copy the key numbers into the worklog or metrics report instead of committing run-specific outputs.
+
+Use `REPORT_TEMPLATE.md` when recording the final result for a PR or worklog.
