@@ -3,6 +3,7 @@ package jobflow.domain.gap;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -97,6 +98,38 @@ class GapAnalysisControllerTest {
                 List.of(JobRole.BACKEND, JobRole.FULLSTACK),
                 5
         );
+    }
+
+    @Test
+    @DisplayName("프로젝트 갭 분석 limit이 1보다 작으면 400 ErrorResponse를 반환한다")
+    void analyzeProjectSkillGapWithTooSmallLimit() throws Exception {
+        setAuthentication();
+
+        mockMvc.perform(get("/gap-analysis/projects/{userProjectId}", 10L)
+                        .param("targetRoles", "BACKEND")
+                        .param("limit", "0"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON_INVALID_INPUT"))
+                .andExpect(jsonPath("$.error.message").value("limit은 1 이상 50 이하로 요청해야 합니다."));
+
+        verifyNoInteractions(gapAnalysisService);
+    }
+
+    @Test
+    @DisplayName("프로젝트 갭 분석 limit이 50보다 크면 400 ErrorResponse를 반환한다")
+    void analyzeProjectSkillGapWithTooLargeLimit() throws Exception {
+        setAuthentication();
+
+        mockMvc.perform(get("/gap-analysis/projects/{userProjectId}", 10L)
+                        .param("targetRoles", "BACKEND")
+                        .param("limit", "51"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON_INVALID_INPUT"))
+                .andExpect(jsonPath("$.error.message").value("limit은 1 이상 50 이하로 요청해야 합니다."));
+
+        verifyNoInteractions(gapAnalysisService);
     }
 
     private void setAuthentication() {
