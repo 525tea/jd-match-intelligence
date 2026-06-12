@@ -15,6 +15,13 @@ public record JobSkillMatchSummary(
         Long matchedPreferredSkillCount
 ) {
 
+    public JobSkillMatchSummary {
+        requiredSkillCount = zeroIfNull(requiredSkillCount);
+        matchedRequiredSkillCount = zeroIfNull(matchedRequiredSkillCount);
+        preferredSkillCount = zeroIfNull(preferredSkillCount);
+        matchedPreferredSkillCount = zeroIfNull(matchedPreferredSkillCount);
+    }
+
     public long missingRequiredSkillCount() {
         return requiredSkillCount - matchedRequiredSkillCount;
     }
@@ -59,5 +66,12 @@ public record JobSkillMatchSummary(
             return 0.0;
         }
         return matchRate * 10.0;
+    }
+
+    private static Long zeroIfNull(Long value) {
+        if (value == null) {
+            return 0L;
+        }
+        return value;
     }
 }
