@@ -103,3 +103,94 @@ WHERE j.source IN ('JUMPIT', 'WANTED')
   AND j.role IN ('BACKEND', 'FULLSTACK', 'SOFTWARE_ENGINEER', 'DEVOPS')
 GROUP BY j.source, j.role
 ORDER BY j.source, indexed_open_job_count DESC, j.role;
+
+WITH target_roles AS (
+    SELECT 'BACKEND' AS role
+    UNION ALL SELECT 'FULLSTACK'
+    UNION ALL SELECT 'SOFTWARE_ENGINEER'
+    UNION ALL SELECT 'DEVOPS'
+),
+     indexed_job_bucket AS (
+         SELECT
+             j.id AS job_id,
+             j.source,
+             j.external_id,
+             j.title,
+             j.company_name,
+             j.role,
+             SUM(CASE WHEN jsi.requirement_type = 'REQUIRED' THEN 1 ELSE 0 END) AS required_skill_count,
+             SUM(CASE WHEN jsi.requirement_type = 'PREFERRED' THEN 1 ELSE 0 END) AS preferred_skill_count
+         FROM jobs j
+                  JOIN job_skill_index jsi ON jsi.job_id = j.id
+                  JOIN target_roles tr ON tr.role = j.role
+         WHERE j.source IN ('JUMPIT', 'WANTED')
+           AND j.status = 'OPEN'
+         GROUP BY
+             j.id,
+             j.source,
+             j.external_id,
+             j.title,
+             j.company_name,
+             j.role
+     )
+SELECT
+    source,
+    COUNT(*) AS indexed_target_role_job_count,
+    SUM(CASE WHEN required_skill_count > 0 THEN 1 ELSE 0 END) AS required_bucket_job_count,
+    SUM(CASE WHEN preferred_skill_count > 0 THEN 1 ELSE 0 END) AS preferred_bucket_job_count,
+    SUM(CASE WHEN required_skill_count = 0 AND preferred_skill_count > 0 THEN 1 ELSE 0 END) AS preferred_only_job_count,
+    SUM(CASE WHEN required_skill_count > 0 AND preferred_skill_count = 0 THEN 1 ELSE 0 END) AS required_only_job_count,
+    SUM(CASE WHEN required_skill_count > 0 AND preferred_skill_count > 0 THEN 1 ELSE 0 END) AS both_bucket_job_count
+FROM indexed_job_bucket
+GROUP BY source
+ORDER BY source;
+
+WITH target_roles AS (
+    SELECT 'BACKEND' AS role
+    UNION ALL SELECT 'FULLSTACK'
+    UNION ALL SELECT 'SOFTWARE_ENGINEER'
+    UNION ALL SELECT 'DEVOPS'
+),
+     indexed_job_bucket AS (
+         SELECT
+             j.id AS job_id,
+             j.source,
+             j.external_id,
+             j.title,
+             j.company_name,
+             j.role,
+             j.career_level,
+             j.original_url,
+             SUM(CASE WHEN jsi.requirement_type = 'REQUIRED' THEN 1 ELSE 0 END) AS required_skill_count,
+             SUM(CASE WHEN jsi.requirement_type = 'PREFERRED' THEN 1 ELSE 0 END) AS preferred_skill_count
+         FROM jobs j
+                  JOIN job_skill_index jsi ON jsi.job_id = j.id
+                  JOIN target_roles tr ON tr.role = j.role
+         WHERE j.source IN ('JUMPIT', 'WANTED')
+           AND j.status = 'OPEN'
+         GROUP BY
+             j.id,
+             j.source,
+             j.external_id,
+             j.title,
+             j.company_name,
+             j.role,
+             j.career_level,
+             j.original_url
+     )
+SELECT
+    source,
+    job_id,
+    external_id,
+    title,
+    company_name,
+    role,
+    career_level,
+    required_skill_count,
+    preferred_skill_count,
+    original_url
+FROM indexed_job_bucket
+WHERE required_skill_count = 0
+  AND preferred_skill_count > 0
+ORDER BY preferred_skill_count DESC, job_id DESC
+LIMIT 20;
