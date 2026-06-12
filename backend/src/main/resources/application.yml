@@ -35,6 +35,8 @@ app:
   oauth2:
     success-redirect-uri: ${OAUTH2_SUCCESS_REDIRECT_URI:http://localhost:3000/oauth2/success}
     failure-redirect-uri: ${OAUTH2_FAILURE_REDIRECT_URI:http://localhost:3000/oauth2/failure}
+    provider-token:
+      encryption-key: ${OAUTH2_PROVIDER_TOKEN_ENCRYPTION_KEY:}
 
 jobflow:
   analytics:
