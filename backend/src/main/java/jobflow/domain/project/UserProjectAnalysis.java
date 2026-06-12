@@ -12,6 +12,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Objects;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -51,4 +52,26 @@ public class UserProjectAnalysis {
 
     @Column(nullable = false)
     private LocalDateTime analyzedAt;
+
+    public static UserProjectAnalysis create(
+            UserProject userProject,
+            int analysisVersion,
+            String sourceHash,
+            String commitSha,
+            String modelVersion,
+            String rawAnalysis,
+            BigDecimal confidenceScore,
+            LocalDateTime analyzedAt
+    ) {
+        UserProjectAnalysis analysis = new UserProjectAnalysis();
+        analysis.userProject = Objects.requireNonNull(userProject, "userProject must not be null");
+        analysis.analysisVersion = analysisVersion;
+        analysis.sourceHash = Objects.requireNonNull(sourceHash, "sourceHash must not be null");
+        analysis.commitSha = commitSha;
+        analysis.modelVersion = modelVersion;
+        analysis.rawAnalysis = rawAnalysis;
+        analysis.confidenceScore = confidenceScore;
+        analysis.analyzedAt = Objects.requireNonNull(analyzedAt, "analyzedAt must not be null");
+        return analysis;
+    }
 }
