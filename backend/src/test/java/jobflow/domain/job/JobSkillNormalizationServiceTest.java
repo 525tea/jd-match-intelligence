@@ -2,7 +2,6 @@ package jobflow.domain.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.math.BigDecimal;
@@ -15,8 +14,10 @@ import jobflow.domain.skill.SkillCategory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class JobSkillNormalizationServiceTest {
@@ -27,22 +28,24 @@ class JobSkillNormalizationServiceTest {
     @Mock
     private JobSkillRepository jobSkillRepository;
 
+    private final JdRequirementSectionExtractor requirementSectionExtractor = new JdRequirementSectionExtractor();
+
     @Test
-    @DisplayName("정규화된 스킬을 job_skills로 저장한다")
+    @DisplayName("정규화된 스킬을 저장한다")
     void saveNormalizedSkills() {
         JobSkillNormalizationService service = new JobSkillNormalizationService(
                 jdSkillNormalizationService,
+                requirementSectionExtractor,
                 jobSkillRepository
         );
-        Job job = createJob();
+        Job job = createJob(1L);
         Skill springBoot = Skill.create("Spring Boot", "spring boot", SkillCategory.FRAMEWORK);
         Skill kubernetes = Skill.create("Kubernetes", "kubernetes", SkillCategory.INFRA);
         JobSkill springBootJobSkill = JobSkill.create(job, springBoot, RequirementType.REQUIRED);
         JobSkill kubernetesJobSkill = JobSkill.create(job, kubernetes, RequirementType.REQUIRED);
 
         given(jdSkillNormalizationService.normalize(
-                "SpringBoot 백엔드 개발자",
-                "k8s 운영 경험"
+                "백엔드 개발자\n\nSpringBoot 기반 서비스 개발\n\nk8s 운영"
         )).willReturn(List.of(
                 new NormalizedSkillMatch(
                         springBoot,
@@ -62,14 +65,14 @@ class JobSkillNormalizationServiceTest {
 
         List<JobSkill> jobSkills = service.saveNormalizedSkills(
                 job,
-                "SpringBoot 백엔드 개발자",
-                "k8s 운영 경험"
+                "백엔드 개발자",
+                "SpringBoot 기반 서비스 개발",
+                "k8s 운영"
         );
 
         assertThat(jobSkills)
                 .extracting(jobSkill -> jobSkill.getSkill().getName())
                 .containsExactly("Spring Boot", "Kubernetes");
-
         assertThat(jobSkills)
                 .extracting(JobSkill::getRequirementType)
                 .containsExactly(RequirementType.REQUIRED, RequirementType.REQUIRED);
@@ -78,13 +81,116 @@ class JobSkillNormalizationServiceTest {
     }
 
     @Test
-    @DisplayName("정규화된 스킬이 없으면 job_skills를 저장하지 않는다")
+    @DisplayName("자격요건과 우대사항 섹션에 따라 requirement type을 저장한다")
+    void saveNormalizedSkillsByRequirementSection() {
+        JobSkillNormalizationService service = new JobSkillNormalizationService(
+                jdSkillNormalizationService,
+                requirementSectionExtractor,
+                jobSkillRepository
+        );
+        Job job = createJob(1L);
+        Skill java = Skill.create("Java", "java", SkillCategory.LANGUAGE);
+        Skill redis = Skill.create("Redis", "redis", SkillCategory.INFRA);
+
+        given(jdSkillNormalizationService.normalize("Java Spring 기반 백엔드 API 개발 경험"))
+                .willReturn(List.of(new NormalizedSkillMatch(
+                        java,
+                        "Java",
+                        "java",
+                        BigDecimal.ONE
+                )));
+        given(jdSkillNormalizationService.normalize("Redis 운영 경험"))
+                .willReturn(List.of(new NormalizedSkillMatch(
+                        redis,
+                        "Redis",
+                        "redis",
+                        BigDecimal.ONE
+                )));
+
+        service.saveNormalizedSkills(
+                job,
+                """
+                [자격 요건]
+                Java Spring 기반 백엔드 API 개발 경험
+
+                [우대 사항]
+                Redis 운영 경험
+                """
+        );
+
+        ArgumentCaptor<List<JobSkill>> captor = ArgumentCaptor.forClass(List.class);
+        verify(jobSkillRepository).saveAll(captor.capture());
+
+        assertThat(captor.getValue())
+                .extracting(
+                        jobSkill -> jobSkill.getSkill().getName(),
+                        JobSkill::getRequirementType
+                )
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("Java", RequirementType.REQUIRED),
+                        org.assertj.core.groups.Tuple.tuple("Redis", RequirementType.PREFERRED)
+                );
+    }
+
+    @Test
+    @DisplayName("같은 스킬이 required와 preferred에 모두 있으면 required를 우선한다")
+    void requiredSkillWinsOverPreferredSkill() {
+        JobSkillNormalizationService service = new JobSkillNormalizationService(
+                jdSkillNormalizationService,
+                requirementSectionExtractor,
+                jobSkillRepository
+        );
+        Job job = createJob(1L);
+        Skill redis = Skill.create("Redis", "redis", SkillCategory.INFRA);
+
+        given(jdSkillNormalizationService.normalize("Redis 캐시 운영 경험"))
+                .willReturn(List.of(new NormalizedSkillMatch(
+                        redis,
+                        "Redis",
+                        "redis",
+                        BigDecimal.ONE
+                )));
+        given(jdSkillNormalizationService.normalize("Redis 튜닝 경험"))
+                .willReturn(List.of(new NormalizedSkillMatch(
+                        redis,
+                        "Redis",
+                        "redis",
+                        BigDecimal.ONE
+                )));
+
+        service.saveNormalizedSkills(
+                job,
+                """
+                [자격 요건]
+                Redis 캐시 운영 경험
+
+                [우대 사항]
+                Redis 튜닝 경험
+                """
+        );
+
+        ArgumentCaptor<List<JobSkill>> captor = ArgumentCaptor.forClass(List.class);
+        verify(jobSkillRepository).saveAll(captor.capture());
+
+        assertThat(captor.getValue())
+                .extracting(
+                        jobSkill -> jobSkill.getSkill().getName(),
+                        JobSkill::getRequirementType
+                )
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("Redis", RequirementType.REQUIRED)
+                );
+    }
+
+    @Test
+    @DisplayName("정규화된 스킬이 없으면 빈 목록을 반환한다")
     void saveNormalizedSkillsWithNoMatches() {
         JobSkillNormalizationService service = new JobSkillNormalizationService(
                 jdSkillNormalizationService,
+                requirementSectionExtractor,
                 jobSkillRepository
         );
-        Job job = createJob();
+        Job job = createJob(1L);
 
         given(jdSkillNormalizationService.normalize("운영 경험"))
                 .willReturn(List.of());
@@ -92,38 +198,38 @@ class JobSkillNormalizationServiceTest {
         List<JobSkill> jobSkills = service.saveNormalizedSkills(job, "운영 경험");
 
         assertThat(jobSkills).isEmpty();
-
-        verify(jobSkillRepository, never()).saveAll(org.mockito.ArgumentMatchers.anyList());
     }
 
-    private Job createJob() {
-        return Job.create(
-                "MANUAL",
-                "job-skill-normalization-test",
+    private Job createJob(Long id) {
+        Job job = Job.create(
+                "JUMPIT",
+                "backend-skill-normalization-test",
                 "백엔드 개발자",
                 "JobFlow",
-                "Spring Boot 기반 백엔드 개발",
-                "https://example.com/jobs/job-skill-normalization-test",
+                "SpringBoot 기반 서비스 개발",
+                "https://jumpit.saramin.co.kr/position/backend-skill-normalization-test",
                 JobRole.BACKEND,
-                "Java Spring Boot",
+                "k8s 운영",
                 CareerLevel.JUNIOR,
                 0,
                 3,
-                null,
+                "학력무관",
                 EmploymentType.FULL_TIME,
-                null,
+                "STARTUP",
                 "IT",
                 "KR",
                 "Seoul",
                 "Gangnam",
                 RemoteType.HYBRID,
-                null,
-                null,
+                4000,
+                7000,
                 "KRW",
-                false,
-                null,
-                LocalDateTime.of(2026, 6, 1, 9, 0),
+                true,
+                1,
+                LocalDateTime.of(2026, 6, 4, 9, 0),
                 LocalDateTime.of(2026, 7, 1, 23, 59)
         );
+        ReflectionTestUtils.setField(job, "id", id);
+        return job;
     }
 }

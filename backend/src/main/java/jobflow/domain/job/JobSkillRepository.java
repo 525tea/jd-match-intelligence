@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import jobflow.domain.analytics.JobSkillCooccurrenceAggregate;
+import jobflow.domain.analytics.JobSkillIndexSource;
 
 public interface JobSkillRepository extends JpaRepository<JobSkill, Long> {
 
@@ -50,4 +51,15 @@ public interface JobSkillRepository extends JpaRepository<JobSkill, Long> {
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
     );
+
+    @Query("""
+            SELECT new jobflow.domain.analytics.JobSkillIndexSource(
+                js.job,
+                js.skill,
+                js.requirementType
+            )
+            FROM JobSkill js
+            WHERE js.job.status = jobflow.domain.job.JobStatus.OPEN
+            """)
+    List<JobSkillIndexSource> findOpenJobSkillIndexSources();
 }
