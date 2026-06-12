@@ -22,6 +22,11 @@ if [[ -z "${USER_PROJECT_ID}" ]]; then
   echo "Run performance/sql/gap-analysis-smoke-fixture.sql in DB Console first and use its user_project_id."
   exit 1
 fi
+if [[ ! "${LIMIT}" =~ ^[0-9]+$ || "${LIMIT}" -lt 1 || "${LIMIT}" -gt 50 ]]; then
+  echo "LIMIT must be an integer between 1 and 50."
+  echo "Actual LIMIT=${LIMIT}"
+  exit 1
+fi
 
 json_escape() {
   jq -Rn --arg value "$1" '$value'
