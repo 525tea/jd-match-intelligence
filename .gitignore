@@ -6,6 +6,7 @@ docs/metrics/*
 docs/metrics/gap-analysis-smoke/*
 !docs/metrics/gap-analysis-smoke/README.md
 !docs/metrics/gap-analysis-smoke/REPORT_TEMPLATE.md
+!docs/metrics/gap-analysis-smoke/260612_gap_analysis_smoke_report.md
 
 # macOS
 .DS_Store
