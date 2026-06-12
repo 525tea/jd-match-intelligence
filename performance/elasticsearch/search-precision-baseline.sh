@@ -4,6 +4,7 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 LIMIT="${LIMIT:-5}"
+FETCH_LIMIT="${FETCH_LIMIT:-20}"
 ALLOWED_SOURCES="${ALLOWED_SOURCES:-}"
 
 csv_escape() {
@@ -65,6 +66,16 @@ if ! curl -fsS "${BASE_URL}/actuator/health" >/dev/null; then
   exit 1
 fi
 
+if [[ "${LIMIT}" -lt 1 || "${LIMIT}" -gt 100 ]]; then
+  echo "LIMIT must be between 1 and 100. actual=${LIMIT}" >&2
+  exit 1
+fi
+
+if [[ "${FETCH_LIMIT}" -lt "${LIMIT}" || "${FETCH_LIMIT}" -gt 100 ]]; then
+  echo "FETCH_LIMIT must be between LIMIT and 100. actual=${FETCH_LIMIT}, limit=${LIMIT}" >&2
+  exit 1
+fi
+
 # query|expected_roles_csv|expected_keywords_csv
 # role 또는 keyword 중 하나라도 맞으면 relevant=true로 계산한다.
 QUERIES=(
@@ -83,6 +94,7 @@ printf "query,rank,id,source,title,company_name,role,score,relevant\n"
 total_hits=0
 total_relevant=0
 filtered_out=0
+short_query_count=0
 
 for query_config in "${QUERIES[@]}"; do
   IFS='|' read -r query expected_roles expected_keywords <<< "${query_config}"
@@ -90,7 +102,7 @@ for query_config in "${QUERIES[@]}"; do
   response="$(
     curl -sS -G "${BASE_URL}/jobs/search" \
       --data-urlencode "keyword=${query}" \
-      --data-urlencode "limit=${LIMIT}"
+      --data-urlencode "limit=${FETCH_LIMIT}"
   )"
 
   success="$(echo "${response}" | jq -r '.success')"
@@ -103,6 +115,10 @@ for query_config in "${QUERIES[@]}"; do
   emitted_rank=0
 
   for (( index = 0; index < row_count; index++ )); do
+    if [[ "${emitted_rank}" -ge "${LIMIT}" ]]; then
+      break
+    fi
+
     id="$(echo "${response}" | jq -r ".data[${index}].id")"
     source="$(echo "${response}" | jq -r ".data[${index}].source // \"\"")"
     title="$(echo "${response}" | jq -r ".data[${index}].title")"
@@ -139,6 +155,10 @@ for query_config in "${QUERIES[@]}"; do
       "${score}" \
       "${relevant}"
   done
+
+  if [[ "${emitted_rank}" -lt "${LIMIT}" ]]; then
+    short_query_count=$((short_query_count + 1))
+  fi
 done
 
 if [[ "${total_hits}" -eq 0 ]]; then
@@ -148,5 +168,5 @@ else
 fi
 
 echo
-echo "summary,total_hits,total_relevant,precision_at_${LIMIT},filtered_out,allowed_sources"
-echo "summary,${total_hits},${total_relevant},${precision},${filtered_out},$(csv_escape "${ALLOWED_SOURCES:-ALL}")"
+echo "summary,total_hits,total_relevant,precision_at_${LIMIT},filtered_out,short_query_count,allowed_sources,fetch_limit"
+echo "summary,${total_hits},${total_relevant},${precision},${filtered_out},${short_query_count},$(csv_escape "${ALLOWED_SOURCES:-ALL}"),${FETCH_LIMIT}"
