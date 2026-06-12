@@ -135,6 +135,22 @@ class OAuth2ProviderTokenServiceTest {
     }
 
     @Test
+    @DisplayName("필수 provider access token이 없으면 명확한 domain error가 발생한다")
+    void getRequiredAccessTokenWithoutToken() {
+        User user = userRepository.save(User.oauth2(
+                "missing-token@example.com",
+                "github-user",
+                AuthProvider.GITHUB,
+                "github-missing-token"
+        ));
+
+        assertThatThrownBy(() -> tokenService.getRequiredAccessToken(user.getId(), AuthProvider.GITHUB))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.AUTH_OAUTH2_PROVIDER_TOKEN_NOT_FOUND);
+    }
+
+    @Test
     @DisplayName("LOCAL provider token 저장은 허용하지 않는다")
     void saveLocalProviderToken() {
         User user = userRepository.save(User.signup(

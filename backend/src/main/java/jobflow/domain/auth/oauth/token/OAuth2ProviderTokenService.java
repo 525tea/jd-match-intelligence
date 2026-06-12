@@ -60,6 +60,11 @@ public class OAuth2ProviderTokenService {
                 .map(tokenEncryptor::decrypt);
     }
 
+    public String getRequiredAccessToken(Long userId, AuthProvider authProvider) {
+        return findAccessToken(userId, authProvider)
+                .orElseThrow(() -> new BusinessException(ErrorCode.AUTH_OAUTH2_PROVIDER_TOKEN_NOT_FOUND));
+    }
+
     @Transactional
     public void delete(Long userId, AuthProvider authProvider) {
         if (userId == null || authProvider == null || authProvider == AuthProvider.LOCAL) {
