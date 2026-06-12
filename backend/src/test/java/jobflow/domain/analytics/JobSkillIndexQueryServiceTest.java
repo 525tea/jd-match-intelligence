@@ -208,6 +208,13 @@ class JobSkillIndexQueryServiceTest {
         assertThat(response.missingPreferredSkillCount()).isEqualTo(1);
         assertThat(response.preferredMatchRate()).isEqualByComparingTo(BigDecimal.ZERO.setScale(2));
         assertThat(response.matchScore()).isEqualByComparingTo(BigDecimal.valueOf(70.00));
+        assertThat(response.matchedRequiredSkills()).containsExactly(
+                java.getName(),
+                spring.getName()
+        );
+        assertThat(response.missingRequiredSkills()).isEmpty();
+        assertThat(response.matchedPreferredSkills()).isEmpty();
+        assertThat(response.missingPreferredSkills()).containsExactly(redis.getName());
     }
 
     private Skill saveSkill(

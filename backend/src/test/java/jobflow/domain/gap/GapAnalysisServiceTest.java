@@ -95,7 +95,11 @@ class GapAnalysisServiceTest {
                 1,
                 1,
                 BigDecimal.valueOf(50.00),
-                BigDecimal.valueOf(56.33)
+                BigDecimal.valueOf(56.33),
+                List.of("Java", "Spring Boot"),
+                List.of("Kubernetes"),
+                List.of("Docker"),
+                List.of("Kafka")
         );
     }
 }

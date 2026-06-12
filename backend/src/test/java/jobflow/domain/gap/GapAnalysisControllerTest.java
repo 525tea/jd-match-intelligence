@@ -81,7 +81,15 @@ class GapAnalysisControllerTest {
                 .andExpect(jsonPath("$.data.jobMatches[0].missingRequiredSkillCount").value(1))
                 .andExpect(jsonPath("$.data.jobMatches[0].requiredMatchRate").value(66.67))
                 .andExpect(jsonPath("$.data.jobMatches[0].preferredMatchRate").value(50.0))
-                .andExpect(jsonPath("$.data.jobMatches[0].matchScore").value(56.33));
+                .andExpect(jsonPath("$.data.jobMatches[0].matchScore").value(56.33))
+                .andExpect(jsonPath("$.data.jobMatches[0].matchedRequiredSkills", hasSize(2)))
+                .andExpect(jsonPath("$.data.jobMatches[0].matchedRequiredSkills[0]").value("Java"))
+                .andExpect(jsonPath("$.data.jobMatches[0].missingRequiredSkills", hasSize(1)))
+                .andExpect(jsonPath("$.data.jobMatches[0].missingRequiredSkills[0]").value("Kubernetes"))
+                .andExpect(jsonPath("$.data.jobMatches[0].matchedPreferredSkills", hasSize(1)))
+                .andExpect(jsonPath("$.data.jobMatches[0].matchedPreferredSkills[0]").value("Docker"))
+                .andExpect(jsonPath("$.data.jobMatches[0].missingPreferredSkills", hasSize(1)))
+                .andExpect(jsonPath("$.data.jobMatches[0].missingPreferredSkills[0]").value("Kafka"));
 
         verify(gapAnalysisService).analyzeProjectSkillGap(
                 1L,
@@ -133,7 +141,11 @@ class GapAnalysisControllerTest {
                 1,
                 1,
                 BigDecimal.valueOf(50.00),
-                BigDecimal.valueOf(56.33)
+                BigDecimal.valueOf(56.33),
+                List.of("Java", "Spring Boot"),
+                List.of("Kubernetes"),
+                List.of("Docker"),
+                List.of("Kafka")
         );
     }
 }

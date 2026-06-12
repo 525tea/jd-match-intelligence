@@ -2,7 +2,8 @@ package jobflow.domain.analytics.dto;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import jobflow.domain.analytics.JobSkillMatchSummary;
+import java.util.List;
+import jobflow.domain.analytics.JobSkillMatchDetail;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.JobRole;
 
@@ -20,10 +21,15 @@ public record JobSkillMatchResponse(
         long matchedPreferredSkillCount,
         long missingPreferredSkillCount,
         BigDecimal preferredMatchRate,
-        BigDecimal matchScore
+        BigDecimal matchScore,
+        List<String> matchedRequiredSkills,
+        List<String> missingRequiredSkills,
+        List<String> matchedPreferredSkills,
+        List<String> missingPreferredSkills
 ) {
 
-    public static JobSkillMatchResponse from(JobSkillMatchSummary summary) {
+    public static JobSkillMatchResponse from(JobSkillMatchDetail detail) {
+        var summary = detail.summary();
         return new JobSkillMatchResponse(
                 summary.jobId(),
                 summary.title(),
@@ -38,7 +44,11 @@ public record JobSkillMatchResponse(
                 summary.matchedPreferredSkillCount(),
                 summary.missingPreferredSkillCount(),
                 toPercent(summary.preferredMatchRate()),
-                BigDecimal.valueOf(summary.matchScore()).setScale(2, RoundingMode.HALF_UP)
+                BigDecimal.valueOf(summary.matchScore()).setScale(2, RoundingMode.HALF_UP),
+                detail.matchedRequiredSkills(),
+                detail.missingRequiredSkills(),
+                detail.matchedPreferredSkills(),
+                detail.missingPreferredSkills()
         );
     }
 

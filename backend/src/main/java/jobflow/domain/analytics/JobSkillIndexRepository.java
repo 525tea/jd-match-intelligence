@@ -13,6 +13,8 @@ public interface JobSkillIndexRepository extends JpaRepository<JobSkillIndex, Lo
 
     long countByRequirementType(RequirementType requirementType);
 
+    List<JobSkillIndex> findByJobIdIn(Collection<Long> jobIds);
+
     @Query("""
             SELECT new jobflow.domain.analytics.JobSkillMatchSummary(
                 jsi.job.id,
