@@ -127,6 +127,22 @@ class GapAnalysisControllerTest {
     }
 
     @Test
+    @DisplayName("프로젝트 갭 분석 targetRoles가 존재하지 않는 role이면 400 ErrorResponse를 반환한다")
+    void analyzeProjectSkillGapWithInvalidTargetRole() throws Exception {
+        setAuthentication();
+
+        mockMvc.perform(get("/gap-analysis/projects/{userProjectId}", 10L)
+                        .param("targetRoles", "NOT_A_ROLE")
+                        .param("limit", "5"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON_INVALID_INPUT"))
+                .andExpect(jsonPath("$.error.message").value("요청 파라미터 타입이 올바르지 않습니다."));
+
+        verifyNoInteractions(gapAnalysisService);
+    }
+
+    @Test
     @DisplayName("프로젝트 갭 분석 limit이 1보다 작으면 400 ErrorResponse를 반환한다")
     void analyzeProjectSkillGapWithTooSmallLimit() throws Exception {
         setAuthentication();
