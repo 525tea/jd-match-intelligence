@@ -2,6 +2,7 @@ package jobflow.domain.job.search;
 
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionBoostMode;
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreMode;
+import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
 import co.elastic.clients.elasticsearch._types.query_dsl.Query;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,9 @@ class ElasticsearchJobSearchServiceTest {
     private ElasticsearchOperations elasticsearchOperations;
 
     @Mock
+    private JobSearchQueryExpansionService jobSearchQueryExpansionService;
+
+    @Mock
     private SearchHits<JobSearchDocument> searchHits;
 
     @Mock
@@ -42,7 +46,8 @@ class ElasticsearchJobSearchServiceTest {
             "http://localhost:9200",
             "jobflow-jobs",
             "jobflow-jobs-v1",
-            false
+            false,
+            true
     );
 
     @Test
@@ -50,10 +55,13 @@ class ElasticsearchJobSearchServiceTest {
     void search() {
         ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
                 elasticsearchOperations,
-                jobSearchProperties
+                jobSearchProperties,
+                jobSearchQueryExpansionService
         );
         JobSearchDocument document = document();
 
+        given(jobSearchQueryExpansionService.expand("백엔드"))
+                .willReturn(List.of());
         given(elasticsearchOperations.search(
                 any(NativeQuery.class),
                 eq(JobSearchDocument.class),
@@ -61,7 +69,6 @@ class ElasticsearchJobSearchServiceTest {
         )).willReturn(searchHits);
         given(searchHits.stream()).willReturn(Stream.of(searchHit));
         given(searchHit.getContent()).willReturn(document);
-
         given(searchHit.getScore()).willReturn(3.5f);
 
         List<JobSearchResult> results = service.search(" 백엔드 ", 10);
@@ -78,28 +85,129 @@ class ElasticsearchJobSearchServiceTest {
                 eq(JobSearchDocument.class),
                 eq(IndexCoordinates.of("jobflow-jobs"))
         );
+        verify(jobSearchQueryExpansionService).expand("백엔드");
 
         Query capturedQuery = queryCaptor.getValue().getQuery();
 
         assertThat(capturedQuery.isFunctionScore()).isTrue();
         assertThat(capturedQuery.functionScore().query().isMultiMatch()).isTrue();
+        assertThat(capturedQuery.functionScore().query().multiMatch().query()).isEqualTo("백엔드");
+        assertThat(capturedQuery.functionScore().query().multiMatch().operator()).isNull();
         assertThat(capturedQuery.functionScore().functions()).hasSize(2);
         assertThat(capturedQuery.functionScore().scoreMode()).isEqualTo(FunctionScoreMode.Sum);
         assertThat(capturedQuery.functionScore().boostMode()).isEqualTo(FunctionBoostMode.Sum);
     }
 
     @Test
-    @DisplayName("검색어가 비어 있으면 Elasticsearch를 호출하지 않는다")
+    @DisplayName("co-occurrence 확장 후보가 있으면 원 검색어는 must, 확장 검색어는 낮은 boost should로 추가한다")
+    void searchWithCooccurrenceExpansion() {
+        ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
+                elasticsearchOperations,
+                jobSearchProperties,
+                jobSearchQueryExpansionService
+        );
+        JobSearchDocument document = document();
+
+        given(jobSearchQueryExpansionService.expand("Redis"))
+                .willReturn(List.of("Spring Boot", "Kafka"));
+        given(elasticsearchOperations.search(
+                any(NativeQuery.class),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        )).willReturn(searchHits);
+        given(searchHits.stream()).willReturn(Stream.of(searchHit));
+        given(searchHit.getContent()).willReturn(document);
+        given(searchHit.getScore()).willReturn(2.5f);
+
+        List<JobSearchResult> results = service.search(" Redis ", 10);
+
+        assertThat(results).hasSize(1);
+
+        ArgumentCaptor<NativeQuery> queryCaptor = ArgumentCaptor.forClass(NativeQuery.class);
+        verify(elasticsearchOperations).search(
+                queryCaptor.capture(),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        );
+
+        Query searchQuery = queryCaptor.getValue().getQuery().functionScore().query();
+
+        assertThat(searchQuery.isBool()).isTrue();
+        assertThat(searchQuery.bool().must()).hasSize(1);
+        assertThat(searchQuery.bool().must().getFirst().multiMatch().query()).isEqualTo("Redis");
+        assertThat(searchQuery.bool().must().getFirst().multiMatch().operator()).isNull();
+        assertThat(searchQuery.bool().should()).hasSize(2);
+        assertThat(searchQuery.bool().should())
+                .extracting(query -> query.multiMatch().query())
+                .containsExactly("Spring Boot", "Kafka");
+        assertThat(searchQuery.bool().should())
+                .extracting(query -> query.multiMatch().operator())
+                .containsExactly(Operator.And, Operator.And);
+        assertThat(searchQuery.bool().should())
+                .extracting(query -> query.multiMatch().boost())
+                .containsExactly(0.05f, 0.05f);
+        assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
+    }
+
+    @Test
+    @DisplayName("query expansion이 꺼져 있으면 co-occurrence 후보를 조회하지 않는다")
+    void searchWithoutQueryExpansion() {
+        JobSearchProperties disabledExpansionProperties = new JobSearchProperties(
+                "http://localhost:9200",
+                "jobflow-jobs",
+                "jobflow-jobs-v1",
+                false,
+                false
+        );
+        ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
+                elasticsearchOperations,
+                disabledExpansionProperties,
+                jobSearchQueryExpansionService
+        );
+        JobSearchDocument document = document();
+
+        given(elasticsearchOperations.search(
+                any(NativeQuery.class),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        )).willReturn(searchHits);
+        given(searchHits.stream()).willReturn(Stream.of(searchHit));
+        given(searchHit.getContent()).willReturn(document);
+        given(searchHit.getScore()).willReturn(2.5f);
+
+        List<JobSearchResult> results = service.search(" Redis ", 10);
+
+        assertThat(results).hasSize(1);
+
+        ArgumentCaptor<NativeQuery> queryCaptor = ArgumentCaptor.forClass(NativeQuery.class);
+        verify(elasticsearchOperations).search(
+                queryCaptor.capture(),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        );
+        verify(jobSearchQueryExpansionService, never()).expand(any());
+
+        Query searchQuery = queryCaptor.getValue().getQuery().functionScore().query();
+
+        assertThat(searchQuery.isMultiMatch()).isTrue();
+        assertThat(searchQuery.multiMatch().query()).isEqualTo("Redis");
+        assertThat(searchQuery.multiMatch().operator()).isNull();
+    }
+
+    @Test
+    @DisplayName("검색어가 비어 있으면 Elasticsearch와 query expansion을 호출하지 않는다")
     void searchBlankKeyword() {
         ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
                 elasticsearchOperations,
-                jobSearchProperties
+                jobSearchProperties,
+                jobSearchQueryExpansionService
         );
 
         List<JobSearchResult> results = service.search(" ", 10);
 
         assertThat(results).isEmpty();
 
+        verify(jobSearchQueryExpansionService, never()).expand(any());
         verify(elasticsearchOperations, never()).search(
                 any(NativeQuery.class),
                 eq(JobSearchDocument.class),

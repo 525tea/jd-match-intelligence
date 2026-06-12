@@ -4,11 +4,24 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 LIMIT="${LIMIT:-5}"
+FETCH_LIMIT="${FETCH_LIMIT:-20}"
+ALLOWED_SOURCES="${ALLOWED_SOURCES:-}"
+RUN_LABEL="${RUN_LABEL:-search-precision}"
+OUTPUT_FILE="${OUTPUT_FILE:-}"
 
 csv_escape() {
   local value="$1"
   value="${value//\"/\"\"}"
   printf '"%s"' "${value}"
+}
+
+emit() {
+  local line="$1"
+
+  printf "%s\n" "${line}"
+  if [[ -n "${OUTPUT_FILE}" ]]; then
+    printf "%s\n" "${line}" >> "${OUTPUT_FILE}"
+  fi
 }
 
 contains_csv_value() {
@@ -43,6 +56,21 @@ contains_keyword() {
   return 1
 }
 
+is_allowed_source() {
+  local source="$1"
+
+  if [[ -z "${ALLOWED_SOURCES}" ]]; then
+    return 0
+  fi
+
+  contains_csv_value "${ALLOWED_SOURCES}" "${source}"
+}
+
+if [[ -n "${OUTPUT_FILE}" ]]; then
+  mkdir -p "$(dirname "${OUTPUT_FILE}")"
+  : > "${OUTPUT_FILE}"
+fi
+
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required to run this script."
   exit 1
@@ -54,6 +82,16 @@ if ! curl -fsS "${BASE_URL}/actuator/health" >/dev/null; then
   exit 1
 fi
 
+if [[ "${LIMIT}" -lt 1 || "${LIMIT}" -gt 100 ]]; then
+  echo "LIMIT must be between 1 and 100. actual=${LIMIT}" >&2
+  exit 1
+fi
+
+if [[ "${FETCH_LIMIT}" -lt "${LIMIT}" || "${FETCH_LIMIT}" -gt 100 ]]; then
+  echo "FETCH_LIMIT must be between LIMIT and 100. actual=${FETCH_LIMIT}, limit=${LIMIT}" >&2
+  exit 1
+fi
+
 # query|expected_roles_csv|expected_keywords_csv
 # role 또는 keyword 중 하나라도 맞으면 relevant=true로 계산한다.
 QUERIES=(
@@ -62,15 +100,17 @@ QUERIES=(
   "쿠버네티스 플랫폼|DEVOPS,SYSTEM_NETWORK|kubernetes,k8s,쿠버네티스,플랫폼,devops,인프라"
   "C++ 개발자|SOFTWARE_ENGINEER,EMBEDDED_SOFTWARE,ROBOT_SOFTWARE,GAME_CLIENT,HARDWARE_ENGINEER|c++,cplusplus,임베디드,로봇,게임,소프트웨어"
   "Node.js 백엔드|BACKEND,FULLSTACK|node,node.js,nodejs,백엔드,backend"
-  "데이터 엔지니어|DATA_ENGINEER|데이터 엔지니어,data engineer,kafka,spark,etl"
+  "데이터 엔지니어|DATA_ENGINEER,DATA_SCIENTIST,DATA_ANALYST,DEVOPS|데이터 엔지니어,data engineer,데이터 플랫폼,데이터과학,데이터 사이언티스트,데이터 분석가,kafka,spark,etl"
   "AI 엔지니어|AI_ENGINEER,ML_ENGINEER,GENERATIVE_AI,LLM,COMPUTER_VISION,AI_RESEARCHER|ai,ml,llm,머신러닝,인공지능,딥러닝"
   "보안 엔지니어|SECURITY,SYSTEM_NETWORK|보안,security,network,네트워크"
 )
 
-printf "query,rank,id,title,company_name,role,score,relevant\n"
+emit "run_label,query,rank,id,source,title,company_name,role,score,relevant"
 
 total_hits=0
 total_relevant=0
+filtered_out=0
+short_query_count=0
 
 for query_config in "${QUERIES[@]}"; do
   IFS='|' read -r query expected_roles expected_keywords <<< "${query_config}"
@@ -78,7 +118,7 @@ for query_config in "${QUERIES[@]}"; do
   response="$(
     curl -sS -G "${BASE_URL}/jobs/search" \
       --data-urlencode "keyword=${query}" \
-      --data-urlencode "limit=${LIMIT}"
+      --data-urlencode "limit=${FETCH_LIMIT}"
   )"
 
   success="$(echo "${response}" | jq -r '.success')"
@@ -88,10 +128,15 @@ for query_config in "${QUERIES[@]}"; do
   fi
 
   row_count="$(echo "${response}" | jq '.data | length')"
+  emitted_rank=0
 
   for (( index = 0; index < row_count; index++ )); do
-    rank=$((index + 1))
+    if [[ "${emitted_rank}" -ge "${LIMIT}" ]]; then
+      break
+    fi
+
     id="$(echo "${response}" | jq -r ".data[${index}].id")"
+    source="$(echo "${response}" | jq -r ".data[${index}].source // \"\"")"
     title="$(echo "${response}" | jq -r ".data[${index}].title")"
     company_name="$(echo "${response}" | jq -r ".data[${index}].companyName")"
     role="$(echo "${response}" | jq -r ".data[${index}].role")"
@@ -99,6 +144,12 @@ for query_config in "${QUERIES[@]}"; do
     location_city="$(echo "${response}" | jq -r ".data[${index}].locationCity // \"\"")"
     score="$(echo "${response}" | jq -r ".data[${index}].score")"
 
+    if ! is_allowed_source "${source}"; then
+      filtered_out=$((filtered_out + 1))
+      continue
+    fi
+
+    emitted_rank=$((emitted_rank + 1))
     haystack="${title} ${company_name} ${location_region} ${location_city}"
     relevant="false"
 
@@ -109,16 +160,12 @@ for query_config in "${QUERIES[@]}"; do
 
     total_hits=$((total_hits + 1))
 
-    printf "%s,%s,%s,%s,%s,%s,%s,%s\n" \
-      "$(csv_escape "${query}")" \
-      "${rank}" \
-      "${id}" \
-      "$(csv_escape "${title}")" \
-      "$(csv_escape "${company_name}")" \
-      "${role}" \
-      "${score}" \
-      "${relevant}"
+    emit "$(csv_escape "${RUN_LABEL}"),$(csv_escape "${query}"),${emitted_rank},${id},${source},$(csv_escape "${title}"),$(csv_escape "${company_name}"),${role},${score},${relevant}"
   done
+
+  if [[ "${emitted_rank}" -lt "${LIMIT}" ]]; then
+    short_query_count=$((short_query_count + 1))
+  fi
 done
 
 if [[ "${total_hits}" -eq 0 ]]; then
@@ -127,6 +174,6 @@ else
   precision="$(awk -v relevant="${total_relevant}" -v total="${total_hits}" 'BEGIN { printf "%.4f", relevant / total }')"
 fi
 
-echo
-echo "summary,total_hits,total_relevant,precision_at_${LIMIT}"
-echo "summary,${total_hits},${total_relevant},${precision}"
+emit ""
+emit "summary,run_label,total_hits,total_relevant,precision_at_${LIMIT},filtered_out,short_query_count,allowed_sources,fetch_limit"
+emit "summary,$(csv_escape "${RUN_LABEL}"),${total_hits},${total_relevant},${precision},${filtered_out},${short_query_count},$(csv_escape "${ALLOWED_SOURCES:-ALL}"),${FETCH_LIMIT}"

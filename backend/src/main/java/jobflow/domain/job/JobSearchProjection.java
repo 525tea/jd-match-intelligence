@@ -6,6 +6,8 @@ public interface JobSearchProjection {
 
     Long getId();
 
+    String getSource();
+
     String getTitle();
 
     String getCompanyName();

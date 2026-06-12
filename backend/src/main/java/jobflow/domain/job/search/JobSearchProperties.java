@@ -7,6 +7,7 @@ public record JobSearchProperties(
         String url,
         String indexName,
         String physicalIndexName,
-        boolean initializeOnStartup
+        boolean initializeOnStartup,
+        boolean queryExpansionEnabled
 ) {
 }

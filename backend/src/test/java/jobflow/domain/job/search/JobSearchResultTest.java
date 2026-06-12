@@ -19,7 +19,7 @@ class JobSearchResultTest {
     void fromDocument() {
         JobSearchDocument document = new JobSearchDocument(
                 "1",
-                "ZIGHANG",
+                "JUMPIT",
                 "job-1",
                 "jobflow|backend developer|seoul",
                 "백엔드 개발자",
@@ -42,6 +42,7 @@ class JobSearchResultTest {
         JobSearchResult result = JobSearchResult.fromDocument(document, 3.5);
 
         assertThat(result.id()).isEqualTo(1L);
+        assertThat(result.source()).isEqualTo("JUMPIT");
         assertThat(result.title()).isEqualTo("백엔드 개발자");
         assertThat(result.companyName()).isEqualTo("JobFlow");
         assertThat(result.role()).isEqualTo(JobRole.BACKEND);
@@ -59,6 +60,7 @@ class JobSearchResultTest {
     void toResponse() {
         JobSearchResult result = new JobSearchResult(
                 1L,
+                "WANTED",
                 "백엔드 개발자",
                 "JobFlow",
                 JobRole.BACKEND,
@@ -75,6 +77,7 @@ class JobSearchResultTest {
         JobSearchResponse response = result.toResponse();
 
         assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.source()).isEqualTo("WANTED");
         assertThat(response.title()).isEqualTo("백엔드 개발자");
         assertThat(response.companyName()).isEqualTo("JobFlow");
         assertThat(response.score()).isEqualTo(3.5);

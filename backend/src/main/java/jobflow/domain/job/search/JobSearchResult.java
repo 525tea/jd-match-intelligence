@@ -11,6 +11,7 @@ import jobflow.domain.job.dto.JobSearchResponse;
 
 public record JobSearchResult(
         Long id,
+        String source,
         String title,
         String companyName,
         JobRole role,
@@ -27,6 +28,7 @@ public record JobSearchResult(
     public static JobSearchResult fromProjection(JobSearchProjection projection) {
         return new JobSearchResult(
                 projection.getId(),
+                projection.getSource(),
                 projection.getTitle(),
                 projection.getCompanyName(),
                 JobRole.valueOf(projection.getRole()),
@@ -44,6 +46,7 @@ public record JobSearchResult(
     public static JobSearchResult fromDocument(JobSearchDocument document, Double score) {
         return new JobSearchResult(
                 Long.valueOf(document.id()),
+                document.source(),
                 document.title(),
                 document.companyName(),
                 JobRole.valueOf(document.role()),
@@ -61,6 +64,7 @@ public record JobSearchResult(
     public JobSearchResponse toResponse() {
         return new JobSearchResponse(
                 id,
+                source,
                 title,
                 companyName,
                 role,

@@ -33,7 +33,8 @@ class JobSearchIndexServiceTest {
             "http://localhost:9200",
             "jobflow-jobs",
             "jobflow-jobs-v1",
-            false
+            false,
+            true
     );
 
     private final JobSearchIndexDefinition jobSearchIndexDefinition = new JobSearchIndexDefinition();
