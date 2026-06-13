@@ -10,6 +10,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.Objects;
 import jobflow.domain.skill.ExperienceTagCode;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -38,4 +39,18 @@ public class UserProjectExperienceTag {
 
     @Column(length = 500)
     private String evidence;
+
+    public static UserProjectExperienceTag create(
+            UserProjectAnalysis analysis,
+            ExperienceTagCode tagCode,
+            BigDecimal confidence,
+            String evidence
+    ) {
+        UserProjectExperienceTag projectExperienceTag = new UserProjectExperienceTag();
+        projectExperienceTag.analysis = Objects.requireNonNull(analysis, "analysis must not be null");
+        projectExperienceTag.tagCode = Objects.requireNonNull(tagCode, "tagCode must not be null");
+        projectExperienceTag.confidence = confidence;
+        projectExperienceTag.evidence = evidence;
+        return projectExperienceTag;
+    }
 }
