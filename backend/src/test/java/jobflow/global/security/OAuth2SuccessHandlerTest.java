@@ -16,6 +16,9 @@ import java.util.Set;
 import jobflow.domain.auth.OAuth2AuthService;
 import jobflow.domain.auth.oauth.code.OAuth2AuthorizationCode;
 import jobflow.domain.auth.oauth.code.OAuth2AuthorizationCodeStore;
+import jobflow.domain.auth.oauth.OAuth2UserEmailResolver;
+import jobflow.domain.auth.oauth.OAuth2UserInfo;
+import jobflow.domain.auth.oauth.ResolvedOAuth2UserInfo;
 import jobflow.domain.auth.oauth.token.OAuth2ProviderTokenCommand;
 import jobflow.domain.auth.oauth.token.OAuth2ProviderTokenService;
 import jobflow.domain.user.AuthProvider;
@@ -62,6 +65,9 @@ class OAuth2SuccessHandlerTest {
     private OAuth2ProviderTokenService providerTokenService;
 
     @Mock
+    private OAuth2UserEmailResolver userEmailResolver;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -76,7 +82,8 @@ class OAuth2SuccessHandlerTest {
                 authorizationCodeStore,
                 oAuth2Properties,
                 authorizedClientServiceProvider,
-                providerTokenService
+                providerTokenService,
+                userEmailResolver
         );
     }
 
@@ -98,6 +105,8 @@ class OAuth2SuccessHandlerTest {
         given(authorizedClientServiceProvider.getIfAvailable()).willReturn(authorizedClientService);
         given(authorizedClientService.loadAuthorizedClient("github", authentication.getName()))
                 .willReturn(authorizedClient);
+        given(userEmailResolver.resolve(any(), any()))
+                .willAnswer(invocation -> invocation.getArgument(0));
         given(authorizationCodeStore.save(1L))
                 .willReturn(new OAuth2AuthorizationCode(
                         "oauth2-authorization-code",
@@ -123,24 +132,60 @@ class OAuth2SuccessHandlerTest {
         assertThat(command.issuedAt()).isEqualTo(LocalDateTime.of(2026, 6, 12, 10, 0));
         assertThat(command.expiresAt()).isEqualTo(LocalDateTime.of(2026, 6, 12, 11, 0));
 
+        verify(userEmailResolver).resolve(any(), any());
         verify(authorizationCodeStore).save(1L);
         verify(response).sendRedirect("http://localhost:3000/oauth2/success?code=oauth2-authorization-code");
     }
 
     @Test
-    @DisplayName("authorized client가 없으면 provider token 저장을 조용히 건너뛰지 않는다")
-    void onAuthenticationSuccessWithoutAuthorizedClient() {
+    @DisplayName("GitHub profile email이 비공개이면 email resolver로 보정한 뒤 사용자를 생성한다")
+    void onAuthenticationSuccessWithPrivateGitHubEmail() throws Exception {
         User user = User.oauth2(
-                "octocat@example.com",
+                "primary@example.com",
                 "octocat",
                 AuthProvider.GITHUB,
                 "12345"
         );
         ReflectionTestUtils.setField(user, "id", 1L);
 
+        OAuth2AuthenticationToken authentication = githubAuthenticationWithPrivateEmail();
+        OAuth2AuthorizedClient authorizedClient = githubAuthorizedClient();
+
+        given(authorizedClientServiceProvider.getIfAvailable()).willReturn(authorizedClientService);
+        given(authorizedClientService.loadAuthorizedClient("github", authentication.getName()))
+                .willReturn(authorizedClient);
+        given(userEmailResolver.resolve(any(), any()))
+                .willReturn(new ResolvedOAuth2UserInfo(
+                        AuthProvider.GITHUB,
+                        "12345",
+                        "primary@example.com",
+                        "octocat"
+                ));
+        given(oAuth2AuthService.findOrCreateUser(any())).willReturn(user);
+        given(authorizationCodeStore.save(1L))
+                .willReturn(new OAuth2AuthorizationCode(
+                        "oauth2-authorization-code",
+                        1L,
+                        Instant.parse("2026-06-12T10:05:00Z")
+                ));
+        given(oAuth2Properties.successRedirectUri())
+                .willReturn("http://localhost:3000/oauth2/success");
+
+        successHandler.onAuthenticationSuccess(request, response, authentication);
+
+        ArgumentCaptor<OAuth2UserInfo> userInfoCaptor = ArgumentCaptor.forClass(OAuth2UserInfo.class);
+
+        verify(oAuth2AuthService).findOrCreateUser(userInfoCaptor.capture());
+        assertThat(userInfoCaptor.getValue().getEmail()).isEqualTo("primary@example.com");
+        verify(providerTokenService).saveOrReplace(any());
+        verify(response).sendRedirect("http://localhost:3000/oauth2/success?code=oauth2-authorization-code");
+    }
+
+    @Test
+    @DisplayName("authorized client가 없으면 provider token 저장을 조용히 건너뛰지 않는다")
+    void onAuthenticationSuccessWithoutAuthorizedClient() {
         OAuth2AuthenticationToken authentication = githubAuthentication();
 
-        given(oAuth2AuthService.findOrCreateUser(any())).willReturn(user);
         given(authorizedClientServiceProvider.getIfAvailable()).willReturn(authorizedClientService);
         given(authorizedClientService.loadAuthorizedClient("github", authentication.getName()))
                 .willReturn(null);
@@ -154,15 +199,6 @@ class OAuth2SuccessHandlerTest {
     @Test
     @DisplayName("authorized client service가 없으면 provider token 저장을 조용히 건너뛰지 않는다")
     void onAuthenticationSuccessWithoutAuthorizedClientService() {
-        User user = User.oauth2(
-                "octocat@example.com",
-                "octocat",
-                AuthProvider.GITHUB,
-                "12345"
-        );
-        ReflectionTestUtils.setField(user, "id", 1L);
-
-        given(oAuth2AuthService.findOrCreateUser(any())).willReturn(user);
         given(authorizedClientServiceProvider.getIfAvailable()).willReturn(null);
 
         assertThatThrownBy(() -> successHandler.onAuthenticationSuccess(request, response, githubAuthentication()))
@@ -179,6 +215,24 @@ class OAuth2SuccessHandlerTest {
                         "login", "octocat",
                         "name", "octocat",
                         "email", "octocat@example.com"
+                ),
+                "id"
+        );
+
+        return new OAuth2AuthenticationToken(
+                principal,
+                principal.getAuthorities(),
+                "github"
+        );
+    }
+
+    private OAuth2AuthenticationToken githubAuthenticationWithPrivateEmail() {
+        DefaultOAuth2User principal = new DefaultOAuth2User(
+                List.of(new SimpleGrantedAuthority("ROLE_USER")),
+                Map.of(
+                        "id", 12345,
+                        "login", "octocat",
+                        "name", "octocat"
                 ),
                 "id"
         );
