@@ -7,7 +7,19 @@ public interface RepositoryFileClient {
 
     Optional<RepositoryFile> findFile(RepositoryRef repositoryRef, String path);
 
+    default Optional<RepositoryFile> findFile(Long userId, RepositoryRef repositoryRef, String path) {
+        return findFile(repositoryRef, path);
+    }
+
     default List<RepositoryFile> findFiles(
+            RepositoryRef repositoryRef,
+            List<String> paths
+    ) {
+        return findFiles(null, repositoryRef, paths);
+    }
+
+    default List<RepositoryFile> findFiles(
+            Long userId,
             RepositoryRef repositoryRef,
             List<String> paths
     ) {
@@ -16,7 +28,7 @@ public interface RepositoryFileClient {
         }
 
         return paths.stream()
-                .map(path -> findFile(repositoryRef, path))
+                .map(path -> findFile(userId, repositoryRef, path))
                 .flatMap(Optional::stream)
                 .toList();
     }

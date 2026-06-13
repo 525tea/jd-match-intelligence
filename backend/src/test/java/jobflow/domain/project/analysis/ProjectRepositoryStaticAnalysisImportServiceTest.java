@@ -145,11 +145,11 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
         );
         given(userProjectRepository.findByIdAndUserId(userProjectId, userId))
                 .willReturn(Optional.of(userProject));
-        given(projectBuildFileAnalysisService.analyze(repositoryRef))
+        given(projectBuildFileAnalysisService.analyze(userId, repositoryRef))
                 .willReturn(buildFileAnalysis);
-        given(projectInfraFileAnalysisService.analyze(repositoryRef))
+        given(projectInfraFileAnalysisService.analyze(userId, repositoryRef))
                 .willReturn(infraFileAnalysis);
-        given(projectWorkflowFileAnalysisService.analyze(repositoryRef))
+        given(projectWorkflowFileAnalysisService.analyze(userId, repositoryRef))
                 .willReturn(workflowFileAnalysis);
         given(skillRepository.findByNameIn(ArgumentMatchers.<Collection<String>>any()))
                 .willReturn(List.of(java, springBoot));

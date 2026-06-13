@@ -52,10 +52,22 @@ public class ProjectWorkflowFileAnalysisService {
     }
 
     public ProjectWorkflowFileAnalysisResult analyze(RepositoryRef repositoryRef) {
-        return analyze(repositoryRef, DEFAULT_WORKFLOW_FILE_PATHS);
+        return analyze(null, repositoryRef, DEFAULT_WORKFLOW_FILE_PATHS);
+    }
+
+    public ProjectWorkflowFileAnalysisResult analyze(Long userId, RepositoryRef repositoryRef) {
+        return analyze(userId, repositoryRef, DEFAULT_WORKFLOW_FILE_PATHS);
     }
 
     public ProjectWorkflowFileAnalysisResult analyze(
+            RepositoryRef repositoryRef,
+            List<String> candidatePaths
+    ) {
+        return analyze(null, repositoryRef, candidatePaths);
+    }
+
+    public ProjectWorkflowFileAnalysisResult analyze(
+            Long userId,
             RepositoryRef repositoryRef,
             List<String> candidatePaths
     ) {
@@ -66,7 +78,7 @@ public class ProjectWorkflowFileAnalysisService {
             return ProjectWorkflowFileAnalysisResult.empty(repositoryRef, 0);
         }
 
-        List<RepositoryWorkflowFile> workflowFiles = repositoryFileClient.findFiles(repositoryRef, candidatePaths)
+        List<RepositoryWorkflowFile> workflowFiles = repositoryFileClient.findFiles(userId, repositoryRef, candidatePaths)
                 .stream()
                 .map(repositoryFile -> RepositoryWorkflowFile.fromPath(repositoryFile.path(), repositoryFile.content()))
                 .filter(RepositoryWorkflowFile::isSupported)

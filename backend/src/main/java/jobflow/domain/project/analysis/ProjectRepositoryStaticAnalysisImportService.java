@@ -82,9 +82,9 @@ public class ProjectRepositoryStaticAnalysisImportService {
         UserProject userProject = userProjectRepository.findByIdAndUserId(userProjectId, userId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorCode.USER_PROJECT_NOT_FOUND));
 
-        ProjectBuildFileAnalysisResult buildFileAnalysis = projectBuildFileAnalysisService.analyze(repositoryRef);
-        ProjectInfraFileAnalysisResult infraFileAnalysis = projectInfraFileAnalysisService.analyze(repositoryRef);
-        ProjectWorkflowFileAnalysisResult workflowFileAnalysis = projectWorkflowFileAnalysisService.analyze(repositoryRef);
+        ProjectBuildFileAnalysisResult buildFileAnalysis = projectBuildFileAnalysisService.analyze(userId, repositoryRef);
+        ProjectInfraFileAnalysisResult infraFileAnalysis = projectInfraFileAnalysisService.analyze(userId, repositoryRef);
+        ProjectWorkflowFileAnalysisResult workflowFileAnalysis = projectWorkflowFileAnalysisService.analyze(userId, repositoryRef);
 
         Map<String, BuildFileSkillCandidate> skillCandidatesByName =
                 skillCandidatesByName(buildFileAnalysis.skillCandidates());

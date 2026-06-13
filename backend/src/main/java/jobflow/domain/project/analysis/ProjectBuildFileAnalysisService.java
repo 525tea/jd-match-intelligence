@@ -41,10 +41,22 @@ public class ProjectBuildFileAnalysisService {
     }
 
     public ProjectBuildFileAnalysisResult analyze(RepositoryRef repositoryRef) {
-        return analyze(repositoryRef, DEFAULT_BUILD_FILE_PATHS);
+        return analyze(null, repositoryRef, DEFAULT_BUILD_FILE_PATHS);
+    }
+
+    public ProjectBuildFileAnalysisResult analyze(Long userId, RepositoryRef repositoryRef) {
+        return analyze(userId, repositoryRef, DEFAULT_BUILD_FILE_PATHS);
     }
 
     public ProjectBuildFileAnalysisResult analyze(
+            RepositoryRef repositoryRef,
+            List<String> candidatePaths
+    ) {
+        return analyze(null, repositoryRef, candidatePaths);
+    }
+
+    public ProjectBuildFileAnalysisResult analyze(
+            Long userId,
             RepositoryRef repositoryRef,
             List<String> candidatePaths
     ) {
@@ -55,7 +67,7 @@ public class ProjectBuildFileAnalysisService {
             return ProjectBuildFileAnalysisResult.empty(repositoryRef, 0);
         }
 
-        List<RepositoryFile> repositoryFiles = repositoryFileClient.findFiles(repositoryRef, candidatePaths);
+        List<RepositoryFile> repositoryFiles = repositoryFileClient.findFiles(userId, repositoryRef, candidatePaths);
         List<RepositoryBuildFile> buildFiles = repositoryFiles.stream()
                 .map(RepositoryFile::toBuildFile)
                 .filter(buildFile -> buildFile.type() != BuildFileType.UNKNOWN)
