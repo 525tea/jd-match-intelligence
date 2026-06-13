@@ -12,6 +12,13 @@ public interface UserProjectAnalysisRepository extends JpaRepository<UserProject
             Long userId
     );
 
+    Optional<UserProjectAnalysis>
+            findFirstByUserProjectIdAndUserProjectUserIdAndModelVersionOrderByAnalyzedAtDescIdDesc(
+                    Long userProjectId,
+                    Long userId,
+                    String modelVersion
+            );
+
     @Query("""
             SELECT COALESCE(MAX(analysis.analysisVersion), 0)
             FROM UserProjectAnalysis analysis

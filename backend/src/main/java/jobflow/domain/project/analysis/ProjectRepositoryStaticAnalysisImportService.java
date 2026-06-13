@@ -90,6 +90,15 @@ public class ProjectRepositoryStaticAnalysisImportService {
                 skillCandidatesByName(buildFileAnalysis.skillCandidates());
         Map<String, InfraExperienceTagCandidate> tagCandidatesByCode =
                 tagCandidatesByCode(infraFileAnalysis.experienceTagCandidates(), workflowFileAnalysis.experienceTagCandidates());
+        String sourceHash = sourceHash(buildFileAnalysis, infraFileAnalysis, workflowFileAnalysis);
+        UserProjectAnalysis latestAnalysis = latestAnalysis(userId, userProjectId);
+        if (latestAnalysis != null && sourceHash.equals(latestAnalysis.getSourceHash())) {
+            return ProjectRepositoryStaticAnalysisImportResult.skipped(
+                    latestAnalysis.getId(),
+                    latestAnalysis.getAnalysisVersion()
+            );
+        }
+
         Map<String, Skill> skillsByName = skillsByName(skillCandidatesByName.keySet());
         Map<String, ExperienceTagCode> tagCodesByCode = tagCodesByCode(tagCandidatesByCode.keySet());
 
@@ -97,7 +106,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
         UserProjectAnalysis analysis = UserProjectAnalysis.create(
                 userProject,
                 nextVersion,
-                sourceHash(buildFileAnalysis, infraFileAnalysis, workflowFileAnalysis),
+                sourceHash,
                 repositoryRef.ref(),
                 MODEL_VERSION,
                 rawAnalysis(buildFileAnalysis, infraFileAnalysis, workflowFileAnalysis),
@@ -134,6 +143,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
         return new ProjectRepositoryStaticAnalysisImportResult(
                 savedAnalysis.getId(),
                 nextVersion,
+                false,
                 skillCandidatesByName.size(),
                 projectSkills.size(),
                 savedSkillNames(projectSkills),
@@ -143,6 +153,19 @@ public class ProjectRepositoryStaticAnalysisImportService {
                 savedTagCodes(projectExperienceTags),
                 unmappedTagCodes(tagCandidatesByCode.keySet(), tagCodesByCode)
         );
+    }
+
+    private UserProjectAnalysis latestAnalysis(
+            Long userId,
+            Long userProjectId
+    ) {
+        return userProjectAnalysisRepository
+                .findFirstByUserProjectIdAndUserProjectUserIdAndModelVersionOrderByAnalyzedAtDescIdDesc(
+                        userProjectId,
+                        userId,
+                        MODEL_VERSION
+                )
+                .orElse(null);
     }
 
     private Map<String, BuildFileSkillCandidate> skillCandidatesByName(
