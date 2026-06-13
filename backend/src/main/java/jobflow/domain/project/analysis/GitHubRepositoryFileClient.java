@@ -8,6 +8,7 @@ import jobflow.domain.auth.oauth.token.OAuth2ProviderTokenService;
 import jobflow.domain.user.AuthProvider;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.BusinessException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +29,7 @@ public class GitHubRepositoryFileClient implements RepositoryFileClient {
     private final OAuth2ProviderTokenService providerTokenService;
     private final RestClient restClient;
 
+    @Autowired
     public GitHubRepositoryFileClient(OAuth2ProviderTokenService providerTokenService) {
         this(
                 providerTokenService,
