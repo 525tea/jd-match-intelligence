@@ -52,10 +52,22 @@ public class ProjectInfraFileAnalysisService {
     }
 
     public ProjectInfraFileAnalysisResult analyze(RepositoryRef repositoryRef) {
-        return analyze(repositoryRef, DEFAULT_INFRA_FILE_PATHS);
+        return analyze(null, repositoryRef, DEFAULT_INFRA_FILE_PATHS);
+    }
+
+    public ProjectInfraFileAnalysisResult analyze(Long userId, RepositoryRef repositoryRef) {
+        return analyze(userId, repositoryRef, DEFAULT_INFRA_FILE_PATHS);
     }
 
     public ProjectInfraFileAnalysisResult analyze(
+            RepositoryRef repositoryRef,
+            List<String> candidatePaths
+    ) {
+        return analyze(null, repositoryRef, candidatePaths);
+    }
+
+    public ProjectInfraFileAnalysisResult analyze(
+            Long userId,
             RepositoryRef repositoryRef,
             List<String> candidatePaths
     ) {
@@ -66,7 +78,7 @@ public class ProjectInfraFileAnalysisService {
             return ProjectInfraFileAnalysisResult.empty(repositoryRef, 0);
         }
 
-        List<RepositoryFile> repositoryFiles = repositoryFileClient.findFiles(repositoryRef, candidatePaths);
+        List<RepositoryFile> repositoryFiles = repositoryFileClient.findFiles(userId, repositoryRef, candidatePaths);
         List<RepositoryInfraFile> infraFiles = repositoryFiles.stream()
                 .map(repositoryFile -> RepositoryInfraFile.fromPath(repositoryFile.path(), repositoryFile.content()))
                 .filter(infraFile -> infraFile.type() != InfraFileType.UNKNOWN)

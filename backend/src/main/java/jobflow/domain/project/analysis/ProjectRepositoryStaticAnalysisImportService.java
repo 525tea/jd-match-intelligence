@@ -46,6 +46,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
     private final ExperienceTagCodeRepository experienceTagCodeRepository;
     private final ProjectBuildFileAnalysisService projectBuildFileAnalysisService;
     private final ProjectInfraFileAnalysisService projectInfraFileAnalysisService;
+    private final ProjectWorkflowFileAnalysisService projectWorkflowFileAnalysisService;
 
     public ProjectRepositoryStaticAnalysisImportService(
             UserProjectRepository userProjectRepository,
@@ -55,7 +56,8 @@ public class ProjectRepositoryStaticAnalysisImportService {
             SkillRepository skillRepository,
             ExperienceTagCodeRepository experienceTagCodeRepository,
             ProjectBuildFileAnalysisService projectBuildFileAnalysisService,
-            ProjectInfraFileAnalysisService projectInfraFileAnalysisService
+            ProjectInfraFileAnalysisService projectInfraFileAnalysisService,
+            ProjectWorkflowFileAnalysisService projectWorkflowFileAnalysisService
     ) {
         this.userProjectRepository = userProjectRepository;
         this.userProjectAnalysisRepository = userProjectAnalysisRepository;
@@ -65,6 +67,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
         this.experienceTagCodeRepository = experienceTagCodeRepository;
         this.projectBuildFileAnalysisService = projectBuildFileAnalysisService;
         this.projectInfraFileAnalysisService = projectInfraFileAnalysisService;
+        this.projectWorkflowFileAnalysisService = projectWorkflowFileAnalysisService;
     }
 
     public ProjectRepositoryStaticAnalysisImportResult importRepositoryStaticAnalysis(
@@ -79,13 +82,23 @@ public class ProjectRepositoryStaticAnalysisImportService {
         UserProject userProject = userProjectRepository.findByIdAndUserId(userProjectId, userId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorCode.USER_PROJECT_NOT_FOUND));
 
-        ProjectBuildFileAnalysisResult buildFileAnalysis = projectBuildFileAnalysisService.analyze(repositoryRef);
-        ProjectInfraFileAnalysisResult infraFileAnalysis = projectInfraFileAnalysisService.analyze(repositoryRef);
+        ProjectBuildFileAnalysisResult buildFileAnalysis = projectBuildFileAnalysisService.analyze(userId, repositoryRef);
+        ProjectInfraFileAnalysisResult infraFileAnalysis = projectInfraFileAnalysisService.analyze(userId, repositoryRef);
+        ProjectWorkflowFileAnalysisResult workflowFileAnalysis = projectWorkflowFileAnalysisService.analyze(userId, repositoryRef);
 
         Map<String, BuildFileSkillCandidate> skillCandidatesByName =
                 skillCandidatesByName(buildFileAnalysis.skillCandidates());
         Map<String, InfraExperienceTagCandidate> tagCandidatesByCode =
-                tagCandidatesByCode(infraFileAnalysis.experienceTagCandidates());
+                tagCandidatesByCode(infraFileAnalysis.experienceTagCandidates(), workflowFileAnalysis.experienceTagCandidates());
+        String sourceHash = sourceHash(buildFileAnalysis, infraFileAnalysis, workflowFileAnalysis);
+        UserProjectAnalysis latestAnalysis = latestAnalysis(userId, userProjectId);
+        if (latestAnalysis != null && sourceHash.equals(latestAnalysis.getSourceHash())) {
+            return ProjectRepositoryStaticAnalysisImportResult.skipped(
+                    latestAnalysis.getId(),
+                    latestAnalysis.getAnalysisVersion()
+            );
+        }
+
         Map<String, Skill> skillsByName = skillsByName(skillCandidatesByName.keySet());
         Map<String, ExperienceTagCode> tagCodesByCode = tagCodesByCode(tagCandidatesByCode.keySet());
 
@@ -93,10 +106,10 @@ public class ProjectRepositoryStaticAnalysisImportService {
         UserProjectAnalysis analysis = UserProjectAnalysis.create(
                 userProject,
                 nextVersion,
-                sourceHash(buildFileAnalysis, infraFileAnalysis),
+                sourceHash,
                 repositoryRef.ref(),
                 MODEL_VERSION,
-                rawAnalysis(buildFileAnalysis, infraFileAnalysis),
+                rawAnalysis(buildFileAnalysis, infraFileAnalysis, workflowFileAnalysis),
                 averageConfidence(skillCandidatesByName, tagCandidatesByCode),
                 LocalDateTime.now()
         );
@@ -130,6 +143,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
         return new ProjectRepositoryStaticAnalysisImportResult(
                 savedAnalysis.getId(),
                 nextVersion,
+                false,
                 skillCandidatesByName.size(),
                 projectSkills.size(),
                 savedSkillNames(projectSkills),
@@ -139,6 +153,19 @@ public class ProjectRepositoryStaticAnalysisImportService {
                 savedTagCodes(projectExperienceTags),
                 unmappedTagCodes(tagCandidatesByCode.keySet(), tagCodesByCode)
         );
+    }
+
+    private UserProjectAnalysis latestAnalysis(
+            Long userId,
+            Long userProjectId
+    ) {
+        return userProjectAnalysisRepository
+                .findFirstByUserProjectIdAndUserProjectUserIdAndModelVersionOrderByAnalyzedAtDescIdDesc(
+                        userProjectId,
+                        userId,
+                        MODEL_VERSION
+                )
+                .orElse(null);
     }
 
     private Map<String, BuildFileSkillCandidate> skillCandidatesByName(
@@ -154,9 +181,18 @@ public class ProjectRepositoryStaticAnalysisImportService {
     }
 
     private Map<String, InfraExperienceTagCandidate> tagCandidatesByCode(
-            List<InfraExperienceTagCandidate> candidates
+            List<InfraExperienceTagCandidate> infraCandidates,
+            List<WorkflowExperienceTagCandidate> workflowCandidates
     ) {
-        return candidates.stream()
+        return Stream.concat(
+                        infraCandidates.stream(),
+                        workflowCandidates.stream()
+                                .map(candidate -> InfraExperienceTagCandidate.of(
+                                        candidate.tagCode(),
+                                        candidate.confidence().doubleValue(),
+                                        candidate.evidence()
+                                ))
+                )
                 .collect(Collectors.toMap(
                         InfraExperienceTagCandidate::tagCode,
                         Function.identity(),
@@ -207,20 +243,27 @@ public class ProjectRepositoryStaticAnalysisImportService {
 
     private String sourceHash(
             ProjectBuildFileAnalysisResult buildFileAnalysis,
-            ProjectInfraFileAnalysisResult infraFileAnalysis
+            ProjectInfraFileAnalysisResult infraFileAnalysis,
+            ProjectWorkflowFileAnalysisResult workflowFileAnalysis
     ) {
         String source = buildFileAnalysis.repositoryRef().fullName()
                 + ":" + buildFileAnalysis.repositoryRef().ref()
                 + ":build=" + String.join(",", buildFileAnalysis.analyzedPaths())
                 + ":infra=" + String.join(",", infraFileAnalysis.analyzedPaths())
+                + ":workflow=" + String.join(",", workflowFileAnalysis.analyzedPaths())
                 + ":skills=" + buildFileAnalysis.skillCandidates()
                 .stream()
                 .sorted(Comparator.comparing(BuildFileSkillCandidate::skillName))
                 .map(candidate -> candidate.skillName() + "=" + candidate.evidence())
                 .collect(Collectors.joining("|"))
-                + ":tags=" + infraFileAnalysis.experienceTagCandidates()
+                + ":infraTags=" + infraFileAnalysis.experienceTagCandidates()
                 .stream()
                 .sorted(Comparator.comparing(InfraExperienceTagCandidate::tagCode))
+                .map(candidate -> candidate.tagCode() + "=" + candidate.evidence())
+                .collect(Collectors.joining("|"))
+                + ":workflowTags=" + workflowFileAnalysis.experienceTagCandidates()
+                .stream()
+                .sorted(Comparator.comparing(WorkflowExperienceTagCandidate::tagCode))
                 .map(candidate -> candidate.tagCode() + "=" + candidate.evidence())
                 .collect(Collectors.joining("|"));
 
@@ -239,10 +282,12 @@ public class ProjectRepositoryStaticAnalysisImportService {
 
     private String rawAnalysis(
             ProjectBuildFileAnalysisResult buildFileAnalysis,
-            ProjectInfraFileAnalysisResult infraFileAnalysis
+            ProjectInfraFileAnalysisResult infraFileAnalysis,
+            ProjectWorkflowFileAnalysisResult workflowFileAnalysis
     ) {
         String buildPaths = toJsonStringArray(buildFileAnalysis.analyzedPaths());
         String infraPaths = toJsonStringArray(infraFileAnalysis.analyzedPaths());
+        String workflowPaths = toJsonStringArray(workflowFileAnalysis.analyzedPaths());
         String skills = buildFileAnalysis.skillCandidates()
                 .stream()
                 .map(candidate -> "{\"skillName\":\"" + escape(candidate.skillName())
@@ -250,6 +295,12 @@ public class ProjectRepositoryStaticAnalysisImportService {
                         + ",\"evidence\":\"" + escape(candidate.evidence()) + "\"}")
                 .collect(Collectors.joining(","));
         String tags = infraFileAnalysis.experienceTagCandidates()
+                .stream()
+                .map(candidate -> "{\"tagCode\":\"" + escape(candidate.tagCode())
+                        + "\",\"confidence\":" + candidate.confidence()
+                        + ",\"evidence\":\"" + escape(candidate.evidence()) + "\"}")
+                .collect(Collectors.joining(","));
+        String workflowTags = workflowFileAnalysis.experienceTagCandidates()
                 .stream()
                 .map(candidate -> "{\"tagCode\":\"" + escape(candidate.tagCode())
                         + "\",\"confidence\":" + candidate.confidence()
@@ -270,6 +321,12 @@ public class ProjectRepositoryStaticAnalysisImportService {
                 + "\"foundFileCount\":" + infraFileAnalysis.foundFileCount() + ","
                 + "\"analyzedPaths\":[" + infraPaths + "],"
                 + "\"experienceTagCandidates\":[" + tags + "]"
+                + "},"
+                + "\"workflowFileAnalysis\":{"
+                + "\"requestedFileCount\":" + workflowFileAnalysis.requestedFileCount() + ","
+                + "\"foundFileCount\":" + workflowFileAnalysis.foundFileCount() + ","
+                + "\"analyzedPaths\":[" + workflowPaths + "],"
+                + "\"experienceTagCandidates\":[" + workflowTags + "]"
                 + "}"
                 + "}";
     }
