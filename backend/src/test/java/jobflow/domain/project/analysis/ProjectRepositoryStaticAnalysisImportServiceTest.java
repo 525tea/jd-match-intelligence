@@ -61,6 +61,9 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
     private final ProjectInfraFileAnalysisService projectInfraFileAnalysisService =
             mock(ProjectInfraFileAnalysisService.class);
 
+    private final ProjectWorkflowFileAnalysisService projectWorkflowFileAnalysisService =
+            mock(ProjectWorkflowFileAnalysisService.class);
+
     private final ProjectRepositoryStaticAnalysisImportService service =
             new ProjectRepositoryStaticAnalysisImportService(
                     userProjectRepository,
@@ -70,7 +73,8 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                     skillRepository,
                     experienceTagCodeRepository,
                     projectBuildFileAnalysisService,
-                    projectInfraFileAnalysisService
+                    projectInfraFileAnalysisService,
+                    projectWorkflowFileAnalysisService
             );
 
     @Test
@@ -78,12 +82,13 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
     void importRepositoryStaticAnalysis() {
         Long userId = 1L;
         Long userProjectId = 10L;
-        RepositoryRef repositoryRef = new RepositoryRef("525tea", "jobflow", "main");
+        RepositoryRef repositoryRef = new RepositoryRef("example-org", "sample-repo", "main");
         UserProject userProject = mock(UserProject.class);
         Skill java = Skill.create("Java", "java", SkillCategory.LANGUAGE);
         Skill springBoot = Skill.create("Spring Boot", "spring boot", SkillCategory.FRAMEWORK);
         ExperienceTagCode cloudInfra = createExperienceTagCode("CLOUD_INFRA", "클라우드/인프라");
         ExperienceTagCode monitoring = createExperienceTagCode("MONITORING", "모니터링");
+        ExperienceTagCode ciCd = createExperienceTagCode("CI_CD", "CI/CD");
         List<UserProjectSkill> savedProjectSkills = new ArrayList<>();
         List<UserProjectExperienceTag> savedProjectExperienceTags = new ArrayList<>();
         ProjectBuildFileAnalysisResult buildFileAnalysis = new ProjectBuildFileAnalysisResult(
@@ -120,16 +125,36 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                         InfraExperienceTagCandidate.of("UNKNOWN_TAG", 0.60, "unknown evidence")
                 )
         );
+        ProjectWorkflowFileAnalysisResult workflowFileAnalysis = new ProjectWorkflowFileAnalysisResult(
+                repositoryRef,
+                2,
+                1,
+                List.of(".github/workflows/backend-ci.yml"),
+                List.of(
+                        WorkflowExperienceTagCandidate.of(
+                                "CI_CD",
+                                0.95,
+                                ".github/workflows/backend-ci.yml: GitHub Actions workflow"
+                        ),
+                        WorkflowExperienceTagCandidate.of(
+                                "TESTING",
+                                0.85,
+                                ".github/workflows/backend-ci.yml: - run: ./gradlew :backend:test"
+                        )
+                )
+        );
         given(userProjectRepository.findByIdAndUserId(userProjectId, userId))
                 .willReturn(Optional.of(userProject));
         given(projectBuildFileAnalysisService.analyze(repositoryRef))
                 .willReturn(buildFileAnalysis);
         given(projectInfraFileAnalysisService.analyze(repositoryRef))
                 .willReturn(infraFileAnalysis);
+        given(projectWorkflowFileAnalysisService.analyze(repositoryRef))
+                .willReturn(workflowFileAnalysis);
         given(skillRepository.findByNameIn(ArgumentMatchers.<Collection<String>>any()))
                 .willReturn(List.of(java, springBoot));
         given(experienceTagCodeRepository.findAllById(ArgumentMatchers.<Collection<String>>any()))
-                .willReturn(List.of(cloudInfra, monitoring));
+                .willReturn(List.of(cloudInfra, monitoring, ciCd));
         given(userProjectAnalysisRepository.findMaxAnalysisVersionByUserProjectId(userProjectId))
                 .willReturn(7);
         given(userProjectAnalysisRepository.save(any(UserProjectAnalysis.class)))
@@ -160,10 +185,10 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
         assertThat(result.savedSkillCount()).isEqualTo(2);
         assertThat(result.savedSkillNames()).containsExactly("Java", "Spring Boot");
         assertThat(result.unmappedSkillNames()).containsExactly("Next.js");
-        assertThat(result.candidateTagCount()).isEqualTo(3);
-        assertThat(result.savedTagCount()).isEqualTo(2);
-        assertThat(result.savedTagCodes()).containsExactly("CLOUD_INFRA", "MONITORING");
-        assertThat(result.unmappedTagCodes()).containsExactly("UNKNOWN_TAG");
+        assertThat(result.candidateTagCount()).isEqualTo(5);
+        assertThat(result.savedTagCount()).isEqualTo(3);
+        assertThat(result.savedTagCodes()).containsExactly("CI_CD", "CLOUD_INFRA", "MONITORING");
+        assertThat(result.unmappedTagCodes()).containsExactly("TESTING", "UNKNOWN_TAG");
 
         ArgumentCaptor<UserProjectAnalysis> analysisCaptor =
                 ArgumentCaptor.forClass(UserProjectAnalysis.class);
@@ -173,9 +198,11 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
         assertThat(savedAnalysis.getSourceHash()).hasSize(64);
         assertThat(savedAnalysis.getCommitSha()).isEqualTo("main");
         assertThat(savedAnalysis.getModelVersion()).isEqualTo("repository-static-v1");
-        assertThat(savedAnalysis.getRawAnalysis()).contains("\"repository\":\"525tea/jobflow\"");
+        assertThat(savedAnalysis.getRawAnalysis()).contains("\"repository\":\"example-org/sample-repo\"");
         assertThat(savedAnalysis.getRawAnalysis()).contains("\"buildFileAnalysis\"");
         assertThat(savedAnalysis.getRawAnalysis()).contains("\"infraFileAnalysis\"");
+        assertThat(savedAnalysis.getRawAnalysis()).contains("\"workflowFileAnalysis\"");
+        assertThat(savedAnalysis.getRawAnalysis()).contains(".github/workflows/backend-ci.yml");
         assertThat(savedAnalysis.getRawAnalysis()).contains("\"skillCandidates\"");
         assertThat(savedAnalysis.getRawAnalysis()).contains("\"experienceTagCandidates\"");
 
@@ -195,7 +222,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
     void importRepositoryStaticAnalysisWithoutOwnedProject() {
         Long userId = 1L;
         Long userProjectId = 10L;
-        RepositoryRef repositoryRef = RepositoryRef.of("525tea", "jobflow");
+        RepositoryRef repositoryRef = RepositoryRef.of("example-org", "sample-repo");
         given(userProjectRepository.findByIdAndUserId(userProjectId, userId))
                 .willReturn(Optional.empty());
 
@@ -207,6 +234,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
         verifyNoInteractions(
                 projectBuildFileAnalysisService,
                 projectInfraFileAnalysisService,
+                projectWorkflowFileAnalysisService,
                 userProjectAnalysisRepository,
                 userProjectSkillRepository,
                 userProjectExperienceTagRepository,
@@ -218,7 +246,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
     @Test
     @DisplayName("사용자나 프로젝트 식별자가 없으면 USER_PROJECT_NOT_FOUND 예외를 던진다")
     void importRepositoryStaticAnalysisWithoutIdentifiers() {
-        RepositoryRef repositoryRef = RepositoryRef.of("525tea", "jobflow");
+        RepositoryRef repositoryRef = RepositoryRef.of("example-org", "sample-repo");
 
         assertThatThrownBy(() -> service.importRepositoryStaticAnalysis(null, 10L, repositoryRef))
                 .isInstanceOf(EntityNotFoundException.class)
@@ -234,6 +262,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                 userProjectRepository,
                 projectBuildFileAnalysisService,
                 projectInfraFileAnalysisService,
+                projectWorkflowFileAnalysisService,
                 userProjectAnalysisRepository,
                 userProjectSkillRepository,
                 userProjectExperienceTagRepository,
