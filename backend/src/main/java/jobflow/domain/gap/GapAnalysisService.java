@@ -5,6 +5,8 @@ import java.util.List;
 import jobflow.domain.analytics.JobSkillIndexQueryService;
 import jobflow.domain.analytics.dto.JobSkillMatchResponse;
 import jobflow.domain.gap.dto.GapAnalysisResponse;
+import jobflow.domain.gap.dto.GapJobMatchEvidenceResponse;
+import jobflow.domain.gap.dto.GapJobMatchResponse;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.project.ProjectSkillSnapshotService;
 import org.springframework.stereotype.Service;
@@ -16,13 +18,16 @@ public class GapAnalysisService {
 
     private final ProjectSkillSnapshotService projectSkillSnapshotService;
     private final JobSkillIndexQueryService jobSkillIndexQueryService;
+    private final GapAnalysisEvidenceService gapAnalysisEvidenceService;
 
     public GapAnalysisService(
             ProjectSkillSnapshotService projectSkillSnapshotService,
-            JobSkillIndexQueryService jobSkillIndexQueryService
+            JobSkillIndexQueryService jobSkillIndexQueryService,
+            GapAnalysisEvidenceService gapAnalysisEvidenceService
     ) {
         this.projectSkillSnapshotService = projectSkillSnapshotService;
         this.jobSkillIndexQueryService = jobSkillIndexQueryService;
+        this.gapAnalysisEvidenceService = gapAnalysisEvidenceService;
     }
 
     public GapAnalysisResponse analyzeProjectSkillGap(
@@ -42,6 +47,15 @@ public class GapAnalysisService {
                 limit
         );
 
-        return new GapAnalysisResponse(userProjectId, userSkillIds, jobMatches);
+        List<GapJobMatchResponse> gapJobMatches = jobMatches.stream()
+                .map(this::toGapJobMatchResponse)
+                .toList();
+
+        return new GapAnalysisResponse(userProjectId, userSkillIds, gapJobMatches);
+    }
+
+    private GapJobMatchResponse toGapJobMatchResponse(JobSkillMatchResponse matchResponse) {
+        GapJobMatchEvidenceResponse evidence = gapAnalysisEvidenceService.buildEvidence(matchResponse);
+        return GapJobMatchResponse.from(matchResponse, evidence);
     }
 }

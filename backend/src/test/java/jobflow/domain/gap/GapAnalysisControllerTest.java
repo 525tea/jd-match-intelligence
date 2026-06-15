@@ -14,6 +14,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import jobflow.domain.analytics.dto.JobSkillMatchResponse;
 import jobflow.domain.gap.dto.GapAnalysisResponse;
+import jobflow.domain.gap.dto.GapJobMatchEvidenceResponse;
+import jobflow.domain.gap.dto.GapJobMatchResponse;
+import jobflow.domain.gap.dto.GapLearningConnectionResponse;
+import jobflow.domain.gap.dto.GapRelatedTagEvidenceResponse;
+import jobflow.domain.gap.dto.GapSkillCooccurrenceEvidenceResponse;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.JobRole;
 import jobflow.global.error.ErrorCode;
@@ -59,7 +64,7 @@ class GapAnalysisControllerTest {
     }
 
     @Test
-    @DisplayName("프로젝트 갭 분석 조회 성공 시 200 ApiResponse를 반환한다")
+    @DisplayName("프로젝트 갭 분석 조회 성공 시 evidence를 포함한 200 ApiResponse를 반환한다")
     void analyzeProjectSkillGap() throws Exception {
         setAuthentication();
         GapAnalysisResponse response = gapAnalysisResponse();
@@ -94,7 +99,19 @@ class GapAnalysisControllerTest {
                 .andExpect(jsonPath("$.data.jobMatches[0].matchedPreferredSkills", hasSize(1)))
                 .andExpect(jsonPath("$.data.jobMatches[0].matchedPreferredSkills[0]").value("Docker"))
                 .andExpect(jsonPath("$.data.jobMatches[0].missingPreferredSkills", hasSize(1)))
-                .andExpect(jsonPath("$.data.jobMatches[0].missingPreferredSkills[0]").value("Kafka"));
+                .andExpect(jsonPath("$.data.jobMatches[0].missingPreferredSkills[0]").value("Kafka"))
+                .andExpect(jsonPath("$.data.jobMatches[0].evidence.addedJobs").value(43))
+                .andExpect(jsonPath("$.data.jobMatches[0].evidence.cooccurrences", hasSize(1)))
+                .andExpect(jsonPath("$.data.jobMatches[0].evidence.cooccurrences[0].baseSkillName")
+                        .value("Kubernetes"))
+                .andExpect(jsonPath("$.data.jobMatches[0].evidence.cooccurrences[0].relatedSkillName")
+                        .value("Docker"))
+                .andExpect(jsonPath("$.data.jobMatches[0].evidence.relatedTags", hasSize(1)))
+                .andExpect(jsonPath("$.data.jobMatches[0].evidence.relatedTags[0].tagCode")
+                        .value("CLOUD_INFRA"))
+                .andExpect(jsonPath("$.data.jobMatches[0].evidence.learningConnections", hasSize(1)))
+                .andExpect(jsonPath("$.data.jobMatches[0].evidence.learningConnections[0].missingSkillName")
+                        .value("Kubernetes"));
 
         verify(gapAnalysisService).analyzeProjectSkillGap(
                 1L,
@@ -138,8 +155,14 @@ class GapAnalysisControllerTest {
                 10L,
                 List.of(1L, 2L, 3L),
                 List.of(
-                        jobSkillMatchResponseWithEmptyRequiredBucket(),
-                        jobSkillMatchResponseWithEmptyPreferredBucket()
+                        GapJobMatchResponse.from(
+                                jobSkillMatchResponseWithEmptyRequiredBucket(),
+                                GapJobMatchEvidenceResponse.empty()
+                        ),
+                        GapJobMatchResponse.from(
+                                jobSkillMatchResponseWithEmptyPreferredBucket(),
+                                GapJobMatchEvidenceResponse.empty()
+                        )
                 )
         );
         given(gapAnalysisService.analyzeProjectSkillGap(
@@ -262,7 +285,35 @@ class GapAnalysisControllerTest {
         return new GapAnalysisResponse(
                 10L,
                 List.of(1L, 2L, 3L),
-                List.of(jobSkillMatchResponse())
+                List.of(GapJobMatchResponse.from(jobSkillMatchResponse(), gapJobMatchEvidenceResponse()))
+        );
+    }
+
+    private GapJobMatchEvidenceResponse gapJobMatchEvidenceResponse() {
+        return new GapJobMatchEvidenceResponse(
+                43,
+                List.of(new GapSkillCooccurrenceEvidenceResponse(
+                        "Kubernetes",
+                        "Docker",
+                        12,
+                        43,
+                        61,
+                        new BigDecimal("2.5000")
+                )),
+                List.of(new GapRelatedTagEvidenceResponse(
+                        "Kubernetes",
+                        "CLOUD_INFRA",
+                        "클라우드/인프라",
+                        "클라우드 인프라 경험",
+                        20,
+                        43,
+                        120,
+                        new BigDecimal("1.7000")
+                )),
+                List.of(new GapLearningConnectionResponse(
+                        "Kubernetes",
+                        "Kubernetes은(는) Docker와 함께 자주 등장하고, 클라우드/인프라 경험과 연결됩니다."
+                ))
         );
     }
 
@@ -270,7 +321,7 @@ class GapAnalysisControllerTest {
         return new JobSkillMatchResponse(
                 100L,
                 "백엔드 개발자",
-                "JobFlow",
+                "Example Company",
                 JobRole.BACKEND,
                 CareerLevel.JUNIOR,
                 3,
@@ -293,7 +344,7 @@ class GapAnalysisControllerTest {
         return new JobSkillMatchResponse(
                 101L,
                 "Redis 우대 백엔드 개발자",
-                "JobFlow",
+                "Example Company",
                 JobRole.BACKEND,
                 CareerLevel.JUNIOR,
                 0,
@@ -316,7 +367,7 @@ class GapAnalysisControllerTest {
         return new JobSkillMatchResponse(
                 102L,
                 "Java 필수 백엔드 개발자",
-                "JobFlow",
+                "Example Company",
                 JobRole.BACKEND,
                 CareerLevel.JUNIOR,
                 1,

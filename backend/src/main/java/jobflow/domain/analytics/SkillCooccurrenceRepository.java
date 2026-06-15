@@ -1,6 +1,7 @@
 package jobflow.domain.analytics;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +38,25 @@ public interface SkillCooccurrenceRepository extends JpaRepository<SkillCooccurr
             AnalyticsPeriodType periodType,
             LocalDate periodStart,
             Long baseSkillId,
+            long minCooccurrenceCount,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT sc
+            FROM SkillCooccurrence sc
+            JOIN FETCH sc.baseSkill
+            JOIN FETCH sc.coSkill
+            WHERE sc.periodType = :periodType
+              AND sc.periodStart = :periodStart
+              AND sc.baseSkill.name IN :baseSkillNames
+              AND sc.cooccurrenceCount >= :minCooccurrenceCount
+            ORDER BY sc.cooccurrenceCount DESC, sc.liftScore DESC, sc.baseSkill.name ASC, sc.coSkill.name ASC
+            """)
+    List<SkillCooccurrence> findSupportedCooccurrencesByBaseSkillNameIn(
+            AnalyticsPeriodType periodType,
+            LocalDate periodStart,
+            Collection<String> baseSkillNames,
             long minCooccurrenceCount,
             Pageable pageable
     );

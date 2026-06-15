@@ -10,6 +10,7 @@ This report records whether the gap-analysis API can connect these pieces end to
 - user project ownership/not-found guard
 - match score ranking
 - matched/missing skill detail response
+- market evidence response for missing skills
 
 ## Measurement Setup
 
@@ -129,7 +130,55 @@ The smoke script fails when any of these conditions are true:
 | target role filter | response contains role outside `TARGET_ROLES` |
 | meaningful gap detail | all skill detail lists are empty |
 | match rate nullability | required/preferred match rate nullability does not match skill bucket counts |
+| evidence contract | evidence object or evidence arrays are missing/malformed |
+| meaningful evidence | every returned match has empty evidence |
 | missing project guard | missing project request does not return `404` / `USER_PROJECT_NOT_FOUND` |
+
+## Evidence Extension
+
+Gap Analysis v2 extends each job match with an `evidence` object.
+
+| Item | Value |
+| --- | --- |
+| Evidence extension date | `2026-06-15` |
+
+The evidence object includes:
+
+- `addedJobs`: latest monthly `skill_trends.job_count` sum for missing skills
+- `cooccurrences`: supported `skill_cooccurrence` rows for missing skills
+- `relatedTags`: supported `skill_experience_market` rows for missing skills
+- `learningConnections`: user-facing explanation generated from missing skills and market evidence
+
+Support thresholds:
+
+| Evidence source | Minimum support |
+| --- | ---: |
+| `skill_cooccurrence` | `cooccurrence_count >= 3` |
+| `skill_experience_market` | `job_count >= 3` |
+
+Evidence smoke summary:
+
+| Metric | Actual |
+| --- | ---: |
+| meaningful evidence match count | 8 |
+| evidence added jobs sum | 1149 |
+| cooccurrence evidence count | 40 |
+| related tag evidence count | 39 |
+| learning connection count | 53 |
+
+Interpretation:
+
+- 8 of 10 returned matches had non-empty evidence.
+- Matches with all required/preferred skills already covered can have empty evidence because there is no missing skill to explain.
+- The evidence counts confirm that Gap Analysis v2 is using analytics aggregate tables instead of returning only static missing skill lists.
+
+Evidence source readiness:
+
+| Source | Expected |
+| --- | --- |
+| `skill_trends` | latest monthly period exists and has rows |
+| `skill_cooccurrence` | latest monthly period exists and supported rows exist |
+| `skill_experience_market` | latest monthly period exists and supported rows exist |
 
 ## Final DB Match Baseline
 
@@ -170,6 +219,13 @@ Top DB baseline rows:
 | response contains target role only | PASS |
 | response contains matched/missing skill details | PASS |
 | match rate nullability is valid | PASS |
+| evidence fields are present | PASS |
+| evidence contains meaningful rows | PASS |
+| meaningful evidence match count | 8 |
+| evidence added jobs sum | 1149 |
+| cooccurrence evidence count | 40 |
+| related tag evidence count | 39 |
+| learning connection count | 53 |
 | missing project status | 404 |
 | missing project error code | USER_PROJECT_NOT_FOUND |
 
@@ -209,3 +265,5 @@ PASS criteria:
 | missing project smoke uses a high synthetic id | Smoke verifies not-found guard, not cross-user ownership with another real account | add cross-user ownership fixture when multi-user smoke data is introduced |
 | required/preferred extraction depends on JD section parsing | Current index separates sections but quality varies by source text | keep measuring required/preferred distribution |
 | raw smoke files are local-only | Public report records key rows and decisions; generated JSON/TSV remains ignored | regenerate raw files locally when rerunning API smoke |
+| evidence wording is heuristic | Learning connection copy is generated from aggregate evidence, not a personalized curriculum | keep phrasing as guidance/hint instead of final recommendation |
+| evidence can be empty for fully matched jobs | Empty evidence is valid when there are no missing skills | frontend should hide the evidence panel for empty evidence |
