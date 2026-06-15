@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -36,6 +37,9 @@ class UserJobServiceTest {
 
     @Mock
     private JobRepository jobRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private UserJobService userJobService;
@@ -67,6 +71,7 @@ class UserJobServiceTest {
         assertThat(response.viewedAt()).isNotNull();
 
         verify(userJobRepository).save(any(UserJob.class));
+        verify(eventPublisher).publishEvent(new UserJobChangedEvent(userId, jobId, UserJobStatus.VIEWED));
     }
 
     @Test
@@ -85,6 +90,7 @@ class UserJobServiceTest {
         assertThat(response.viewedAt()).isNotNull();
 
         verify(userJobRepository, never()).save(any(UserJob.class));
+        verify(eventPublisher).publishEvent(new UserJobChangedEvent(userId, jobId, UserJobStatus.VIEWED));
     }
 
     @Test
@@ -103,6 +109,7 @@ class UserJobServiceTest {
         assertThat(response.ignoredAt()).isNull();
 
         verify(userJobRepository, never()).save(any(UserJob.class));
+        verify(eventPublisher).publishEvent(new UserJobChangedEvent(userId, jobId, UserJobStatus.SAVED));
     }
 
     @Test
@@ -121,6 +128,7 @@ class UserJobServiceTest {
         assertThat(response.savedAt()).isNull();
 
         verify(userJobRepository, never()).save(any(UserJob.class));
+        verify(eventPublisher).publishEvent(new UserJobChangedEvent(userId, jobId, UserJobStatus.IGNORED));
     }
 
     @Test
@@ -146,6 +154,7 @@ class UserJobServiceTest {
         assertThat(response.status()).isEqualTo(UserJobStatus.SAVED);
         assertThat(response.viewedAt()).isNotNull();
         assertThat(response.savedAt()).isNotNull();
+        verify(eventPublisher).publishEvent(new UserJobChangedEvent(userId, jobId, UserJobStatus.SAVED));
     }
 
     @Test

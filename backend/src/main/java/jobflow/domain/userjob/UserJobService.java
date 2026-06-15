@@ -8,6 +8,7 @@ import jobflow.domain.userjob.dto.UserJobResponse;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ public class UserJobService {
     private final UserJobRepository userJobRepository;
     private final UserRepository userRepository;
     private final JobRepository jobRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public UserJobResponse markViewed(Long userId, Long jobId) {
@@ -34,6 +36,7 @@ public class UserJobService {
                 })
                 .orElseGet(() -> createViewedUserJob(userId, jobId, now));
 
+        publishUserJobChangedEvent(userJob);
         return UserJobResponse.from(userJob);
     }
 
@@ -43,6 +46,7 @@ public class UserJobService {
 
         userJob.save(LocalDateTime.now());
 
+        publishUserJobChangedEvent(userJob);
         return UserJobResponse.from(userJob);
     }
 
@@ -52,6 +56,7 @@ public class UserJobService {
 
         userJob.ignore(LocalDateTime.now());
 
+        publishUserJobChangedEvent(userJob);
         return UserJobResponse.from(userJob);
     }
 
@@ -102,5 +107,13 @@ public class UserJobService {
     private Job findJob(Long jobId) {
         return jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorCode.JOB_NOT_FOUND));
+    }
+
+    private void publishUserJobChangedEvent(UserJob userJob) {
+        eventPublisher.publishEvent(new UserJobChangedEvent(
+                userJob.getUser().getId(),
+                userJob.getJob().getId(),
+                userJob.getStatus()
+        ));
     }
 }
