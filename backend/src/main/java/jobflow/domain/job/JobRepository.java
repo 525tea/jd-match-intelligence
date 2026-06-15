@@ -1,6 +1,7 @@
 package jobflow.domain.job;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -16,6 +17,8 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     List<Job> findAllByOrderByCreatedAtDesc();
 
     List<Job> findByIdGreaterThanOrderByIdAsc(Long id, Pageable pageable);
+
+    List<Job> findByIdIn(Collection<Long> ids);
 
     List<Job> findByStatusAndDeadlineAtBefore(JobStatus status, LocalDateTime deadlineAt);
 
