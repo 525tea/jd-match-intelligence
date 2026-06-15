@@ -243,6 +243,58 @@ if [[ "${invalid_match_rate_count}" -ne 0 ]]; then
   exit 1
 fi
 
+missing_evidence_field_count="$(
+  echo "${response}" | jq '
+    [
+      .data.jobMatches[]
+      | select(
+          (.evidence | type) != "object"
+          or (.evidence.addedJobs | type) != "number"
+          or (.evidence.cooccurrences | type) != "array"
+          or (.evidence.relatedTags | type) != "array"
+          or (.evidence.learningConnections | type) != "array"
+        )
+    ]
+    | length
+  '
+)"
+if [[ "${missing_evidence_field_count}" -ne 0 ]]; then
+  echo "Gap analysis API smoke failed: evidence fields are missing or malformed."
+  exit 1
+fi
+
+meaningful_evidence_count="$(
+  echo "${response}" | jq '
+    [
+      .data.jobMatches[]
+      | select(
+          (.evidence.addedJobs > 0)
+          or ((.evidence.cooccurrences | length) > 0)
+          or ((.evidence.relatedTags | length) > 0)
+          or ((.evidence.learningConnections | length) > 0)
+        )
+    ]
+    | length
+  '
+)"
+if [[ "${meaningful_evidence_count}" -eq 0 ]]; then
+  echo "Gap analysis API smoke failed: every evidence object is empty."
+  exit 1
+fi
+
+evidence_added_jobs_sum="$(echo "${response}" | jq '[.data.jobMatches[].evidence.addedJobs] | add // 0')"
+cooccurrence_evidence_count="$(echo "${response}" | jq '[.data.jobMatches[].evidence.cooccurrences | length] | add // 0')"
+related_tag_evidence_count="$(echo "${response}" | jq '[.data.jobMatches[].evidence.relatedTags | length] | add // 0')"
+learning_connection_count="$(echo "${response}" | jq '[.data.jobMatches[].evidence.learningConnections | length] | add // 0')"
+
+echo
+echo "### Evidence Summary"
+echo "meaningful_evidence_count=${meaningful_evidence_count}"
+echo "evidence_added_jobs_sum=${evidence_added_jobs_sum}"
+echo "cooccurrence_evidence_count=${cooccurrence_evidence_count}"
+echo "related_tag_evidence_count=${related_tag_evidence_count}"
+echo "learning_connection_count=${learning_connection_count}"
+
 echo
 echo "### Match Summary"
 match_summary="$(
@@ -264,7 +316,11 @@ match_summary="$(
       (.matchedRequiredSkills | join(", ")),
       (.missingRequiredSkills | join(", ")),
       (.matchedPreferredSkills | join(", ")),
-      (.missingPreferredSkills | join(", "))
+      (.missingPreferredSkills | join(", ")),
+      .evidence.addedJobs,
+      (.evidence.cooccurrences | length),
+      (.evidence.relatedTags | length),
+      (.evidence.learningConnections | length)
     ]
   | @tsv
   '
@@ -280,7 +336,7 @@ if [[ -n "${OUTPUT_DIR}" ]]; then
 
   echo "${response}" | jq > "${response_path}"
   {
-    printf "job_id\ttitle\trole\trequired_skill_count\tmatched_required_skill_count\tmissing_required_skill_count\trequired_match_rate\tpreferred_skill_count\tmatched_preferred_skill_count\tmissing_preferred_skill_count\tpreferred_match_rate\tmatch_score\tmatched_required_skills\tmissing_required_skills\tmatched_preferred_skills\tmissing_preferred_skills\n"
+    printf "job_id\ttitle\trole\trequired_skill_count\tmatched_required_skill_count\tmissing_required_skill_count\trequired_match_rate\tpreferred_skill_count\tmatched_preferred_skill_count\tmissing_preferred_skill_count\tpreferred_match_rate\tmatch_score\tmatched_required_skills\tmissing_required_skills\tmatched_preferred_skills\tmissing_preferred_skills\tevidence_added_jobs\tcooccurrence_evidence_count\trelated_tag_evidence_count\tlearning_connection_count\n"
     echo "${match_summary}"
   } > "${summary_path}"
 

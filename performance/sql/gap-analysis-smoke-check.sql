@@ -196,3 +196,127 @@ WHERE required_skill_count = 0
   AND preferred_skill_count > 0
 ORDER BY preferred_skill_count DESC, job_id DESC
 LIMIT 20;
+
+SELECT
+    'skill_trends' AS evidence_source,
+    MAX(period_start) AS latest_period_start,
+    COUNT(*) AS row_count
+FROM skill_trends
+WHERE period_type = 'MONTHLY'
+UNION ALL
+SELECT
+    'skill_cooccurrence' AS evidence_source,
+    MAX(period_start) AS latest_period_start,
+    COUNT(*) AS row_count
+FROM skill_cooccurrence
+WHERE period_type = 'MONTHLY'
+UNION ALL
+SELECT
+    'skill_experience_market' AS evidence_source,
+    MAX(period_start) AS latest_period_start,
+    COUNT(*) AS row_count
+FROM skill_experience_market
+WHERE period_type = 'MONTHLY';
+
+SELECT
+    COUNT(*) AS supported_cooccurrence_count
+FROM skill_cooccurrence sc
+WHERE sc.period_type = 'MONTHLY'
+  AND sc.period_start = (
+    SELECT MAX(period_start)
+    FROM skill_cooccurrence
+    WHERE period_type = 'MONTHLY'
+)
+  AND sc.cooccurrence_count >= 3;
+
+SELECT
+    COUNT(*) AS supported_skill_experience_market_count
+FROM skill_experience_market sem
+WHERE sem.period_type = 'MONTHLY'
+  AND sem.period_start = (
+    SELECT MAX(period_start)
+    FROM skill_experience_market
+    WHERE period_type = 'MONTHLY'
+)
+  AND sem.job_count >= 3;
+
+WITH smoke_project_skills AS (
+    SELECT DISTINCT ups.skill_id
+    FROM users u
+             JOIN user_projects up ON up.user_id = u.id
+             JOIN user_project_analysis upa ON upa.user_project_id = up.id
+             JOIN user_project_skills ups ON ups.analysis_id = upa.id
+    WHERE u.email = 'gap-smoke@example.com'
+      AND up.external_id = 'gap-analysis-smoke-project'
+      AND upa.id = (
+        SELECT latest.id
+        FROM user_project_analysis latest
+        WHERE latest.user_project_id = up.id
+        ORDER BY latest.analyzed_at DESC, latest.id DESC
+    LIMIT 1
+    )
+    ),
+    target_roles AS (
+SELECT 'BACKEND' AS role
+UNION ALL SELECT 'FULLSTACK'
+UNION ALL SELECT 'SOFTWARE_ENGINEER'
+UNION ALL SELECT 'DEVOPS'
+    ),
+    missing_skills AS (
+SELECT DISTINCT
+    s.id AS skill_id,
+    s.name AS skill_name
+FROM job_skill_index jsi
+    JOIN jobs j ON j.id = jsi.job_id
+    JOIN target_roles tr ON tr.role = j.role
+    JOIN skills s ON s.id = jsi.skill_id
+    LEFT JOIN smoke_project_skills sps ON sps.skill_id = s.id
+WHERE j.source IN ('JUMPIT', 'WANTED')
+  AND j.status = 'OPEN'
+  AND sps.skill_id IS NULL
+    )
+SELECT
+    ms.skill_name,
+    COALESCE(st.job_count, 0) AS added_jobs,
+    COUNT(DISTINCT sc.id) AS supported_cooccurrence_count,
+    COUNT(DISTINCT sem.id) AS supported_related_tag_count
+FROM missing_skills ms
+         LEFT JOIN skill_trends st
+                   ON st.skill_id = ms.skill_id
+                       AND st.period_type = 'MONTHLY'
+                       AND st.period_start = (
+                           SELECT MAX(period_start)
+                           FROM skill_trends
+                           WHERE period_type = 'MONTHLY'
+                       )
+         LEFT JOIN skill_cooccurrence sc
+                   ON sc.base_skill_id = ms.skill_id
+                       AND sc.period_type = 'MONTHLY'
+                       AND sc.period_start = (
+                           SELECT MAX(period_start)
+                           FROM skill_cooccurrence
+                           WHERE period_type = 'MONTHLY'
+                       )
+                       AND sc.cooccurrence_count >= 3
+         LEFT JOIN skill_experience_market sem
+                   ON sem.skill_id = ms.skill_id
+                       AND sem.period_type = 'MONTHLY'
+                       AND sem.period_start = (
+                           SELECT MAX(period_start)
+                           FROM skill_experience_market
+                           WHERE period_type = 'MONTHLY'
+                       )
+                       AND sem.job_count >= 3
+GROUP BY
+    ms.skill_id,
+    ms.skill_name,
+    st.job_count
+HAVING added_jobs > 0
+    OR supported_cooccurrence_count > 0
+    OR supported_related_tag_count > 0
+ORDER BY
+    added_jobs DESC,
+    supported_cooccurrence_count DESC,
+    supported_related_tag_count DESC,
+    ms.skill_name
+    LIMIT 30;
