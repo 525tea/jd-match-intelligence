@@ -15,6 +15,16 @@ public interface JobExperienceTagRepository extends JpaRepository<JobExperienceT
     void deleteByJobId(Long jobId);
 
     @Query("""
+            SELECT jet
+            FROM JobExperienceTag jet
+            JOIN FETCH jet.job job
+            JOIN FETCH jet.tagCode tagCode
+            WHERE job.id IN :jobIds
+            ORDER BY job.id ASC, tagCode.code ASC
+            """)
+    List<JobExperienceTag> findByJobIdInWithTagCode(@Param("jobIds") List<Long> jobIds);
+
+    @Query("""
             SELECT new jobflow.domain.analytics.JobSkillExperienceMarketAggregate(
                 js.skill,
                 jet.tagCode,
