@@ -15,10 +15,12 @@ import jobflow.domain.project.dto.ProjectSkillInventoryResponse;
 import jobflow.domain.skill.ExperienceTagCode;
 import jobflow.domain.skill.Skill;
 import jobflow.domain.skill.SkillCategory;
+import jobflow.global.cache.CacheNames;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.BusinessException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.cache.annotation.Cacheable;
 
 class ProjectInventoryServiceTest {
 
@@ -180,6 +182,35 @@ class ProjectInventoryServiceTest {
                 userProjectSkillRepository,
                 userProjectExperienceTagRepository
         );
+    }
+
+    @Test
+    @DisplayName("프로젝트 스킬 인벤토리 조회에 캐시를 적용한다")
+    void getProjectSkillsUsesCache() throws NoSuchMethodException {
+        Cacheable cacheable = ProjectInventoryService.class
+                .getMethod("getProjectSkills", Long.class, Long.class)
+                .getAnnotation(Cacheable.class);
+
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.PROJECT_SKILL_INVENTORY);
+        assertThat(cacheable.key()).contains("projectInventoryCacheKey");
+    }
+
+    @Test
+    @DisplayName("프로젝트 경험 태그 인벤토리 조회에 캐시를 적용한다")
+    void getProjectExperienceTagsUsesCache() throws NoSuchMethodException {
+        Cacheable cacheable = ProjectInventoryService.class
+                .getMethod("getProjectExperienceTags", Long.class, Long.class)
+                .getAnnotation(Cacheable.class);
+
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY);
+        assertThat(cacheable.key()).contains("projectInventoryCacheKey");
+    }
+
+    @Test
+    @DisplayName("프로젝트 인벤토리 캐시 key는 사용자와 프로젝트를 함께 포함한다")
+    void projectInventoryCacheKeyIncludesUserAndProject() {
+        assertThat(ProjectInventoryService.projectInventoryCacheKey(4L, 2L))
+                .isEqualTo("userId=4:projectId=2");
     }
 
     private UserProjectAnalysis analysis(Long userProjectId, Long analysisId, int analysisVersion) {
