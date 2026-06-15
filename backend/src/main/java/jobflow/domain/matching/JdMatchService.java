@@ -220,7 +220,7 @@ public class JdMatchService {
                 .toList();
     }
 
-    static String jdMatchCacheKey(
+    public static String jdMatchCacheKey(
             Long userId,
             Long userProjectId,
             Collection<JobRole> targetRoles,

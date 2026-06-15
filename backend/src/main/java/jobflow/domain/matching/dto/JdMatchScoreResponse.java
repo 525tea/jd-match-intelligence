@@ -1,5 +1,6 @@
 package jobflow.domain.matching.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import jobflow.domain.matching.JdMatchScoreBreakdown;
 
@@ -15,7 +16,7 @@ public record JdMatchScoreResponse(
         BigDecimal experienceTagRate,
         BigDecimal careerLevelFitRate,
         BigDecimal confidenceRate
-) {
+) implements Serializable {
 
     public static JdMatchScoreResponse from(JdMatchScoreBreakdown breakdown) {
         return new JdMatchScoreResponse(

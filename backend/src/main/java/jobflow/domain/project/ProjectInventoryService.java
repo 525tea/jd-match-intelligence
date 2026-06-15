@@ -59,7 +59,7 @@ public class ProjectInventoryService {
                 .orElseGet(List::of);
     }
 
-    static String projectInventoryCacheKey(Long userId, Long userProjectId) {
+    public static String projectInventoryCacheKey(Long userId, Long userProjectId) {
         return "userId=" + userId + ":projectId=" + userProjectId;
     }
 

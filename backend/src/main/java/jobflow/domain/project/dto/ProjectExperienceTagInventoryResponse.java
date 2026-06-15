@@ -1,5 +1,6 @@
 package jobflow.domain.project.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import jobflow.domain.project.AnalysisSource;
@@ -19,7 +20,7 @@ public record ProjectExperienceTagInventoryResponse(
         AnalysisSource source,
         BigDecimal confidence,
         String evidence
-) {
+) implements Serializable {
 
     public static ProjectExperienceTagInventoryResponse from(
             UserProjectAnalysis analysis,

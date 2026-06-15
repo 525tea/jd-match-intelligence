@@ -2,6 +2,8 @@ package jobflow.global.error;
 
 import java.util.List;
 import jobflow.global.error.exception.BusinessException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindException;
@@ -13,6 +15,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
@@ -74,6 +78,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception exception) {
+        log.error("Unhandled exception occurred.", exception);
+
         return ResponseEntity
                 .status(ErrorCode.COMMON_INTERNAL_ERROR.getStatus())
                 .body(ErrorResponse.of(ErrorCode.COMMON_INTERNAL_ERROR));

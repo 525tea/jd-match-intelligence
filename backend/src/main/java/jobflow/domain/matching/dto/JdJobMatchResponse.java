@@ -1,5 +1,6 @@
 package jobflow.domain.matching.dto;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
 import jobflow.domain.analytics.JobSkillMatchDetail;
@@ -34,7 +35,7 @@ public record JdJobMatchResponse(
         List<String> missingPreferredSkills,
         List<JdMatchExperienceTagResponse> matchedExperienceTags,
         List<JdMatchExperienceTagResponse> missingExperienceTags
-) {
+) implements Serializable {
 
     public static JdJobMatchResponse from(
             Long userProjectId,

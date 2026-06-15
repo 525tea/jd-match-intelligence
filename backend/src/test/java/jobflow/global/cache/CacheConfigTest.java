@@ -3,15 +3,19 @@ package jobflow.global.cache;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import java.math.BigDecimal;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
+import jobflow.domain.analytics.dto.SkillTrendResponse;
+import jobflow.domain.skill.SkillCategory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.CacheManager;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import tools.jackson.databind.ObjectMapper;
 
 class CacheConfigTest {
 
@@ -27,12 +31,10 @@ class CacheConfigTest {
                 Duration.ofMinutes(30),
                 Duration.ofHours(1)
         );
-        ObjectMapper objectMapper = new ObjectMapper();
 
         CacheManager cacheManager = cacheConfig.cacheManager(
                 redisConnectionFactory,
-                cacheProperties,
-                objectMapper
+                cacheProperties
         );
 
         assertThat(cacheManager).isInstanceOf(RedisCacheManager.class);
@@ -47,12 +49,8 @@ class CacheConfigTest {
                 Duration.ofMinutes(30),
                 Duration.ofHours(1)
         );
-        ObjectMapper objectMapper = new ObjectMapper();
 
-        Map<String, RedisCacheConfiguration> cacheConfigurations = cacheConfig.cacheConfigurations(
-                cacheProperties,
-                objectMapper
-        );
+        Map<String, RedisCacheConfiguration> cacheConfigurations = cacheConfig.cacheConfigurations(cacheProperties);
 
         assertThat(cacheConfigurations)
                 .containsOnlyKeys(
@@ -65,5 +63,27 @@ class CacheConfigTest {
                         CacheNames.PROJECT_SKILL_INVENTORY,
                         CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY
                 );
+    }
+
+    @Test
+    @DisplayName("Redis cache value serializer는 List 응답을 다시 같은 타입으로 복원한다")
+    void serializesAndDeserializesListResponse() {
+        List<SkillTrendResponse> responses = List.of(
+                new SkillTrendResponse(
+                        1L,
+                        "Java",
+                        SkillCategory.LANGUAGE,
+                        LocalDate.of(2026, 6, 1),
+                        10,
+                        8,
+                        2,
+                        BigDecimal.valueOf(18)
+                )
+        );
+
+        byte[] serialized = cacheConfig.redisValueSerializer().serialize(responses);
+        Object deserialized = cacheConfig.redisValueSerializer().deserialize(serialized);
+
+        assertThat(deserialized).isEqualTo(responses);
     }
 }

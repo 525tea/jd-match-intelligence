@@ -1,5 +1,6 @@
 package jobflow.domain.gap.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import jobflow.domain.analytics.SkillCooccurrence;
 
@@ -10,7 +11,7 @@ public record GapSkillCooccurrenceEvidenceResponse(
         long baseSkillJobCount,
         long relatedSkillJobCount,
         BigDecimal liftScore
-) {
+) implements Serializable {
 
     public static GapSkillCooccurrenceEvidenceResponse from(SkillCooccurrence cooccurrence) {
         return new GapSkillCooccurrenceEvidenceResponse(

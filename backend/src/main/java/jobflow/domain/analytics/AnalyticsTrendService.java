@@ -109,17 +109,17 @@ public class AnalyticsTrendService {
                 .toList();
     }
 
-    static String trendCacheKey(LocalDate month, int limit) {
+    public static String trendCacheKey(LocalDate month, int limit) {
         return resolvePeriodStartForCache(month) + ":limit=" + normalizeLimitForCache(limit);
     }
 
-    static String trendSkillCacheKey(LocalDate month, Long skillId, int limit) {
+    public static String trendSkillCacheKey(LocalDate month, Long skillId, int limit) {
         return resolvePeriodStartForCache(month)
                 + ":skillId=" + skillId
                 + ":limit=" + normalizeLimitForCache(limit);
     }
 
-    static String trendMarketCacheKey(LocalDate month, JobRole role, int limit) {
+    public static String trendMarketCacheKey(LocalDate month, JobRole role, int limit) {
         return resolvePeriodStartForCache(month)
                 + ":role=" + role
                 + ":limit=" + normalizeLimitForCache(limit);

@@ -64,7 +64,7 @@ public class GapAnalysisService {
         return new GapAnalysisResponse(userProjectId, userSkillIds, gapJobMatches);
     }
 
-    static String gapAnalysisCacheKey(
+    public static String gapAnalysisCacheKey(
             Long userId,
             Long userProjectId,
             Collection<JobRole> targetRoles,

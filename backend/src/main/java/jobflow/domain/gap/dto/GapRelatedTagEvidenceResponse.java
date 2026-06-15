@@ -1,5 +1,6 @@
 package jobflow.domain.gap.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import jobflow.domain.analytics.SkillExperienceMarket;
 import jobflow.domain.skill.ExperienceTagCode;
@@ -13,7 +14,7 @@ public record GapRelatedTagEvidenceResponse(
         long skillJobCount,
         long tagJobCount,
         BigDecimal liftScore
-) {
+) implements Serializable {
 
     public static GapRelatedTagEvidenceResponse from(SkillExperienceMarket market) {
         ExperienceTagCode tagCode = market.getTagCode();
