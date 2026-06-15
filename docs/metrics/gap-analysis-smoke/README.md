@@ -1,8 +1,8 @@
-# Gap Analysis Smoke Artifacts
+# Gap Analysis Smoke 산출물
 
-This directory is reserved for local gap-analysis API smoke outputs.
+이 디렉터리는 Gap Analysis API smoke 결과를 기록하기 위한 metrics 디렉터리다.
 
-The script below can write reproducible smoke artifacts here:
+아래 스크립트는 재현 가능한 smoke 산출물을 이 디렉터리에 저장할 수 있다.
 
 ```bash
 BASE_URL=http://localhost:8080 \
@@ -15,23 +15,25 @@ OUTPUT_DIR=docs/metrics/gap-analysis-smoke \
 bash performance/analytics/gap-analysis-api-smoke.sh
 ```
 
-The smoke script verifies:
+smoke script는 다음 항목을 검증한다.
 
-- non-empty `jobMatches`
+- `jobMatches`가 비어 있지 않음
 - `jobMatches.length <= LIMIT`
-- `LIMIT` is an integer from 1 to 50
-- response roles are inside `TARGET_ROLES`
-- matched/missing required/preferred skill detail arrays exist
-- required/preferred match rates are `null` only when the matching skill bucket is empty
-- missing project requests return `404` with `USER_PROJECT_NOT_FOUND`
+- `LIMIT`은 1 이상 50 이하의 정수
+- 응답 role이 `TARGET_ROLES` 안에 있음
+- required/preferred skill의 matched/missing detail array가 존재함
+- required/preferred match rate는 해당 skill bucket이 비어 있을 때만 `null`
+- missing project 요청은 `404`와 `USER_PROJECT_NOT_FOUND`를 반환함
 
-Generated files:
+생성 파일:
 
 ```text
 gap-analysis-api-response.json
 gap-analysis-match-summary.tsv
 ```
 
-These generated files are local verification artifacts and are intentionally ignored by git. Copy the key numbers into the worklog or metrics report instead of committing run-specific outputs.
+위 raw output 파일은 로컬 검증 산출물이다.
 
-Use `REPORT_TEMPLATE.md` when recording the final result for a PR or worklog.
+PR이나 작업일지에는 raw file을 그대로 커밋하기보다 핵심 숫자만 metrics report에 옮겨 적는다.
+
+최종 결과를 기록할 때는 `REPORT_TEMPLATE.md`를 사용한다.

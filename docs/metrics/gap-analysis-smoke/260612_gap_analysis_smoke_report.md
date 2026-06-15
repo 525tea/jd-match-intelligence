@@ -1,26 +1,26 @@
 # Gap Analysis API Smoke Report
 
-## Purpose
+## 목적
 
-This report records whether the gap-analysis API can connect these pieces end to end:
+Gap Analysis API가 다음 데이터를 end-to-end로 연결하는지 확인한다.
 
-- latest user project skill snapshot
+- 최신 사용자 프로젝트 skill snapshot
 - `job_skill_index` required/preferred skill index
 - target role filtering
-- user project ownership/not-found guard
+- 사용자 프로젝트 소유권 / not-found guard
 - match score ranking
 - matched/missing skill detail response
-- market evidence response for missing skills
+- 부족 skill에 대한 market evidence response
 
-## Measurement Setup
+## 측정 기준
 
-| Item | Value |
+| 항목 | 값 |
 | --- | --- |
-| Date | `2026-06-12` |
+| 측정일 | `2026-06-12` |
 | DB | local MySQL `jobflow` |
 | API base URL | `http://localhost:8080` |
-| User | `gap-smoke@example.com` |
-| Project external id | `gap-analysis-smoke-project` |
+| User | smoke fixture user |
+| Project external id | smoke fixture project |
 | Target roles | `BACKEND,FULLSTACK,SOFTWARE_ENGINEER,DEVOPS` |
 | Limit | `10` (`1..50`) |
 | Missing project check | `true` |
@@ -30,59 +30,59 @@ This report records whether the gap-analysis API can connect these pieces end to
 | Smoke script | `performance/analytics/gap-analysis-api-smoke.sh` |
 | Output dir | `docs/metrics/gap-analysis-smoke` |
 
-## DB Console Checks
+## DB Console 사전 확인
 
-Run the fixture first:
+먼저 fixture를 실행한다.
 
 ```sql
 -- performance/sql/gap-analysis-smoke-fixture.sql 전체 실행
 ```
 
-Then run:
+그 다음 check SQL을 실행한다.
 
 ```sql
 -- performance/sql/gap-analysis-smoke-check.sql 전체 실행
 ```
 
-Expected fixture result:
+기대 fixture 결과:
 
-| Metric | Expected |
+| Metric | 기대값 |
 | --- | --- |
 | `user_project_id` | not null |
 | `analysis_id` | not null |
 | `user_project_skill_count` | `8` |
 | `user_project_skills` | `AWS, Docker, Git, Java, MySQL, Redis, Spring Boot, Spring Framework` |
 
-Actual fixture result:
+실제 fixture 결과:
 
 | user_project_id | analysis_id | user_project_skill_count | user_project_skills |
 | ---: | ---: | ---: | --- |
 | 1 | 1 | 8 | AWS, Docker, Git, Java, MySQL, Redis, Spring Boot, Spring Framework |
 
-Expected index result:
+기대 index 결과:
 
-| Metric | Expected |
+| Metric | 기대값 |
 | --- | --- |
 | JUMPIT indexed open jobs | `> 0` |
 | WANTED indexed open jobs | `> 0` |
 | target role indexed open jobs | `> 0` |
-| preferred-only target role jobs | recorded, may be `0` |
+| preferred-only target role jobs | 기록 대상, `0`일 수 있음 |
 
-Actual index result:
+실제 index 결과:
 
 | source | open_job_count | indexed_open_job_count | required_indexed_open_job_count | preferred_indexed_open_job_count | indexed_skill_count |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | JUMPIT | 149 | 126 | 106 | 72 | 585 |
 | WANTED | 155 | 142 | 127 | 98 | 776 |
 
-Actual target role bucket result:
+실제 target role bucket 결과:
 
 | source | indexed_target_role_job_count | required_bucket_job_count | preferred_bucket_job_count | preferred_only_job_count | required_only_job_count | both_bucket_job_count |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | JUMPIT | 38 | 35 | 28 | 3 | 10 | 25 |
 | WANTED | 59 | 54 | 44 | 5 | 15 | 39 |
 
-Preferred-only samples:
+Preferred-only sample:
 
 | source | job_id | external_id | title | company_name | role | career_level | required_skill_count | preferred_skill_count | original_url |
 | --- | ---: | --- | --- | --- | --- | --- | ---: | ---: | --- |
@@ -95,7 +95,7 @@ Preferred-only samples:
 | JUMPIT | 218 | 54111887 | [AI Vision Engineer] YOLO 기반 다회용기 인식·계수·검수 시스템 개발 담당 | 써큘러랩스 | BACKEND | NEWCOMER | 0 | 1 | https://jumpit.saramin.co.kr/position/54111887 |
 | JUMPIT | 205 | 54118057 | ML Systems Runtime Engineer [신입] | 보스반도체 | BACKEND | NEWCOMER | 0 | 1 | https://jumpit.saramin.co.kr/position/54118057 |
 
-## API Smoke Command
+## API Smoke 실행 명령
 
 ```bash
 BASE_URL=http://localhost:8080 \
@@ -108,7 +108,7 @@ OUTPUT_DIR=docs/metrics/gap-analysis-smoke \
 bash performance/analytics/gap-analysis-api-smoke.sh
 ```
 
-Expected result:
+기대 결과:
 
 ```text
 Gap analysis API smoke completed.
@@ -117,48 +117,48 @@ Saved response: docs/metrics/gap-analysis-smoke/gap-analysis-api-response.json
 Saved match summary: docs/metrics/gap-analysis-smoke/gap-analysis-match-summary.tsv
 ```
 
-## API Smoke Assertions
+## API Smoke 검증 항목
 
-The smoke script fails when any of these conditions are true:
+smoke script는 다음 조건 중 하나라도 깨지면 실패한다.
 
-| Assertion | Failure condition |
+| 검증 항목 | 실패 조건 |
 | --- | --- |
 | API success | `.success != true` |
-| non-empty result | `.data.jobMatches` is empty |
-| limit contract | `.data.jobMatches.length` exceeds requested `LIMIT` |
-| detail fields | one of skill detail fields is missing or not an array |
-| target role filter | response contains role outside `TARGET_ROLES` |
-| meaningful gap detail | all skill detail lists are empty |
-| match rate nullability | required/preferred match rate nullability does not match skill bucket counts |
-| evidence contract | evidence object or evidence arrays are missing/malformed |
-| meaningful evidence | every returned match has empty evidence |
-| missing project guard | missing project request does not return `404` / `USER_PROJECT_NOT_FOUND` |
+| 비어 있지 않은 결과 | `.data.jobMatches`가 비어 있음 |
+| limit contract | `.data.jobMatches.length`가 요청한 `LIMIT`을 초과함 |
+| detail fields | skill detail field가 없거나 array가 아님 |
+| target role filter | 응답에 `TARGET_ROLES` 밖의 role이 포함됨 |
+| meaningful gap detail | 모든 skill detail list가 비어 있음 |
+| match rate nullability | required/preferred match rate nullability가 skill bucket count와 맞지 않음 |
+| evidence contract | evidence object 또는 evidence array가 없거나 형식이 잘못됨 |
+| meaningful evidence | 모든 match의 evidence가 비어 있음 |
+| missing project guard | missing project 요청이 `404` / `USER_PROJECT_NOT_FOUND`를 반환하지 않음 |
 
-## Evidence Extension
+## Evidence 확장
 
-Gap Analysis v2 extends each job match with an `evidence` object.
+Gap Analysis 응답은 각 job match에 `evidence` object를 포함한다.
 
-| Item | Value |
+| 항목 | 값 |
 | --- | --- |
-| Evidence extension date | `2026-06-15` |
+| Evidence 확장 측정일 | `2026-06-15` |
 
-The evidence object includes:
+`evidence` object는 다음 정보를 포함한다.
 
-- `addedJobs`: latest monthly `skill_trends.job_count` sum for missing skills
-- `cooccurrences`: supported `skill_cooccurrence` rows for missing skills
-- `relatedTags`: supported `skill_experience_market` rows for missing skills
-- `learningConnections`: user-facing explanation generated from missing skills and market evidence
+- `addedJobs`: 부족 skill 기준 최신 월간 `skill_trends.job_count` 합계
+- `cooccurrences`: 부족 skill과 함께 등장한 `skill_cooccurrence` row
+- `relatedTags`: 부족 skill과 연결된 `skill_experience_market` row
+- `learningConnections`: 부족 skill과 market evidence를 기반으로 만든 사용자 설명
 
-Support thresholds:
+Support threshold:
 
-| Evidence source | Minimum support |
+| Evidence source | 최소 support |
 | --- | ---: |
 | `skill_cooccurrence` | `cooccurrence_count >= 3` |
 | `skill_experience_market` | `job_count >= 3` |
 
-Evidence smoke summary:
+Evidence smoke 요약:
 
-| Metric | Actual |
+| Metric | 실제값 |
 | --- | ---: |
 | meaningful evidence match count | 8 |
 | evidence added jobs sum | 1149 |
@@ -166,33 +166,33 @@ Evidence smoke summary:
 | related tag evidence count | 39 |
 | learning connection count | 53 |
 
-Interpretation:
+해석:
 
-- 8 of 10 returned matches had non-empty evidence.
-- Matches with all required/preferred skills already covered can have empty evidence because there is no missing skill to explain.
-- The evidence counts confirm that Gap Analysis v2 is using analytics aggregate tables instead of returning only static missing skill lists.
+- 반환된 10개 match 중 8개가 비어 있지 않은 evidence를 가졌다.
+- required/preferred skill이 모두 충족된 match는 설명할 missing skill이 없으므로 evidence가 비어 있을 수 있다.
+- evidence count를 통해 Gap Analysis가 단순 missing skill list가 아니라 analytics aggregate table을 사용함을 확인했다.
 
-Evidence source readiness:
+Evidence source 준비 상태:
 
-| Source | Expected |
+| Source | 기대값 |
 | --- | --- |
 | `skill_trends` | latest monthly period exists and has rows |
 | `skill_cooccurrence` | latest monthly period exists and supported rows exist |
 | `skill_experience_market` | latest monthly period exists and supported rows exist |
 
-## Final DB Match Baseline
+## 최종 DB Match Baseline
 
-This section records the final DB Console baseline after the gap-analysis query/scoring hardening.
-It uses `performance/sql/job-skill-index-match-smoke.sql` to verify that `job_skill_index` can produce explainable required/preferred hit-miss rows before the API response layer formats them.
+이 섹션은 Gap Analysis query/scoring hardening 이후 DB Console 기준 baseline을 기록한다.
+`performance/sql/job-skill-index-match-smoke.sql`로 API response layer에 들어가기 전 `job_skill_index`가 설명 가능한 required/preferred hit-miss row를 만들 수 있는지 확인했다.
 
-The SQL baseline verifies:
+SQL baseline은 다음을 검증한다.
 
-- required and preferred skills are scored separately
-- matched and missing skill names are explainable per job
-- jobs without a required or preferred bucket keep the corresponding match rate nullable
-- the resulting `match_score` is derived from required/preferred match rates, not from a single flat skill count
+- required skill과 preferred skill을 분리해서 점수화한다.
+- 공고별 matched/missing skill name을 설명할 수 있다.
+- required 또는 preferred bucket이 없는 공고는 해당 match rate를 nullable로 유지한다.
+- `match_score`는 단일 flat skill count가 아니라 required/preferred match rate에서 계산된다.
 
-Top DB baseline rows:
+상위 DB baseline row:
 
 | source | job_id | external_id | title | role | required_match_rate | preferred_match_rate | match_score | matched_required_skills | missing_required_skills | matched_preferred_skills | missing_preferred_skills |
 | --- | ---: | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- | --- |
@@ -207,9 +207,9 @@ Top DB baseline rows:
 | WANTED | 340 | 366799 | Data Infra Engineer | BACKEND | 66.67 | 0.00 | 46.67 | Docker, Java | Python |  | Apache HTTP Server, Kafka, MongoDB |
 | WANTED | 344 | 366775 | 백엔드개발 (Predict) | BACKEND | 50.00 | 33.33 | 45.00 | Java, MySQL, Spring Boot | Jira, Linux, Notion | Docker | Kubernetes, MSA |
 
-## Result Summary
+## 결과 요약
 
-| Metric | Actual |
+| Metric | 실제값 |
 | --- | ---: |
 | job match count | 10 |
 | job match count <= limit | PASS |
@@ -229,9 +229,9 @@ Top DB baseline rows:
 | missing project status | 404 |
 | missing project error code | USER_PROJECT_NOT_FOUND |
 
-## Top Match Samples
+## Top Match Sample
 
-Paste the first rows from `gap-analysis-match-summary.tsv`.
+`gap-analysis-match-summary.tsv`의 상위 row를 기록한다.
 
 | job_id | title | role | required_match_rate | preferred_match_rate | match_score | matched_required_skills | missing_required_skills | matched_preferred_skills | missing_preferred_skills |
 | ---: | --- | --- | ---: | ---: | ---: | --- | --- | --- | --- |
@@ -241,29 +241,29 @@ Paste the first rows from `gap-analysis-match-summary.tsv`.
 | 16 | 백엔드 플랫폼 개발자 | BACKEND | 100.00 | 100.00 | 73.00 | Spring Boot |  | Redis |  |
 | 184 | 웹어플리케이션 백엔드 개발자(2년↑) | BACKEND | 66.67 | 25.00 | 72.83 | Java, MySQL, Spring Boot, Spring Framework | Linux, Oracle Database | Docker | Hibernate, Kubernetes, Python |
 
-## Decision
+## 판정
 
 PASS.
 
-PASS criteria:
+PASS 기준:
 
-- fixture project has 8 project skills
-- `job_skill_index` has indexed real JUMPIT/WANTED open jobs
-- gap-analysis API returns non-empty matches
-- gap-analysis API returns no more than requested `LIMIT`
-- missing project request returns `404` with `USER_PROJECT_NOT_FOUND`
-- returned matches are restricted to requested target roles
-- response includes matched/missing required/preferred skill details
-- match rate is `null` only when the corresponding required/preferred skill bucket is empty
+- fixture project가 8개 project skill을 가진다.
+- `job_skill_index`에 real JUMPIT/WANTED open job이 색인되어 있다.
+- Gap Analysis API가 비어 있지 않은 match 결과를 반환한다.
+- Gap Analysis API가 요청한 `LIMIT` 이하의 결과만 반환한다.
+- missing project 요청이 `404`와 `USER_PROJECT_NOT_FOUND`를 반환한다.
+- 반환된 match가 요청한 target role 안에 있다.
+- 응답에 matched/missing required/preferred skill detail이 포함된다.
+- match rate는 해당 required/preferred skill bucket이 비어 있을 때만 `null`이다.
 
-## Open Risks
+## 남은 리스크
 
-| Risk | Current handling | Follow-up |
+| 리스크 | 현재 처리 | 후속 확인 |
 | --- | --- | --- |
-| match score weights are heuristic | Smoke verifies ordering and explainability, not final ranking quality | tune with labeled fixture after W5 matching engine |
-| project skill snapshot is fixture-based | Smoke uses deterministic static skill list | replace with real GitHub analysis sample in W5 |
-| missing project smoke uses a high synthetic id | Smoke verifies not-found guard, not cross-user ownership with another real account | add cross-user ownership fixture when multi-user smoke data is introduced |
-| required/preferred extraction depends on JD section parsing | Current index separates sections but quality varies by source text | keep measuring required/preferred distribution |
-| raw smoke files are local-only | Public report records key rows and decisions; generated JSON/TSV remains ignored | regenerate raw files locally when rerunning API smoke |
-| evidence wording is heuristic | Learning connection copy is generated from aggregate evidence, not a personalized curriculum | keep phrasing as guidance/hint instead of final recommendation |
-| evidence can be empty for fully matched jobs | Empty evidence is valid when there are no missing skills | frontend should hide the evidence panel for empty evidence |
+| match score weight가 heuristic이다 | smoke는 ranking 품질 최종판이 아니라 정렬과 설명 가능성을 검증한다 | labeled fixture 기준으로 score weight 튜닝 |
+| project skill snapshot이 fixture 기반이다 | smoke는 deterministic static skill list를 사용한다 | 실제 GitHub analysis sample로 교체 |
+| missing project smoke가 synthetic high id를 사용한다 | not-found guard는 검증하지만, 다른 실제 사용자 소유 project 접근은 검증하지 않는다 | multi-user smoke data 도입 시 cross-user ownership fixture 추가 |
+| required/preferred 추출은 JD section parsing 품질에 의존한다 | 현재 index는 section을 분리하지만 source text 품질에 따라 달라질 수 있다 | required/preferred 분포를 계속 측정 |
+| raw smoke file은 local-only다 | 공개 report에는 핵심 row와 판정만 기록하고, 생성 JSON/TSV는 커밋하지 않는다 | API smoke 재실행 시 raw file은 로컬에서 재생성 |
+| evidence 문구는 heuristic이다 | learning connection copy는 개인화 curriculum이 아니라 aggregate evidence 기반 설명이다 | 최종 추천 문구가 아니라 guidance/hint 톤으로 유지 |
+| fully matched job은 evidence가 비어 있을 수 있다 | missing skill이 없으면 empty evidence가 정상이다 | frontend는 empty evidence panel을 숨긴다 |
