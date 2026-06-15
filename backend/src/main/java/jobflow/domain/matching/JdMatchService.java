@@ -23,9 +23,11 @@ import jobflow.domain.project.UserProjectExperienceTagRepository;
 import jobflow.domain.project.UserProjectRepository;
 import jobflow.domain.project.UserProjectSkillRepository;
 import jobflow.domain.skill.ExperienceTagCode;
+import jobflow.global.cache.CacheNames;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.BusinessException;
 import jobflow.global.error.exception.EntityNotFoundException;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -63,6 +65,11 @@ public class JdMatchService {
         this.jdMatchScoreCalculator = jdMatchScoreCalculator;
     }
 
+    @Cacheable(
+            cacheNames = CacheNames.JD_MATCH,
+            key = "T(jobflow.domain.matching.JdMatchService).jdMatchCacheKey("
+                    + "#userId, #userProjectId, #targetRoles, #targetCareerLevel, #limit)"
+    )
     public List<JdJobMatchResponse> findProjectJobMatches(
             Long userId,
             Long userProjectId,
@@ -213,8 +220,51 @@ public class JdMatchService {
                 .toList();
     }
 
-    private int normalizeLimit(int limit) {
+    static String jdMatchCacheKey(
+            Long userId,
+            Long userProjectId,
+            Collection<JobRole> targetRoles,
+            CareerLevel targetCareerLevel,
+            int limit
+    ) {
+        return "userId=" + userId
+                + ":projectId=" + userProjectId
+                + ":roles=" + normalizeTargetRoleKey(targetRoles)
+                + ":career=" + normalizeCareerLevelKey(targetCareerLevel)
+                + ":limit=" + normalizeLimitKey(limit);
+    }
+
+    private static String normalizeTargetRoleKey(Collection<JobRole> targetRoles) {
+        if (targetRoles == null || targetRoles.isEmpty()) {
+            return "ALL";
+        }
+
+        String roles = targetRoles.stream()
+                .filter(role -> role != null)
+                .map(JobRole::name)
+                .distinct()
+                .sorted()
+                .collect(Collectors.joining(","));
+
+        if (roles.isBlank()) {
+            return "ALL";
+        }
+        return roles;
+    }
+
+    private static String normalizeCareerLevelKey(CareerLevel targetCareerLevel) {
+        if (targetCareerLevel == null) {
+            return "ANY";
+        }
+        return targetCareerLevel.name();
+    }
+
+    private static int normalizeLimitKey(int limit) {
         return Math.min(Math.max(1, limit), MAX_LIMIT);
+    }
+
+    private int normalizeLimit(int limit) {
+        return normalizeLimitKey(limit);
     }
 
     private List<JobRole> normalizeTargetRoles(Collection<JobRole> targetRoles) {

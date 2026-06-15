@@ -45,6 +45,7 @@ public class CacheConfig {
                 CacheNames.TREND_SKILL_EXPERIENCE_TAGS, cacheConfiguration(cacheProperties.trendTtl(), objectMapper),
                 CacheNames.TREND_MARKET, cacheConfiguration(cacheProperties.trendTtl(), objectMapper),
                 CacheNames.GAP_ANALYSIS, cacheConfiguration(cacheProperties.gapAnalysisTtl(), objectMapper),
+                CacheNames.JD_MATCH, cacheConfiguration(cacheProperties.jdMatchTtl(), objectMapper),
                 CacheNames.PROJECT_SKILL_INVENTORY, cacheConfiguration(cacheProperties.projectInventoryTtl(), objectMapper),
                 CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY, cacheConfiguration(cacheProperties.projectInventoryTtl(), objectMapper)
         );

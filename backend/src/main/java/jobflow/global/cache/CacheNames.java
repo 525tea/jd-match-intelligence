@@ -8,6 +8,7 @@ public final class CacheNames {
     public static final String TREND_MARKET = "trendMarket";
 
     public static final String GAP_ANALYSIS = "gapAnalysis";
+    public static final String JD_MATCH = "jdMatch";
 
     public static final String PROJECT_SKILL_INVENTORY = "projectSkillInventory";
     public static final String PROJECT_EXPERIENCE_TAG_INVENTORY = "projectExperienceTagInventory";
