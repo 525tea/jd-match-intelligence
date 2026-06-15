@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import jobflow.domain.project.ProjectInventoryCacheService;
+import jobflow.domain.project.ProjectAnalysisUpdatedEvent;
 import jobflow.domain.project.UserProject;
 import jobflow.domain.project.UserProjectAnalysis;
 import jobflow.domain.project.UserProjectAnalysisRepository;
@@ -38,6 +38,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
+import org.springframework.context.ApplicationEventPublisher;
 
 class ProjectRepositoryStaticAnalysisImportServiceTest {
 
@@ -53,8 +54,8 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
     private final UserProjectExperienceTagRepository userProjectExperienceTagRepository =
             mock(UserProjectExperienceTagRepository.class);
 
-    private final ProjectInventoryCacheService projectInventoryCacheService =
-            mock(ProjectInventoryCacheService.class);
+    private final ApplicationEventPublisher eventPublisher =
+            mock(ApplicationEventPublisher.class);
 
     private final SkillRepository skillRepository =
             mock(SkillRepository.class);
@@ -77,7 +78,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                     userProjectAnalysisRepository,
                     userProjectSkillRepository,
                     userProjectExperienceTagRepository,
-                    projectInventoryCacheService,
+                    eventPublisher,
                     skillRepository,
                     experienceTagCodeRepository,
                     projectBuildFileAnalysisService,
@@ -225,7 +226,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
         verify(userProjectSkillRepository).saveAll(ArgumentMatchers.<Iterable<UserProjectSkill>>any());
         verify(userProjectExperienceTagRepository)
                 .saveAll(ArgumentMatchers.<Iterable<UserProjectExperienceTag>>any());
-        verify(projectInventoryCacheService).evictProjectInventoryAfterCommit(userId, userProjectId);
+        verify(eventPublisher).publishEvent(new ProjectAnalysisUpdatedEvent(userId, userProjectId));
         assertThat(savedProjectSkills)
                 .extracting(UserProjectSkill::getAnalysis)
                 .containsOnly(savedAnalysis);
@@ -343,7 +344,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                 userProjectAnalysisRepository,
                 userProjectSkillRepository,
                 userProjectExperienceTagRepository,
-                projectInventoryCacheService,
+                eventPublisher,
                 skillRepository,
                 experienceTagCodeRepository
         );
@@ -362,7 +363,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
         verify(userProjectSkillRepository, never()).saveAll(ArgumentMatchers.<Iterable<UserProjectSkill>>any());
         verify(userProjectExperienceTagRepository, never())
                 .saveAll(ArgumentMatchers.<Iterable<UserProjectExperienceTag>>any());
-        verifyNoInteractions(projectInventoryCacheService);
+        verifyNoInteractions(eventPublisher);
         verifyNoInteractions(skillRepository, experienceTagCodeRepository);
     }
 
@@ -387,7 +388,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                 userProjectAnalysisRepository,
                 userProjectSkillRepository,
                 userProjectExperienceTagRepository,
-                projectInventoryCacheService,
+                eventPublisher,
                 skillRepository,
                 experienceTagCodeRepository
         );
@@ -416,7 +417,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                 userProjectAnalysisRepository,
                 userProjectSkillRepository,
                 userProjectExperienceTagRepository,
-                projectInventoryCacheService,
+                eventPublisher,
                 skillRepository,
                 experienceTagCodeRepository
         );

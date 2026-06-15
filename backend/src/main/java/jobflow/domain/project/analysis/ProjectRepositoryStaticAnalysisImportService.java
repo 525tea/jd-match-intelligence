@@ -14,7 +14,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import jobflow.domain.project.AnalysisSource;
-import jobflow.domain.project.ProjectInventoryCacheService;
+import jobflow.domain.project.ProjectAnalysisUpdatedEvent;
 import jobflow.domain.project.UserProject;
 import jobflow.domain.project.UserProjectAnalysis;
 import jobflow.domain.project.UserProjectAnalysisRepository;
@@ -29,6 +29,7 @@ import jobflow.domain.skill.Skill;
 import jobflow.domain.skill.SkillRepository;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.EntityNotFoundException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,7 +44,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
     private final UserProjectAnalysisRepository userProjectAnalysisRepository;
     private final UserProjectSkillRepository userProjectSkillRepository;
     private final UserProjectExperienceTagRepository userProjectExperienceTagRepository;
-    private final ProjectInventoryCacheService projectInventoryCacheService;
+    private final ApplicationEventPublisher eventPublisher;
     private final SkillRepository skillRepository;
     private final ExperienceTagCodeRepository experienceTagCodeRepository;
     private final ProjectBuildFileAnalysisService projectBuildFileAnalysisService;
@@ -55,7 +56,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
             UserProjectAnalysisRepository userProjectAnalysisRepository,
             UserProjectSkillRepository userProjectSkillRepository,
             UserProjectExperienceTagRepository userProjectExperienceTagRepository,
-            ProjectInventoryCacheService projectInventoryCacheService,
+            ApplicationEventPublisher eventPublisher,
             SkillRepository skillRepository,
             ExperienceTagCodeRepository experienceTagCodeRepository,
             ProjectBuildFileAnalysisService projectBuildFileAnalysisService,
@@ -66,7 +67,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
         this.userProjectAnalysisRepository = userProjectAnalysisRepository;
         this.userProjectSkillRepository = userProjectSkillRepository;
         this.userProjectExperienceTagRepository = userProjectExperienceTagRepository;
-        this.projectInventoryCacheService = projectInventoryCacheService;
+        this.eventPublisher = eventPublisher;
         this.skillRepository = skillRepository;
         this.experienceTagCodeRepository = experienceTagCodeRepository;
         this.projectBuildFileAnalysisService = projectBuildFileAnalysisService;
@@ -143,7 +144,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
 
         userProjectSkillRepository.saveAll(projectSkills);
         userProjectExperienceTagRepository.saveAll(projectExperienceTags);
-        projectInventoryCacheService.evictProjectInventoryAfterCommit(userId, userProjectId);
+        eventPublisher.publishEvent(new ProjectAnalysisUpdatedEvent(userId, userProjectId));
 
         return new ProjectRepositoryStaticAnalysisImportResult(
                 savedAnalysis.getId(),
