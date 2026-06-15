@@ -125,6 +125,9 @@ cache_pattern_for_mode() {
     jd-match)
       echo "jdMatch::*"
       ;;
+    job-recommendation)
+      echo "jobRecommendation::*"
+      ;;
     project-skills)
       echo "projectSkillInventory::*"
       ;;
@@ -133,7 +136,7 @@ cache_pattern_for_mode() {
       ;;
     *)
       echo "Unsupported MODE=${MODE}" >&2
-      echo "Supported modes: trend-skills, gap-analysis, jd-match, project-skills, project-experience-tags" >&2
+      echo "Supported modes: trend-skills, gap-analysis, jd-match, job-recommendation, project-skills, project-experience-tags" >&2
       exit 1
       ;;
   esac
@@ -173,6 +176,18 @@ request_path_for_mode() {
         query="${query}&targetCareerLevel=$(urlencode "${TARGET_CAREER_LEVEL}")"
       fi
       echo "/projects/${USER_PROJECT_ID}/job-matches?${query}"
+      ;;
+    job-recommendation)
+      if [[ -z "${USER_PROJECT_ID}" ]]; then
+        echo "USER_PROJECT_ID is required for MODE=job-recommendation." >&2
+        exit 1
+      fi
+
+      local query="userProjectId=$(urlencode "${USER_PROJECT_ID}")&limit=$(urlencode "${LIMIT}")"
+      if [[ -n "${roles_query}" ]]; then
+        query="${query}&${roles_query}"
+      fi
+      echo "/recommendations/jobs?${query}"
       ;;
     project-skills)
       if [[ -z "${USER_PROJECT_ID}" ]]; then

@@ -1,5 +1,6 @@
 package jobflow.domain.recommendation.dto;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
 import jobflow.domain.analytics.dto.JobSkillMatchResponse;
@@ -36,7 +37,7 @@ public record JobRecommendationResponse(
         List<String> missingRequiredSkills,
         List<String> matchedPreferredSkills,
         List<String> missingPreferredSkills
-) {
+) implements Serializable {
 
     public static JobRecommendationResponse from(
             Job job,
