@@ -11,6 +11,7 @@ import java.util.List;
 import jobflow.domain.analytics.JobSkillIndexQueryService;
 import jobflow.domain.analytics.dto.JobSkillMatchResponse;
 import jobflow.domain.gap.dto.GapAnalysisResponse;
+import jobflow.domain.gap.dto.GapJobMatchEvidenceResponse;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.project.ProjectSkillSnapshotService;
@@ -25,8 +26,15 @@ class GapAnalysisServiceTest {
     private final JobSkillIndexQueryService jobSkillIndexQueryService =
             mock(JobSkillIndexQueryService.class);
 
+    private final GapAnalysisEvidenceService gapAnalysisEvidenceService =
+            mock(GapAnalysisEvidenceService.class);
+
     private final GapAnalysisService gapAnalysisService =
-            new GapAnalysisService(projectSkillSnapshotService, jobSkillIndexQueryService);
+            new GapAnalysisService(
+                    projectSkillSnapshotService,
+                    jobSkillIndexQueryService,
+                    gapAnalysisEvidenceService
+            );
 
     @Test
     @DisplayName("사용자 프로젝트 skill snapshot으로 공고 required/preferred 갭 분석을 수행한다")
@@ -36,11 +44,19 @@ class GapAnalysisServiceTest {
         List<Long> skillIds = List.of(1L, 2L, 3L);
         List<JobRole> targetRoles = List.of(JobRole.BACKEND, JobRole.FULLSTACK);
         JobSkillMatchResponse matchResponse = jobSkillMatchResponse();
+        GapJobMatchEvidenceResponse evidence = new GapJobMatchEvidenceResponse(
+                43,
+                List.of(),
+                List.of(),
+                List.of()
+        );
 
         given(projectSkillSnapshotService.findLatestSkillIds(userId, userProjectId))
                 .willReturn(skillIds);
         given(jobSkillIndexQueryService.findTopOpenJobMatchResponses(skillIds, targetRoles, 20))
                 .willReturn(List.of(matchResponse));
+        given(gapAnalysisEvidenceService.buildEvidence(matchResponse))
+                .willReturn(evidence);
 
         GapAnalysisResponse response = gapAnalysisService.analyzeProjectSkillGap(
                 userId,
@@ -51,10 +67,18 @@ class GapAnalysisServiceTest {
 
         assertThat(response.userProjectId()).isEqualTo(userProjectId);
         assertThat(response.userSkillIds()).containsExactly(1L, 2L, 3L);
-        assertThat(response.jobMatches()).containsExactly(matchResponse);
+        assertThat(response.jobMatches()).hasSize(1);
+        assertThat(response.jobMatches().get(0).jobId()).isEqualTo(matchResponse.jobId());
+        assertThat(response.jobMatches().get(0).missingRequiredSkills())
+                .containsExactly("Kubernetes");
+        assertThat(response.jobMatches().get(0).missingPreferredSkills())
+                .containsExactly("Kafka");
+        assertThat(response.jobMatches().get(0).evidence()).isEqualTo(evidence);
+        assertThat(response.jobMatches().get(0).evidence().addedJobs()).isEqualTo(43);
 
         verify(projectSkillSnapshotService).findLatestSkillIds(userId, userProjectId);
         verify(jobSkillIndexQueryService).findTopOpenJobMatchResponses(skillIds, targetRoles, 20);
+        verify(gapAnalysisEvidenceService).buildEvidence(matchResponse);
     }
 
     @Test
@@ -77,14 +101,14 @@ class GapAnalysisServiceTest {
         assertThat(response.jobMatches()).isEmpty();
 
         verify(projectSkillSnapshotService).findLatestSkillIds(userId, userProjectId);
-        verifyNoInteractions(jobSkillIndexQueryService);
+        verifyNoInteractions(jobSkillIndexQueryService, gapAnalysisEvidenceService);
     }
 
     private JobSkillMatchResponse jobSkillMatchResponse() {
         return new JobSkillMatchResponse(
                 100L,
                 "백엔드 개발자",
-                "JobFlow",
+                "Example Company",
                 JobRole.BACKEND,
                 CareerLevel.JUNIOR,
                 3,
