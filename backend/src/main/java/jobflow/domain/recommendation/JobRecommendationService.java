@@ -19,6 +19,8 @@ import jobflow.domain.recommendation.dto.JobRecommendationScoreResponse;
 import jobflow.domain.userjob.UserJob;
 import jobflow.domain.userjob.UserJobRepository;
 import jobflow.domain.userjob.UserJobStatus;
+import jobflow.global.cache.CacheNames;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +51,10 @@ public class JobRecommendationService {
         this.recommendationScoreCalculator = recommendationScoreCalculator;
     }
 
+    @Cacheable(
+            cacheNames = CacheNames.JOB_RECOMMENDATION,
+            key = "T(jobflow.domain.recommendation.JobRecommendationService).recommendationCacheKey(#userId, #userProjectId, #targetRoles, #limit)"
+    )
     public List<JobRecommendationResponse> recommendJobs(
             Long userId,
             Long userProjectId,
@@ -100,6 +106,28 @@ public class JobRecommendationService {
                         .thenComparing(JobRecommendationResponse::jobId, Comparator.reverseOrder()))
                 .limit(normalizedLimit)
                 .toList();
+    }
+
+    public static String recommendationCacheKey(
+            Long userId,
+            Long userProjectId,
+            Collection<JobRole> targetRoles,
+            int limit
+    ) {
+        return "userId=" + userId
+                + ":projectId=" + userProjectId
+                + ":roles=" + normalizeRolesForCache(targetRoles)
+                + ":limit=" + Math.max(1, limit);
+    }
+
+    private static String normalizeRolesForCache(Collection<JobRole> targetRoles) {
+        if (targetRoles == null || targetRoles.isEmpty()) {
+            return "ALL";
+        }
+        return targetRoles.stream()
+                .map(JobRole::name)
+                .sorted()
+                .collect(Collectors.joining(","));
     }
 
     private JobRecommendationResponse toRecommendation(

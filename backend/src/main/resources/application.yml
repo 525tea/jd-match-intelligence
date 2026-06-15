@@ -22,6 +22,7 @@ app:
     trend-ttl: ${CACHE_TREND_TTL:6h}
     gap-analysis-ttl: ${CACHE_GAP_ANALYSIS_TTL:30m}
     jd-match-ttl: ${CACHE_JD_MATCH_TTL:30m}
+    recommendation-ttl: ${CACHE_RECOMMENDATION_TTL:10m}
     project-inventory-ttl: ${CACHE_PROJECT_INVENTORY_TTL:1h}
 
   search:

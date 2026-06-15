@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.BDDMockito.given;
 
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import jobflow.domain.analytics.JobSkillIndexQueryService;
 import jobflow.domain.analytics.dto.JobSkillMatchResponse;
@@ -20,12 +22,14 @@ import jobflow.domain.recommendation.dto.JobRecommendationResponse;
 import jobflow.domain.user.User;
 import jobflow.domain.userjob.UserJob;
 import jobflow.domain.userjob.UserJobRepository;
+import jobflow.global.cache.CacheNames;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -148,6 +152,36 @@ class JobRecommendationServiceTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).jobId()).isEqualTo(100L);
         assertThat(responses.get(0).score().skillMatchScore()).isEqualByComparingTo("20.00");
+    }
+
+    @Test
+    @DisplayName("추천 API 결과를 Redis cache 대상으로 지정한다")
+    void recommendJobsIsCacheable() throws NoSuchMethodException {
+        Method method = JobRecommendationService.class.getMethod(
+                "recommendJobs",
+                Long.class,
+                Long.class,
+                Collection.class,
+                int.class
+        );
+
+        Cacheable cacheable = method.getAnnotation(Cacheable.class);
+
+        assertThat(cacheable).isNotNull();
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.JOB_RECOMMENDATION);
+    }
+
+    @Test
+    @DisplayName("추천 cache key는 user/project/role/limit 기준으로 정규화한다")
+    void recommendationCacheKey() {
+        String key = JobRecommendationService.recommendationCacheKey(
+                1L,
+                2L,
+                List.of(JobRole.FULLSTACK, JobRole.BACKEND),
+                0
+        );
+
+        assertThat(key).isEqualTo("userId=1:projectId=2:roles=BACKEND,FULLSTACK:limit=1");
     }
 
     private JobSkillMatchResponse matchResponse(

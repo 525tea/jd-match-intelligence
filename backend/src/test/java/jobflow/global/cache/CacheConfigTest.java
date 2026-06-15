@@ -29,6 +29,7 @@ class CacheConfigTest {
                 Duration.ofHours(6),
                 Duration.ofMinutes(30),
                 Duration.ofMinutes(30),
+                Duration.ofMinutes(10),
                 Duration.ofHours(1)
         );
 
@@ -47,6 +48,7 @@ class CacheConfigTest {
                 Duration.ofHours(6),
                 Duration.ofMinutes(30),
                 Duration.ofMinutes(30),
+                Duration.ofMinutes(10),
                 Duration.ofHours(1)
         );
 
@@ -60,6 +62,7 @@ class CacheConfigTest {
                         CacheNames.TREND_MARKET,
                         CacheNames.GAP_ANALYSIS,
                         CacheNames.JD_MATCH,
+                        CacheNames.JOB_RECOMMENDATION,
                         CacheNames.PROJECT_SKILL_INVENTORY,
                         CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY
                 );

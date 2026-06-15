@@ -42,6 +42,7 @@ public class CacheConfig {
                 CacheNames.TREND_MARKET, cacheConfiguration(cacheProperties.trendTtl()),
                 CacheNames.GAP_ANALYSIS, cacheConfiguration(cacheProperties.gapAnalysisTtl()),
                 CacheNames.JD_MATCH, cacheConfiguration(cacheProperties.jdMatchTtl()),
+                CacheNames.JOB_RECOMMENDATION, cacheConfiguration(cacheProperties.recommendationTtl()),
                 CacheNames.PROJECT_SKILL_INVENTORY, cacheConfiguration(cacheProperties.projectInventoryTtl()),
                 CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY, cacheConfiguration(cacheProperties.projectInventoryTtl())
         );
