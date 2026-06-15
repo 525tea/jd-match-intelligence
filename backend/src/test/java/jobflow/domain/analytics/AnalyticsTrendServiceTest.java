@@ -15,12 +15,14 @@ import jobflow.domain.job.JobRole;
 import jobflow.domain.skill.ExperienceTagCode;
 import jobflow.domain.skill.Skill;
 import jobflow.domain.skill.SkillCategory;
+import jobflow.global.cache.CacheNames;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.annotation.Cacheable;
 
 @ExtendWith(MockitoExtension.class)
 class AnalyticsTrendServiceTest {
@@ -185,5 +187,72 @@ class AnalyticsTrendServiceTest {
         assertThat(responses.get(0).remoteType()).isEqualTo("HYBRID");
         assertThat(responses.get(0).jobCount()).isEqualTo(12);
         assertThat(responses.get(0).avgMinExperienceYears()).isEqualByComparingTo("1.5");
+    }
+
+    @Test
+    @DisplayName("스킬 트렌드 조회에 캐시를 적용한다")
+    void getSkillTrendsUsesCache() throws NoSuchMethodException {
+        Cacheable cacheable = AnalyticsTrendService.class
+                .getMethod("getSkillTrends", LocalDate.class, int.class)
+                .getAnnotation(Cacheable.class);
+
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.TREND_SKILLS);
+        assertThat(cacheable.key()).contains("trendCacheKey");
+    }
+
+    @Test
+    @DisplayName("스킬 동시 등장 조회에 캐시를 적용한다")
+    void getSkillCooccurrencesUsesCache() throws NoSuchMethodException {
+        Cacheable cacheable = AnalyticsTrendService.class
+                .getMethod("getSkillCooccurrences", LocalDate.class, Long.class, int.class)
+                .getAnnotation(Cacheable.class);
+
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.TREND_SKILL_COOCCURRENCES);
+        assertThat(cacheable.key()).contains("trendSkillCacheKey");
+    }
+
+    @Test
+    @DisplayName("스킬 경험 태그 시장 조회에 캐시를 적용한다")
+    void getSkillExperienceMarketsUsesCache() throws NoSuchMethodException {
+        Cacheable cacheable = AnalyticsTrendService.class
+                .getMethod("getSkillExperienceMarkets", LocalDate.class, Long.class, int.class)
+                .getAnnotation(Cacheable.class);
+
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.TREND_SKILL_EXPERIENCE_TAGS);
+        assertThat(cacheable.key()).contains("trendSkillCacheKey");
+    }
+
+    @Test
+    @DisplayName("공고 시장 통계 조회에 캐시를 적용한다")
+    void getJobMarketStatsUsesCache() throws NoSuchMethodException {
+        Cacheable cacheable = AnalyticsTrendService.class
+                .getMethod("getJobMarketStats", LocalDate.class, JobRole.class, int.class)
+                .getAnnotation(Cacheable.class);
+
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.TREND_MARKET);
+        assertThat(cacheable.key()).contains("trendMarketCacheKey");
+    }
+
+    @Test
+    @DisplayName("트렌드 캐시 key는 월 시작일과 정규화된 limit을 사용한다")
+    void trendCacheKeyUsesPeriodStartAndNormalizedLimit() {
+        assertThat(AnalyticsTrendService.trendCacheKey(LocalDate.of(2026, 6, 15), 0))
+                .isEqualTo("2026-06-01:limit=20");
+        assertThat(AnalyticsTrendService.trendCacheKey(LocalDate.of(2026, 6, 30), 200))
+                .isEqualTo("2026-06-01:limit=100");
+    }
+
+    @Test
+    @DisplayName("스킬 트렌드 캐시 key는 skillId를 포함한다")
+    void trendSkillCacheKeyIncludesSkillId() {
+        assertThat(AnalyticsTrendService.trendSkillCacheKey(LocalDate.of(2026, 6, 15), 1L, 10))
+                .isEqualTo("2026-06-01:skillId=1:limit=10");
+    }
+
+    @Test
+    @DisplayName("시장 통계 캐시 key는 role을 포함한다")
+    void trendMarketCacheKeyIncludesRole() {
+        assertThat(AnalyticsTrendService.trendMarketCacheKey(LocalDate.of(2026, 6, 15), JobRole.BACKEND, 10))
+                .isEqualTo("2026-06-01:role=BACKEND:limit=10");
     }
 }

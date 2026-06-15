@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,9 +28,11 @@ import jobflow.domain.project.UserProjectExperienceTagRepository;
 import jobflow.domain.project.UserProjectRepository;
 import jobflow.domain.project.UserProjectSkillRepository;
 import jobflow.domain.skill.ExperienceTagCode;
+import jobflow.global.cache.CacheNames;
 import jobflow.global.error.exception.EntityNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class JdMatchServiceTest {
@@ -53,6 +56,65 @@ class JdMatchServiceTest {
             jobExperienceTagRepository,
             jdMatchScoreCalculator
     );
+
+    @Test
+    @DisplayName("JD 매칭 조회 결과를 Redis cache 대상으로 표시한다")
+    void findProjectJobMatchesIsCacheable() throws NoSuchMethodException {
+        Method method = JdMatchService.class.getMethod(
+                "findProjectJobMatches",
+                Long.class,
+                Long.class,
+                java.util.Collection.class,
+                CareerLevel.class,
+                int.class
+        );
+
+        Cacheable cacheable = method.getAnnotation(Cacheable.class);
+
+        assertThat(cacheable).isNotNull();
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.JD_MATCH);
+        assertThat(cacheable.key()).contains("jdMatchCacheKey");
+    }
+
+    @Test
+    @DisplayName("JD 매칭 cache key는 role 순서와 중복을 정규화한다")
+    void jdMatchCacheKeyNormalizesTargetRoles() {
+        String firstKey = JdMatchService.jdMatchCacheKey(
+                1L,
+                10L,
+                List.of(JobRole.FULLSTACK, JobRole.BACKEND, JobRole.BACKEND),
+                CareerLevel.MID,
+                100
+        );
+        String secondKey = JdMatchService.jdMatchCacheKey(
+                1L,
+                10L,
+                List.of(JobRole.BACKEND, JobRole.FULLSTACK),
+                CareerLevel.MID,
+                50
+        );
+
+        assertThat(firstKey).isEqualTo(secondKey);
+        assertThat(firstKey).contains("roles=BACKEND,FULLSTACK");
+        assertThat(firstKey).contains("career=MID");
+        assertThat(firstKey).contains("limit=50");
+    }
+
+    @Test
+    @DisplayName("JD 매칭 cache key는 role과 career level이 없으면 기본값으로 정규화한다")
+    void jdMatchCacheKeyNormalizesEmptyFilters() {
+        String key = JdMatchService.jdMatchCacheKey(
+                1L,
+                10L,
+                List.of(),
+                null,
+                0
+        );
+
+        assertThat(key).contains("roles=ALL");
+        assertThat(key).contains("career=ANY");
+        assertThat(key).contains("limit=1");
+    }
 
     @Test
     @DisplayName("프로젝트 최신 분석 결과와 공고 skill/tag를 비교해 JD 매칭 점수를 반환한다")

@@ -18,6 +18,12 @@ management:
         include: health,info
 
 app:
+  cache:
+    trend-ttl: ${CACHE_TREND_TTL:6h}
+    gap-analysis-ttl: ${CACHE_GAP_ANALYSIS_TTL:30m}
+    jd-match-ttl: ${CACHE_JD_MATCH_TTL:30m}
+    project-inventory-ttl: ${CACHE_PROJECT_INVENTORY_TTL:1h}
+
   search:
     elasticsearch:
       url: ${ELASTICSEARCH_URL:http://localhost:9200}

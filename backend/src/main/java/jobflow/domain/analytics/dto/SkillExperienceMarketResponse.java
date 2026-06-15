@@ -1,5 +1,6 @@
 package jobflow.domain.analytics.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import jobflow.domain.analytics.SkillExperienceMarket;
@@ -14,7 +15,7 @@ public record SkillExperienceMarketResponse(
         long skillJobCount,
         long tagJobCount,
         BigDecimal liftScore
-) {
+) implements Serializable {
 
     public static SkillExperienceMarketResponse from(SkillExperienceMarket market) {
         return new SkillExperienceMarketResponse(

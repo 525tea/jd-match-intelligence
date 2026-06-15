@@ -1,5 +1,6 @@
 package jobflow.domain.gap.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.List;
 import jobflow.domain.analytics.dto.JobSkillMatchResponse;
@@ -26,7 +27,7 @@ public record GapJobMatchResponse(
         List<String> matchedPreferredSkills,
         List<String> missingPreferredSkills,
         GapJobMatchEvidenceResponse evidence
-) {
+) implements Serializable {
 
     public static GapJobMatchResponse from(
             JobSkillMatchResponse response,

@@ -1,5 +1,6 @@
 package jobflow.domain.gap.dto;
 
+import java.io.Serializable;
 import java.util.List;
 
 public record GapJobMatchEvidenceResponse(
@@ -7,7 +8,7 @@ public record GapJobMatchEvidenceResponse(
         List<GapSkillCooccurrenceEvidenceResponse> cooccurrences,
         List<GapRelatedTagEvidenceResponse> relatedTags,
         List<GapLearningConnectionResponse> learningConnections
-) {
+) implements Serializable {
 
     public static GapJobMatchEvidenceResponse empty() {
         return new GapJobMatchEvidenceResponse(

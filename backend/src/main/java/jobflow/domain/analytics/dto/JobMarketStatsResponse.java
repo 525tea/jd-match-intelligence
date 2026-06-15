@@ -1,5 +1,6 @@
 package jobflow.domain.analytics.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import jobflow.domain.analytics.JobMarketStats;
@@ -18,7 +19,7 @@ public record JobMarketStatsResponse(
         long expiredJobCount,
         BigDecimal avgMinExperienceYears,
         BigDecimal avgMaxExperienceYears
-) {
+) implements Serializable {
 
     public static JobMarketStatsResponse from(JobMarketStats stats) {
         return new JobMarketStatsResponse(

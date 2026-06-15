@@ -1,5 +1,6 @@
 package jobflow.domain.analytics.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import jobflow.domain.analytics.SkillTrend;
@@ -14,7 +15,7 @@ public record SkillTrendResponse(
         long requiredCount,
         long preferredCount,
         BigDecimal trendScore
-) {
+) implements Serializable {
 
     public static SkillTrendResponse from(SkillTrend skillTrend) {
         return new SkillTrendResponse(

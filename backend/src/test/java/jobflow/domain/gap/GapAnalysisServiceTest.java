@@ -15,8 +15,10 @@ import jobflow.domain.gap.dto.GapJobMatchEvidenceResponse;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.project.ProjectSkillSnapshotService;
+import jobflow.global.cache.CacheNames;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.cache.annotation.Cacheable;
 
 class GapAnalysisServiceTest {
 
@@ -102,6 +104,41 @@ class GapAnalysisServiceTest {
 
         verify(projectSkillSnapshotService).findLatestSkillIds(userId, userProjectId);
         verifyNoInteractions(jobSkillIndexQueryService, gapAnalysisEvidenceService);
+    }
+
+    @Test
+    @DisplayName("갭 분석 조회에 캐시를 적용한다")
+    void analyzeProjectSkillGapUsesCache() throws NoSuchMethodException {
+        Cacheable cacheable = GapAnalysisService.class
+                .getMethod("analyzeProjectSkillGap", Long.class, Long.class, java.util.Collection.class, int.class)
+                .getAnnotation(Cacheable.class);
+
+        assertThat(cacheable.cacheNames()).containsExactly(CacheNames.GAP_ANALYSIS);
+        assertThat(cacheable.key()).contains("gapAnalysisCacheKey");
+    }
+
+    @Test
+    @DisplayName("갭 분석 캐시 key는 사용자, 프로젝트, 정렬된 target role, limit을 포함한다")
+    void gapAnalysisCacheKeyIncludesUserProjectRolesAndLimit() {
+        String cacheKey = GapAnalysisService.gapAnalysisCacheKey(
+                4L,
+                2L,
+                List.of(JobRole.FULLSTACK, JobRole.BACKEND),
+                20
+        );
+
+        assertThat(cacheKey)
+                .isEqualTo("userId=4:projectId=2:roles=BACKEND,FULLSTACK:limit=20");
+    }
+
+    @Test
+    @DisplayName("target role이 없으면 갭 분석 캐시 key에 ALL role을 사용한다")
+    void gapAnalysisCacheKeyUsesAllWhenTargetRolesAreEmpty() {
+        assertThat(GapAnalysisService.gapAnalysisCacheKey(4L, 2L, null, 20))
+                .isEqualTo("userId=4:projectId=2:roles=ALL:limit=20");
+
+        assertThat(GapAnalysisService.gapAnalysisCacheKey(4L, 2L, List.of(), 20))
+                .isEqualTo("userId=4:projectId=2:roles=ALL:limit=20");
     }
 
     private JobSkillMatchResponse jobSkillMatchResponse() {

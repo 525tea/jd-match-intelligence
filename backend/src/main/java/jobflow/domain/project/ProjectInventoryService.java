@@ -3,9 +3,11 @@ package jobflow.domain.project;
 import java.util.List;
 import jobflow.domain.project.dto.ProjectExperienceTagInventoryResponse;
 import jobflow.domain.project.dto.ProjectSkillInventoryResponse;
+import jobflow.global.cache.CacheNames;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +21,10 @@ public class ProjectInventoryService {
     private final UserProjectSkillRepository userProjectSkillRepository;
     private final UserProjectExperienceTagRepository userProjectExperienceTagRepository;
 
+    @Cacheable(
+            cacheNames = CacheNames.PROJECT_SKILL_INVENTORY,
+            key = "T(jobflow.domain.project.ProjectInventoryService).projectInventoryCacheKey(#userId, #userProjectId)"
+    )
     public List<ProjectSkillInventoryResponse> getProjectSkills(Long userId, Long userProjectId) {
         validateOwnedProject(userId, userProjectId);
 
@@ -31,6 +37,10 @@ public class ProjectInventoryService {
                 .orElseGet(List::of);
     }
 
+    @Cacheable(
+            cacheNames = CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY,
+            key = "T(jobflow.domain.project.ProjectInventoryService).projectInventoryCacheKey(#userId, #userProjectId)"
+    )
     public List<ProjectExperienceTagInventoryResponse> getProjectExperienceTags(
             Long userId,
             Long userProjectId
@@ -47,6 +57,10 @@ public class ProjectInventoryService {
                         ))
                         .toList())
                 .orElseGet(List::of);
+    }
+
+    public static String projectInventoryCacheKey(Long userId, Long userProjectId) {
+        return "userId=" + userId + ":projectId=" + userProjectId;
     }
 
     private void validateOwnedProject(Long userId, Long userProjectId) {

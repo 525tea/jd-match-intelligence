@@ -1,5 +1,6 @@
 package jobflow.domain.analytics.dto;
 
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import jobflow.domain.analytics.SkillCooccurrence;
@@ -14,7 +15,7 @@ public record SkillCooccurrenceResponse(
         long baseSkillJobCount,
         long coSkillJobCount,
         BigDecimal liftScore
-) {
+) implements Serializable {
 
     public static SkillCooccurrenceResponse from(SkillCooccurrence cooccurrence) {
         return new SkillCooccurrenceResponse(
