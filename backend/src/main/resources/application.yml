@@ -45,6 +45,12 @@ app:
     provider-token:
       encryption-key: ${OAUTH2_PROVIDER_TOKEN_ENCRYPTION_KEY:}
 
+  notification:
+    deadline-reminder:
+      window: ${DEADLINE_REMINDER_WINDOW:24h}
+      idempotency-ttl: ${DEADLINE_REMINDER_IDEMPOTENCY_TTL:25h}
+      max-attempts: ${DEADLINE_REMINDER_MAX_ATTEMPTS:3}
+
 jobflow:
   analytics:
     skill-trend:
