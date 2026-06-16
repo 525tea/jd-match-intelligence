@@ -4,6 +4,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@EnableConfigurationProperties(DeadlineReminderProperties.class)
+@EnableConfigurationProperties({
+        DeadlineReminderProperties.class,
+        MailgunProperties.class
+})
 public class NotificationConfig {
 }
