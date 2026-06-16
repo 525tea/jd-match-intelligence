@@ -8,6 +8,10 @@ import jobflow.domain.job.JobRole;
 import jobflow.domain.job.RemoteType;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
+import jobflow.domain.notification.NotificationLog;
+import jobflow.domain.notification.NotificationLogRepository;
+import jobflow.domain.notification.NotificationType;
+import jobflow.domain.notification.DeadlineReminderTarget;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +41,9 @@ class UserJobRepositoryTest {
 
     @Autowired
     private JobRepository jobRepository;
+
+    @Autowired
+    private NotificationLogRepository notificationLogRepository;
 
     @Test
     @DisplayName("사용자와 공고 id로 UserJob을 조회한다")
@@ -132,7 +139,86 @@ class UserJobRepositoryTest {
         assertThat(exists).isTrue();
     }
 
+    @Test
+    @DisplayName("저장한 OPEN 공고 중 24시간 이내 마감이고 아직 알림 로그가 없는 대상만 조회한다")
+    void findDeadlineReminderTargets() {
+        User user = userRepository.save(User.signup("user@example.com", "encoded-password", "사용자"));
+        LocalDateTime now = LocalDateTime.of(2026, 6, 16, 10, 0);
+        Job targetJob = jobRepository.save(createJob(
+                "target-job",
+                now.plusHours(3)
+        ));
+        Job alreadyLoggedJob = jobRepository.save(createJob(
+                "already-logged-job",
+                now.plusHours(4)
+        ));
+        Job viewedJob = jobRepository.save(createJob(
+                "viewed-job",
+                now.plusHours(5)
+        ));
+        Job farDeadlineJob = jobRepository.save(createJob(
+                "far-deadline-job",
+                now.plusHours(25)
+        ));
+        Job nullDeadlineJob = jobRepository.save(createJob(
+                "null-deadline-job",
+                null
+        ));
+        Job closedJob = jobRepository.save(createJob(
+                "closed-job",
+                now.plusHours(6)
+        ));
+        closedJob.close();
+
+        UserJob targetUserJob = UserJob.viewed(user, targetJob, now.minusHours(1));
+        targetUserJob.save(now.minusMinutes(50));
+        UserJob alreadyLoggedUserJob = UserJob.viewed(user, alreadyLoggedJob, now.minusHours(1));
+        alreadyLoggedUserJob.save(now.minusMinutes(40));
+        UserJob viewedUserJob = UserJob.viewed(user, viewedJob, now.minusHours(1));
+        UserJob farDeadlineUserJob = UserJob.viewed(user, farDeadlineJob, now.minusHours(1));
+        farDeadlineUserJob.save(now.minusMinutes(30));
+        UserJob nullDeadlineUserJob = UserJob.viewed(user, nullDeadlineJob, now.minusHours(1));
+        nullDeadlineUserJob.save(now.minusMinutes(20));
+        UserJob closedUserJob = UserJob.viewed(user, closedJob, now.minusHours(1));
+        closedUserJob.save(now.minusMinutes(10));
+        userJobRepository.saveAll(List.of(
+                targetUserJob,
+                alreadyLoggedUserJob,
+                viewedUserJob,
+                farDeadlineUserJob,
+                nullDeadlineUserJob,
+                closedUserJob
+        ));
+        notificationLogRepository.save(NotificationLog.create(
+                user,
+                alreadyLoggedJob,
+                NotificationType.DEADLINE_REMINDER,
+                now.minusMinutes(5)
+        ));
+        userJobRepository.flush();
+
+        List<DeadlineReminderTarget> targets = userJobRepository.findDeadlineReminderTargets(
+                UserJobStatus.SAVED,
+                jobflow.domain.job.JobStatus.OPEN,
+                now,
+                now.plusHours(24),
+                NotificationType.DEADLINE_REMINDER
+        );
+
+        assertThat(targets).hasSize(1);
+        DeadlineReminderTarget target = targets.getFirst();
+        assertThat(target.userId()).isEqualTo(user.getId());
+        assertThat(target.userEmail()).isEqualTo("user@example.com");
+        assertThat(target.jobId()).isEqualTo(targetJob.getId());
+        assertThat(target.jobTitle()).isEqualTo("백엔드 개발자");
+        assertThat(target.deadlineAt()).isEqualTo(now.plusHours(3));
+    }
+
     private Job createJob(String externalId) {
+        return createJob(externalId, LocalDateTime.of(2026, 6, 30, 23, 59));
+    }
+
+    private Job createJob(String externalId, LocalDateTime deadlineAt) {
         return Job.create(
                 "MANUAL",
                 externalId,
@@ -159,7 +245,7 @@ class UserJobRepositoryTest {
                 true,
                 1,
                 LocalDateTime.of(2026, 6, 1, 0, 0),
-                LocalDateTime.of(2026, 6, 30, 23, 59)
+                deadlineAt
         );
     }
 }
