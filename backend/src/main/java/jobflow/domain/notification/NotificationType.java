@@ -1,5 +1,6 @@
 package jobflow.domain.notification;
 
 public enum NotificationType {
-    DEADLINE_REMINDER
+    DEADLINE_REMINDER,
+    DAILY_DIGEST
 }

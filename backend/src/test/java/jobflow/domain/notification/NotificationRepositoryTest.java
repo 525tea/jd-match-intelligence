@@ -3,6 +3,7 @@ package jobflow.domain.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import jobflow.domain.job.CareerLevel;
@@ -40,7 +41,7 @@ class NotificationRepositoryTest {
     private JobRepository jobRepository;
 
     @Test
-    @DisplayName("사용자/공고/알림 타입 단위로 NotificationLog 중복 생성을 막는다")
+    @DisplayName("사용자/공고/알림 타입 deduplication key 단위로 NotificationLog 중복 생성을 막는다")
     void preventDuplicateNotificationLog() {
         User user = userRepository.save(User.signup("user@example.com", "encoded-password", "사용자"));
         Job job = jobRepository.save(createJob("deadline-reminder-test-job"));
@@ -59,6 +60,33 @@ class NotificationRepositoryTest {
                     user,
                     job,
                     NotificationType.DEADLINE_REMINDER,
+                    now.plusMinutes(1)
+            ));
+            notificationLogRepository.flush();
+        })
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("사용자/날짜 단위 Daily Digest NotificationLog 중복 생성을 막는다")
+    void preventDuplicateDailyDigestNotificationLog() {
+        User user = userRepository.save(User.signup("user@example.com", "encoded-password", "사용자"));
+        LocalDate digestDate = LocalDate.of(2026, 6, 17);
+        LocalDateTime now = LocalDateTime.of(2026, 6, 17, 9, 0);
+
+        notificationLogRepository.save(NotificationLog.createDailyDigest(
+                user,
+                digestDate,
+                3,
+                now
+        ));
+        notificationLogRepository.flush();
+
+        assertThatThrownBy(() -> {
+            notificationLogRepository.save(NotificationLog.createDailyDigest(
+                    user,
+                    digestDate,
+                    3,
                     now.plusMinutes(1)
             ));
             notificationLogRepository.flush();
