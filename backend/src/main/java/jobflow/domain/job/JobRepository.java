@@ -22,6 +22,13 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
     List<Job> findByStatusAndDeadlineAtBefore(JobStatus status, LocalDateTime deadlineAt);
 
+    List<Job> findByStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDescIdDesc(
+            JobStatus status,
+            LocalDateTime from,
+            LocalDateTime to,
+            Pageable pageable
+    );
+
     boolean existsBySourceAndExternalId(String source, String externalId);
 
     Optional<Job> findBySourceAndExternalId(String source, String externalId);
