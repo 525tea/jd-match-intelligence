@@ -21,6 +21,10 @@ public class DeadlineReminderIdempotencyService {
         return Boolean.TRUE.equals(acquired);
     }
 
+    public void release(Long userId, Long jobId) {
+        redisTemplate.delete(key(userId, jobId));
+    }
+
     public String key(Long userId, Long jobId) {
         return KEY_PREFIX + ":" + userId + ":" + jobId;
     }

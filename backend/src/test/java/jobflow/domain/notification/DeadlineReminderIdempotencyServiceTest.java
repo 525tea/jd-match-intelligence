@@ -65,4 +65,12 @@ class DeadlineReminderIdempotencyServiceTest {
 
         assertThat(acquired).isFalse();
     }
+
+    @Test
+    @DisplayName("deadline reminder SETNX key를 삭제한다")
+    void release() {
+        service.release(10L, 20L);
+
+        verify(redisTemplate).delete("deadline_reminder:10:20");
+    }
 }
