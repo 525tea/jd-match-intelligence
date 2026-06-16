@@ -3,6 +3,7 @@ package jobflow.domain.notification;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -15,6 +16,12 @@ import org.springframework.web.client.RestClientResponseException;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(
+        prefix = "app.notification",
+        name = "email-provider",
+        havingValue = "mailgun",
+        matchIfMissing = true
+)
 public class MailgunEmailSender implements EmailSender {
 
     static final String PROVIDER = "MAILGUN";
