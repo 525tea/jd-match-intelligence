@@ -57,6 +57,16 @@ app:
       from: ${MAILGUN_FROM:no-reply@localhost}
 
 jobflow:
+  notification:
+    deadline-reminder:
+      scheduler:
+        enabled: ${DEADLINE_REMINDER_SCHEDULER_ENABLED:false}
+      fixed-delay: ${DEADLINE_REMINDER_FIXED_DELAY:3600000}
+      initial-delay: ${DEADLINE_REMINDER_INITIAL_DELAY:60000}
+      runner:
+        enabled: ${DEADLINE_REMINDER_RUNNER_ENABLED:false}
+        mode: ${DEADLINE_REMINDER_RUNNER_MODE:due-soon}
+
   analytics:
     skill-trend:
       scheduler:
