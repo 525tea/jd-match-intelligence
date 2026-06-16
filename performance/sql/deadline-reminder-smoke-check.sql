@@ -1,5 +1,10 @@
 -- deadline reminder batch verification
 -- Run this in IntelliJ DB Console after executing the deadline reminder batch smoke.
+--
+-- The Spring app uses Asia/Seoul local time. MySQL NOW() can differ by session/server timezone,
+-- so candidate checks below use @app_now = UTC_TIMESTAMP + 9 hours to mirror the app clock.
+
+SET @app_now = DATE_ADD(UTC_TIMESTAMP(6), INTERVAL 9 HOUR);
 
 -- 1) 현재 시점 기준 마감 알림 후보 수
 SELECT
@@ -10,8 +15,8 @@ FROM user_jobs uj
 WHERE uj.status = 'SAVED'
   AND j.status = 'OPEN'
   AND j.deadline_at IS NOT NULL
-  AND j.deadline_at > NOW()
-  AND j.deadline_at <= DATE_ADD(NOW(), INTERVAL 24 HOUR)
+  AND j.deadline_at > @app_now
+  AND j.deadline_at <= DATE_ADD(@app_now, INTERVAL 24 HOUR)
   AND NOT EXISTS (
       SELECT 1
       FROM notification_logs nl
@@ -74,6 +79,21 @@ FROM notification_logs nl
 WHERE nl.type = 'DEADLINE_REMINDER'
 ORDER BY nl.updated_at DESC, na.attempt_number DESC
 LIMIT 30;
+
+-- 4-1) Smoke fixture row timezone sanity check
+SELECT
+    j.id,
+    j.source,
+    j.external_id,
+    j.status,
+    j.deadline_at,
+    NOW() AS db_now,
+    @app_now AS app_now,
+    TIMESTAMPDIFF(MINUTE, @app_now, j.deadline_at) AS app_minutes_until_deadline
+FROM jobs j
+WHERE j.source = 'NOTIFICATION_SMOKE'
+ORDER BY j.id DESC
+LIMIT 10;
 
 -- 5) unique key가 막아야 하는 중복 로그가 없는지 확인
 SELECT
