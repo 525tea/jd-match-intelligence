@@ -13,7 +13,19 @@ public interface NotificationLogRepository extends JpaRepository<NotificationLog
             NotificationType type
     );
 
+    Optional<NotificationLog> findByUserIdAndTypeAndDeduplicationKey(
+            Long userId,
+            NotificationType type,
+            String deduplicationKey
+    );
+
     boolean existsByUserIdAndJobIdAndType(Long userId, Long jobId, NotificationType type);
+
+    boolean existsByUserIdAndTypeAndDeduplicationKey(
+            Long userId,
+            NotificationType type,
+            String deduplicationKey
+    );
 
     List<NotificationLog> findByTypeAndStatusAndNextRetryAtLessThanEqual(
             NotificationType type,

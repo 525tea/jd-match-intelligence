@@ -1,7 +1,9 @@
 package jobflow.domain.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.EmploymentType;
@@ -11,6 +13,7 @@ import jobflow.domain.job.RemoteType;
 import jobflow.domain.user.User;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class NotificationLogTest {
 
@@ -30,7 +33,45 @@ class NotificationLogTest {
         assertThat(notificationLog.getAttemptCount()).isZero();
         assertThat(notificationLog.getMaxAttempts()).isEqualTo(3);
         assertThat(notificationLog.getNextRetryAt()).isEqualTo(now);
+        assertThat(notificationLog.getDeduplicationKey()).isEqualTo("DEADLINE_REMINDER:job:10");
         assertThat(notificationLog.canRetry(now)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Daily Digest 로그는 job 없이 날짜 기준 deduplication key로 생성된다")
+    void createDailyDigestNotificationLog() {
+        LocalDateTime now = LocalDateTime.of(2026, 6, 17, 9, 0);
+
+        NotificationLog notificationLog = NotificationLog.createDailyDigest(
+                User.signup("user@example.com", "encoded-password", "사용자"),
+                LocalDate.of(2026, 6, 17),
+                3,
+                now
+        );
+
+        assertThat(notificationLog.getJob()).isNull();
+        assertThat(notificationLog.getType()).isEqualTo(NotificationType.DAILY_DIGEST);
+        assertThat(notificationLog.getDeduplicationKey()).isEqualTo("DAILY_DIGEST:date:2026-06-17");
+        assertThat(notificationLog.getStatus()).isEqualTo(NotificationStatus.PENDING);
+        assertThat(notificationLog.getAttemptCount()).isZero();
+        assertThat(notificationLog.getMaxAttempts()).isEqualTo(3);
+        assertThat(notificationLog.getNextRetryAt()).isEqualTo(now);
+    }
+
+    @Test
+    @DisplayName("job-level 알림 로그는 job 없이 생성할 수 없다")
+    void rejectJobLevelNotificationLogWithoutJob() {
+        LocalDateTime now = LocalDateTime.of(2026, 6, 17, 9, 0);
+
+        assertThatThrownBy(() -> NotificationLog.create(
+                User.signup("user@example.com", "encoded-password", "사용자"),
+                null,
+                NotificationType.DEADLINE_REMINDER,
+                3,
+                now
+        ))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("job is required for job-level notification log");
     }
 
     @Test
@@ -95,7 +136,7 @@ class NotificationLogTest {
     }
 
     private Job createJob() {
-        return Job.create(
+        Job job = Job.create(
                 "MANUAL",
                 "deadline-reminder-test-job",
                 "백엔드 개발자",
@@ -123,5 +164,7 @@ class NotificationLogTest {
                 LocalDateTime.of(2026, 6, 1, 0, 0),
                 LocalDateTime.of(2026, 6, 17, 9, 0)
         );
+        ReflectionTestUtils.setField(job, "id", 10L);
+        return job;
     }
 }

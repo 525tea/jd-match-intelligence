@@ -67,6 +67,13 @@ jobflow:
         enabled: ${DEADLINE_REMINDER_RUNNER_ENABLED:false}
         mode: ${DEADLINE_REMINDER_RUNNER_MODE:due-soon}
 
+    daily-digest:
+      runner:
+        enabled: ${DAILY_DIGEST_RUNNER_ENABLED:false}
+        mode: ${DAILY_DIGEST_RUNNER_MODE:daily}
+        target-roles: ${DAILY_DIGEST_TARGET_ROLES:}
+        target-career-level: ${DAILY_DIGEST_TARGET_CAREER_LEVEL:}
+
   analytics:
     skill-trend:
       scheduler:

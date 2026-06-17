@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableConfigurationProperties({
         DeadlineReminderProperties.class,
+        DailyDigestProperties.class,
         MailgunProperties.class,
         MockEmailSenderProperties.class
 })
