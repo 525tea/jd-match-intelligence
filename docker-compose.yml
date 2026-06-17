@@ -14,6 +14,11 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u jobflow -pjobflow --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7.4
@@ -22,6 +27,11 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   elasticsearch:
     build:
@@ -37,8 +47,66 @@ services:
       - "9300:9300"
     volumes:
       - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    image: jobflow-backend:local
+    container_name: jobflow-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/jobflow?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      JWT_SECRET: jobflow-local-development-secret-key-must-be-at-least-32-bytes
+      SKILL_TREND_AGGREGATION_SCHEDULER_ENABLED: "false"
+      DEADLINE_REMINDER_SCHEDULER_ENABLED: "false"
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    container_name: jobflow-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    depends_on:
+      - backend
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: jobflow-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
 
 volumes:
   mysql-data:
   redis-data:
   es-data:
+  grafana-data:
