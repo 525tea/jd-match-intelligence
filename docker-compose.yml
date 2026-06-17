@@ -64,6 +64,8 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       ELASTICSEARCH_URL: http://elasticsearch:9200
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      TRACING_SAMPLING_PROBABILITY: "1.0"
       JWT_SECRET: jobflow-local-development-secret-key-must-be-at-least-32-bytes
       SKILL_TREND_AGGREGATION_SCHEDULER_ENABLED: "false"
       DEADLINE_REMINDER_SCHEDULER_ENABLED: "false"
@@ -76,6 +78,14 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      zipkin:
+        condition: service_started
+
+  zipkin:
+    image: openzipkin/zipkin:3.4.0
+    container_name: jobflow-zipkin
+    ports:
+      - "9411:9411"
 
   prometheus:
     image: prom/prometheus:v2.51.2

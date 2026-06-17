@@ -19,6 +19,12 @@ management:
   metrics:
     tags:
       application: jobflow-backend
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}
 
 app:
   cache:
