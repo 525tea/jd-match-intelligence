@@ -101,12 +101,16 @@ services:
     container_name: jobflow-gateway
     environment:
       BACKEND_URL: http://backend:8080
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE: 100
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       TRACING_SAMPLING_PROBABILITY: "1.0"
     ports:
       - "8081:8081"
     depends_on:
       - backend
+      - redis
       - zipkin
 
   prometheus:

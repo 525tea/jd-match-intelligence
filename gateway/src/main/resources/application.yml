@@ -1,21 +1,25 @@
 server:
   port: ${GATEWAY_PORT:8081}
 
+gateway:
+  backend-url: ${BACKEND_URL:http://localhost:8080}
+  rate-limit:
+    requests-per-minute: ${GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE:100}
+
 spring:
   application:
     name: jobflow-gateway
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
 
   cloud:
     gateway:
       server:
         webflux:
-          routes:
-            - id: backend-api
-              uri: ${BACKEND_URL:http://localhost:8080}
-              predicates:
-                - Path=/api/**
-              filters:
-                - StripPrefix=1
+          enabled: true
 
 management:
   endpoints:
