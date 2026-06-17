@@ -1,0 +1,23 @@
+html, body { margin: 0; padding: 0; overflow-x: hidden; }
+* { box-sizing: border-box; }
+#root { overflow-x: hidden; }
+button { -webkit-tap-highlight-color: transparent; }
+.jf-stat { transition: transform .15s, box-shadow .15s, border-color .15s; }
+.jf-stat:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.08); border-color: #d6d2c6 !important; }
+.jf-stat:hover .jf-arrow { opacity: 1 !important; transform: translateX(2px); }
+.jf-statcell:hover .jf-arrow { opacity: 1 !important; transform: translateX(2px); }
+.jf-stat:active { transform: translateY(0); }
+.jf-matchrow { transition: background .14s; }
+.jf-matchrow:hover { background: #faf9f5; }
+.jf-navitem:hover { background: rgba(0,0,0,0.05); color: #16150f !important; }
+.jf-link:hover { text-decoration: underline; }
+.jf-cta { transition: transform .14s, filter .14s; }
+.jf-cta:hover { transform: translateY(-1px); filter: brightness(1.04); }
+.jf-cta:active { transform: translateY(0); }
+.jf-insight { transition: transform .14s, box-shadow .14s; }
+.jf-insight:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(0,0,0,0.18); }
+.jf-jobcard { transition: transform .14s, box-shadow .14s, border-color .14s; }
+.jf-jobcard:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(20,21,26,0.09); border-color: #dfe2e7 !important; }
+@media (max-width: 980px) {
+  .jf-tweaks { display: none !important; }
+}
