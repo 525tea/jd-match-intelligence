@@ -12,3 +12,13 @@ scrape_configs:
       - source_labels: [__address__]
         target_label: instance
         replacement: jobflow-backend
+
+  - job_name: jobflow-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets:
+          - gateway:8081
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: jobflow-gateway

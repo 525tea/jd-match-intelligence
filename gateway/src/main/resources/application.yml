@@ -1,0 +1,52 @@
+server:
+  port: ${GATEWAY_PORT:8081}
+
+gateway:
+  backend-url: ${BACKEND_URL:http://localhost:8080}
+  rate-limit:
+    requests-per-minute: ${GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE:100}
+
+spring:
+  application:
+    name: jobflow-gateway
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          enabled: true
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      backendApiCircuitBreaker:
+        sliding-window-type: count_based
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+  timelimiter:
+    instances:
+      backendApiCircuitBreaker:
+        timeout-duration: 3s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: jobflow-gateway
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}

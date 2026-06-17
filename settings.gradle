@@ -9,3 +9,4 @@ rootProject.name = 'jobflow'
 
 includeBuild('backend')
 includeBuild('collector')
+includeBuild('gateway')
