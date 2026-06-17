@@ -166,6 +166,12 @@ echo
 
 echo "### Gateway Prometheus metrics"
 if curl --fail --silent --show-error "${PROMETHEUS_URL}/-/ready" >/dev/null 2>&1; then
+  targets_response="$(curl --fail --silent --show-error "${PROMETHEUS_URL}/api/v1/targets")"
+  assert_contains "${targets_response}" '"job":"jobflow-gateway"' \
+    "Prometheus should include jobflow-gateway target. Restart Prometheus after prometheus.yml changes: docker compose up -d prometheus"
+  assert_contains "${targets_response}" '"health":"up"' \
+    "Prometheus targets should include an up target"
+
   prometheus_response="$(curl --fail --silent --show-error \
     --get "${PROMETHEUS_URL}/api/v1/query" \
     --data-urlencode 'query=http_server_requests_seconds_count{application="jobflow-gateway"}')"
@@ -175,6 +181,8 @@ if curl --fail --silent --show-error "${PROMETHEUS_URL}/-/ready" >/dev/null 2>&1
 
   if [[ "${prometheus_response}" == *'"result":[]'* ]]; then
     echo "Assertion failed: Prometheus should contain gateway HTTP metrics" >&2
+    echo "If jobflow-gateway was just added, wait for one scrape interval or restart Prometheus:" >&2
+    echo "docker compose up -d prometheus" >&2
     exit 1
   fi
 
