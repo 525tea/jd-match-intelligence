@@ -1,0 +1,33 @@
+server:
+  port: ${GATEWAY_PORT:8081}
+
+spring:
+  application:
+    name: jobflow-gateway
+
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: backend-api
+              uri: ${BACKEND_URL:http://localhost:8080}
+              predicates:
+                - Path=/api/**
+              filters:
+                - StripPrefix=1
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: jobflow-gateway
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}
+  zipkin:
+    tracing:
+      endpoint: ${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}

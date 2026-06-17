@@ -59,7 +59,7 @@ services:
     image: jobflow-backend:local
     container_name: jobflow-backend
     environment:
-      SPRING_PROFILES_ACTIVE: local
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/jobflow?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
@@ -67,6 +67,12 @@ services:
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       TRACING_SAMPLING_PROBABILITY: "1.0"
       JWT_SECRET: jobflow-local-development-secret-key-must-be-at-least-32-bytes
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_OAUTH_REDIRECT_URI: ${GITHUB_OAUTH_REDIRECT_URI:-http://localhost:8081/api/login/oauth2/code/github}
+      OAUTH2_PROVIDER_TOKEN_ENCRYPTION_KEY: ${OAUTH2_PROVIDER_TOKEN_ENCRYPTION_KEY:-}
+      OAUTH2_SUCCESS_REDIRECT_URI: ${OAUTH2_SUCCESS_REDIRECT_URI:-http://localhost:3000/oauth2/success}
+      OAUTH2_FAILURE_REDIRECT_URI: ${OAUTH2_FAILURE_REDIRECT_URI:-http://localhost:3000/oauth2/failure}
       SKILL_TREND_AGGREGATION_SCHEDULER_ENABLED: "false"
       DEADLINE_REMINDER_SCHEDULER_ENABLED: "false"
     ports:
@@ -86,6 +92,22 @@ services:
     container_name: jobflow-zipkin
     ports:
       - "9411:9411"
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    image: jobflow-gateway:local
+    container_name: jobflow-gateway
+    environment:
+      BACKEND_URL: http://backend:8080
+      ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      TRACING_SAMPLING_PROBABILITY: "1.0"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - backend
+      - zipkin
 
   prometheus:
     image: prom/prometheus:v2.51.2
