@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.notification.digest.DailyDigestContent;
@@ -85,9 +86,39 @@ public class DailyDigestBatchService {
     private List<UserProject> findLatestProjectPerUser() {
         Map<Long, UserProject> latestProjectByUserId = new LinkedHashMap<>();
         for (UserProject userProject : userProjectRepository.findAllByOrderByUpdatedAtDescIdDesc()) {
+            if (!matchesTargetUser(userProject.getUser())) {
+                continue;
+            }
             latestProjectByUserId.putIfAbsent(userProject.getUser().getId(), userProject);
         }
         return List.copyOf(latestProjectByUserId.values());
+    }
+
+    private boolean matchesTargetUser(User user) {
+        String targetUserEmailPattern = properties.targetUserEmailPattern();
+        if (targetUserEmailPattern == null) {
+            return true;
+        }
+        return matchesSqlLikePattern(user.getEmail(), targetUserEmailPattern);
+    }
+
+    private boolean matchesSqlLikePattern(String value, String sqlLikePattern) {
+        if (value == null) {
+            return false;
+        }
+
+        StringBuilder regex = new StringBuilder();
+        for (int index = 0; index < sqlLikePattern.length(); index++) {
+            char character = sqlLikePattern.charAt(index);
+            if (character == '%') {
+                regex.append(".*");
+            } else if (character == '_') {
+                regex.append('.');
+            } else {
+                regex.append(Pattern.quote(String.valueOf(character)));
+            }
+        }
+        return Pattern.compile(regex.toString()).matcher(value).matches();
     }
 
     private void sendNewDigest(

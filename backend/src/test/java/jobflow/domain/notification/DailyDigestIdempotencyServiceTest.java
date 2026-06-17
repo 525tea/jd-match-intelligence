@@ -15,7 +15,7 @@ class DailyDigestIdempotencyServiceTest {
 
     private final StringRedisTemplate redisTemplate = org.mockito.Mockito.mock(StringRedisTemplate.class);
     private final ValueOperations<String, String> valueOperations = org.mockito.Mockito.mock(ValueOperations.class);
-    private final DailyDigestProperties properties = new DailyDigestProperties(Duration.ofHours(25), 3);
+    private final DailyDigestProperties properties = new DailyDigestProperties(Duration.ofHours(25), 3, null);
     private final DailyDigestIdempotencyService service = new DailyDigestIdempotencyService(
             redisTemplate,
             properties

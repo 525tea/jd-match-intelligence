@@ -42,7 +42,7 @@ class DailyDigestBatchServiceTest {
     private final DailyDigestContentService contentService = org.mockito.Mockito.mock(DailyDigestContentService.class);
     private final DailyDigestEmailRenderer emailRenderer = new DailyDigestEmailRenderer();
     private final EmailSender emailSender = org.mockito.Mockito.mock(EmailSender.class);
-    private final DailyDigestProperties properties = new DailyDigestProperties(null, 3);
+    private final DailyDigestProperties properties = new DailyDigestProperties(null, 3, null);
     private final Clock clock = Clock.fixed(
             Instant.parse("2026-06-17T00:00:00Z"),
             ZoneId.of("Asia/Seoul")
@@ -106,6 +106,47 @@ class DailyDigestBatchServiceTest {
         assertThat(attempt.getNotificationLog().getStatus()).isEqualTo(NotificationStatus.SENT);
         assertThat(attempt.getNotificationLog().getDeduplicationKey())
                 .isEqualTo("DAILY_DIGEST:date:2026-06-17");
+    }
+
+    @Test
+    @DisplayName("targetUserEmailPattern이 설정되면 매칭되는 사용자 프로젝트만 Daily Digest 대상으로 삼는다")
+    void sendDailyDigestsWithTargetUserEmailPattern() {
+        DailyDigestBatchService filteredService = newService(new DailyDigestProperties(
+                null,
+                3,
+                "daily-digest-smoke-user-%@example.com"
+        ));
+        User targetUser = user(1L, "daily-digest-smoke-user-1@example.com");
+        User ignoredUser = user(2L, "user@example.com");
+        UserProject targetProject = userProject(200L, targetUser, "target-project");
+        UserProject ignoredProject = userProject(300L, ignoredUser, "ignored-project");
+        given(userProjectRepository.findAllByOrderByUpdatedAtDescIdDesc())
+                .willReturn(List.of(ignoredProject, targetProject));
+        given(idempotencyService.acquire(1L, NOW.toLocalDate())).willReturn(true);
+        given(notificationLogRepository.existsByUserIdAndTypeAndDeduplicationKey(
+                1L,
+                NotificationType.DAILY_DIGEST,
+                "DAILY_DIGEST:date:2026-06-17"
+        )).willReturn(false);
+        given(contentService.buildDigest(
+                1L,
+                200L,
+                List.of(JobRole.BACKEND),
+                CareerLevel.MID
+        )).willReturn(content());
+        given(notificationLogRepository.save(any(NotificationLog.class)))
+                .willAnswer(invocation -> invocation.getArgument(0));
+        given(emailSender.send(any(EmailSendRequest.class)))
+                .willReturn(EmailSendResult.sent("MAILGUN", "message-id-1"));
+
+        DailyDigestBatchResult result = filteredService.sendDailyDigests(
+                List.of(JobRole.BACKEND),
+                CareerLevel.MID
+        );
+
+        assertThat(result).isEqualTo(new DailyDigestBatchResult(1, 1, 0, 0));
+        verify(contentService).buildDigest(1L, 200L, List.of(JobRole.BACKEND), CareerLevel.MID);
+        verify(contentService, never()).buildDigest(2L, 300L, List.of(JobRole.BACKEND), CareerLevel.MID);
     }
 
     @Test
@@ -207,7 +248,11 @@ class DailyDigestBatchServiceTest {
     }
 
     private User user(Long id) {
-        User user = User.signup("user@example.com", "encoded-password", "사용자");
+        return user(id, "user@example.com");
+    }
+
+    private User user(Long id, String email) {
+        User user = User.signup(email, "encoded-password", "사용자");
         ReflectionTestUtils.setField(user, "id", id);
         return user;
     }
@@ -231,5 +276,19 @@ class DailyDigestBatchServiceTest {
         } catch (ReflectiveOperationException exception) {
             throw new IllegalStateException("Failed to instantiate UserProject test fixture", exception);
         }
+    }
+
+    private DailyDigestBatchService newService(DailyDigestProperties dailyDigestProperties) {
+        return new DailyDigestBatchService(
+                userProjectRepository,
+                notificationLogRepository,
+                notificationAttemptRepository,
+                idempotencyService,
+                contentService,
+                emailRenderer,
+                emailSender,
+                dailyDigestProperties,
+                clock
+        );
     }
 }
