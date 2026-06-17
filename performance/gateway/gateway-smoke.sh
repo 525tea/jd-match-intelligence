@@ -10,6 +10,11 @@ LIMIT="${LIMIT:-5}"
 RATE_LIMIT_REQUESTS="${RATE_LIMIT_REQUESTS:-120}"
 EXPECT_RATE_LIMIT="${EXPECT_RATE_LIMIT:-true}"
 EXPECT_FALLBACK="${EXPECT_FALLBACK:-true}"
+SMOKE_RUN_ID="${SMOKE_RUN_ID:-$(date +%s)}"
+ROUTING_CLIENT_KEY="${ROUTING_CLIENT_KEY:-gateway-smoke-routing-${SMOKE_RUN_ID}}"
+RATE_LIMIT_CLIENT_KEY="${RATE_LIMIT_CLIENT_KEY:-gateway-smoke-rate-limit-${SMOKE_RUN_ID}}"
+FALLBACK_CLIENT_KEY="${FALLBACK_CLIENT_KEY:-gateway-smoke-fallback-${SMOKE_RUN_ID}}"
+RECOVERY_CLIENT_KEY="${RECOVERY_CLIENT_KEY:-gateway-smoke-recovery-${SMOKE_RUN_ID}}"
 
 echo "GATEWAY_URL=${GATEWAY_URL}"
 echo "BACKEND_SERVICE=${BACKEND_SERVICE}"
@@ -19,6 +24,7 @@ echo "LIMIT=${LIMIT}"
 echo "RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS}"
 echo "EXPECT_RATE_LIMIT=${EXPECT_RATE_LIMIT}"
 echo "EXPECT_FALLBACK=${EXPECT_FALLBACK}"
+echo "SMOKE_RUN_ID=${SMOKE_RUN_ID}"
 echo
 
 require_command() {
@@ -54,6 +60,7 @@ echo
 
 echo "### Gateway routing"
 routing_response="$(curl --fail --silent --show-error \
+  --header "X-Forwarded-For: ${ROUTING_CLIENT_KEY}" \
   --get "${GATEWAY_URL}/api/jobs/search" \
   --data-urlencode "keyword=${KEYWORD}" \
   --data-urlencode "limit=${LIMIT}")"
@@ -68,6 +75,7 @@ last_rate_limit_status=""
 
 for i in $(seq 1 "${RATE_LIMIT_REQUESTS}"); do
   http_code="$(curl --silent --output /dev/null --write-out "%{http_code}" \
+    --header "X-Forwarded-For: ${RATE_LIMIT_CLIENT_KEY}" \
     "${GATEWAY_URL}/api/jobs/search?keyword=backend&limit=1")"
   last_rate_limit_status="${http_code}"
 
@@ -97,6 +105,7 @@ if [[ "${EXPECT_FALLBACK}" == "true" ]]; then
   set +e
   fallback_response="$(
     curl --silent --show-error \
+      --header "X-Forwarded-For: ${FALLBACK_CLIENT_KEY}" \
       --write-out $'\n%{http_code}' \
       --get "${GATEWAY_URL}/api/jobs/search" \
       --data-urlencode "keyword=${KEYWORD}" \
@@ -136,6 +145,7 @@ echo "### Backend recovery routing"
 recovered=false
 for i in {1..20}; do
   if recovery_response="$(curl --fail --silent --show-error \
+    --header "X-Forwarded-For: ${RECOVERY_CLIENT_KEY}" \
     --get "${GATEWAY_URL}/api/jobs/search" \
     --data-urlencode "keyword=${KEYWORD}" \
     --data-urlencode "limit=${LIMIT}")"; then
