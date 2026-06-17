@@ -7,6 +7,8 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 
+import java.net.URI;
+
 @SpringBootApplication
 public class GatewayApplication {
 
@@ -26,6 +28,10 @@ public class GatewayApplication {
                         .filters(filters -> filters
                                 .stripPrefix(1)
                                 .filter(fixedWindowRateLimitFilter)
+                                .circuitBreaker(config -> config
+                                        .setName("backendApiCircuitBreaker")
+                                        .setFallbackUri(URI.create("forward:/fallback/backend"))
+                                )
                         )
                         .uri(backendUrl)
                 )
