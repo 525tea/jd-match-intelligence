@@ -7,10 +7,10 @@ SET @digest_type := 'DAILY_DIGEST' COLLATE utf8mb4_unicode_ci;
 SET @email_pattern := 'daily-digest-smoke-user-%@example.com' COLLATE utf8mb4_unicode_ci;
 
 SELECT
-    COUNT(*) AS notification_log_count,
-    SUM(nl.status = 'SENT') AS sent_log_count,
-    SUM(nl.status = 'PENDING') AS pending_log_count,
-    SUM(nl.status = 'FAILED') AS failed_log_count,
+    COUNT(DISTINCT nl.id) AS notification_log_count,
+    COUNT(DISTINCT CASE WHEN nl.status = 'SENT' THEN nl.id END) AS sent_log_count,
+    COUNT(DISTINCT CASE WHEN nl.status = 'PENDING' THEN nl.id END) AS pending_log_count,
+    COUNT(DISTINCT CASE WHEN nl.status = 'FAILED' THEN nl.id END) AS failed_log_count,
     COUNT(na.id) AS total_attempt_count,
     MIN(nl.attempt_count) AS min_attempt_count,
     MAX(nl.attempt_count) AS max_attempt_count
