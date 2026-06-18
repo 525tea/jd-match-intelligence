@@ -285,6 +285,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const shortJdFragments = new Set([
     '추천',
     '추천 추론',
+    '추론',
     '검색',
     '데이터베이스 설계',
     '인프라 및 성능 최적화',
@@ -299,8 +300,9 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   };
   const shouldAppendToPreviousLine = (previous, current) => {
     if (!previous) return false;
-    if (/^(운영|구현|서빙|검색|튜닝|서버|클라이언트)\s+/u.test(current) && /(설계|구현|추천|추론|클라이언트|데이터베이스 설계)$/u.test(previous)) return true;
-    if (/^(검색 시스템|서빙 API|튜닝 MySQL|운영 Docker|운영 Prometheus|운영 Redis)/u.test(current) && /(추천|추론|데이터베이스 설계|설계|설계·구현)$/u.test(previous)) return true;
+    if (/^(운영|구현|서빙|검색|튜닝|서버|클라이언트|개발|문서화|최적화|관리|처리|배포|모니터링|알림|캐싱)\s+/u.test(current) && /(설계|구현|추천|추론|클라이언트|서버|운영|개발|최적화|데이터베이스 설계)$/u.test(previous)) return true;
+    if (/^(검색 시스템|서빙 API|튜닝 MySQL|운영 Docker|운영 Prometheus|운영 Redis|API 개발|스키마 문서화|파이프라인 개발자 포지션)/u.test(current) && /(추천|추론|데이터베이스 설계|설계|설계·구현|OpenAPI|Swagger|GraphQL)$/u.test(previous)) return true;
+    if (/^[가-힣\s]{1,12}$/u.test(previous) && !/[.?!。]$/u.test(previous) && /^[가-힣A-Za-z0-9]/u.test(current)) return true;
     return false;
   };
   const joinJdFragments = (left, right) => {
@@ -313,12 +315,11 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     const cleaned = rawLines.map(stripListMarker).filter(Boolean);
     const result = [];
     for (let index = 0; index < cleaned.length; index += 1) {
-      const current = cleaned[index];
+      let current = cleaned[index];
       const next = cleaned[index + 1];
-      if (next && shouldJoinWithNextLine(current, next)) {
-        result.push(joinJdFragments(current, next));
+      while (cleaned[index + 1] && shouldJoinWithNextLine(current, cleaned[index + 1])) {
+        current = joinJdFragments(current, cleaned[index + 1]);
         index += 1;
-        continue;
       }
       if (result.length && shouldAppendToPreviousLine(result[result.length - 1], current)) {
         result[result.length - 1] = joinJdFragments(result[result.length - 1], current);
