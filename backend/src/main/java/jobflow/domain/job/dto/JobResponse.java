@@ -5,6 +5,7 @@ import java.util.List;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.EmploymentType;
 import jobflow.domain.job.Job;
+import jobflow.domain.job.JobDescriptionSectionParser;
 import jobflow.domain.job.JobExperienceTag;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.job.JobSkill;
@@ -19,6 +20,8 @@ public record JobResponse(
         String companyName,
         String description,
         String url,
+        String originalUrl,
+        List<JobDescriptionSectionResponse> descriptionSections,
         JobRole role,
         String roleDetail,
         CareerLevel careerLevel,
@@ -57,6 +60,8 @@ public record JobResponse(
                 job.getCompanyName(),
                 job.getDescription(),
                 job.getUrl(),
+                job.getOriginalUrl(),
+                new JobDescriptionSectionParser().parse(job.getDescription()),
                 job.getRole(),
                 job.getRoleDetail(),
                 job.getCareerLevel(),

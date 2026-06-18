@@ -119,6 +119,7 @@ export function toPrototypeJob(job, index = 0) {
     views: job.views || 0,
     companyIntro: rawJob.companyIntro || job.companyIntro || '',
     desc: rawJob.description || job.description || '공고 원문이 제공되지 않았습니다.',
+    descriptionSections: rawJob.descriptionSections || job.descriptionSections || [],
   };
 }
 

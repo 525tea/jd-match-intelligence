@@ -1,7 +1,21 @@
 package jobflow.domain.job;
 
+import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import jobflow.domain.job.dto.JobDescriptionSectionResponse;
 import jobflow.domain.job.dto.JobExperienceTagResponse;
 import jobflow.domain.job.dto.JobResponse;
+import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSkillResponse;
 import jobflow.domain.job.dto.JobSummaryResponse;
 import jobflow.global.error.ErrorCode;
@@ -20,20 +34,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.time.LocalDateTime;
-import java.util.List;
-
-import static org.hamcrest.Matchers.hasSize;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import jobflow.domain.job.dto.JobSearchResponse;
 
 @WebMvcTest(
         controllers = JobController.class,
@@ -66,6 +66,10 @@ class JobControllerTest {
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.title").value("백엔드 개발자"))
                 .andExpect(jsonPath("$.data.companyName").value("JobFlow"))
+                .andExpect(jsonPath("$.data.originalUrl").value("https://example.com/jobs/1"))
+                .andExpect(jsonPath("$.data.descriptionSections", hasSize(1)))
+                .andExpect(jsonPath("$.data.descriptionSections[0].type").value("REQUIREMENTS"))
+                .andExpect(jsonPath("$.data.descriptionSections[0].title").value("자격 요건"))
                 .andExpect(jsonPath("$.data.status").value("OPEN"))
                 .andExpect(jsonPath("$.data.skills", hasSize(1)))
                 .andExpect(jsonPath("$.data.skills[0].name").value("Spring Boot"))
@@ -162,6 +166,8 @@ class JobControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(1))
                 .andExpect(jsonPath("$.data.title").value("백엔드 개발자"))
+                .andExpect(jsonPath("$.data.originalUrl").value("https://example.com/jobs/1"))
+                .andExpect(jsonPath("$.data.descriptionSections[0].body").value("Spring Boot 기반 백엔드 개발자 채용"))
                 .andExpect(jsonPath("$.data.skills", hasSize(1)))
                 .andExpect(jsonPath("$.data.experienceTags", hasSize(1)));
     }
@@ -359,8 +365,14 @@ class JobControllerTest {
                 "external-1",
                 "백엔드 개발자",
                 "JobFlow",
-                "Spring Boot 기반 백엔드 개발자 채용",
+                "[자격 요건]\nSpring Boot 기반 백엔드 개발자 채용",
                 "https://example.com/jobs/1",
+                "https://example.com/jobs/1",
+                List.of(new JobDescriptionSectionResponse(
+                        "REQUIREMENTS",
+                        "자격 요건",
+                        "Spring Boot 기반 백엔드 개발자 채용"
+                )),
                 JobRole.BACKEND,
                 "Java/Spring",
                 CareerLevel.JUNIOR,

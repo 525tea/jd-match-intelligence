@@ -246,6 +246,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     companyIntro: (m && m.companyIntro) || '',
     originalUrl: (m && m.originalUrl) || (l && l.originalUrl) || '',
     desc: (m && m.desc) || (l && l.desc) || '공고 상세 설명이 제공되지 않았습니다.',
+    descriptionSections: (m && m.descriptionSections) || (l && l.descriptionSections) || [],
   };
   const has = (s) => userSkills.has(s);
   const reqMatched = reqList.filter(has), reqMissing = reqList.filter((s) => !has(s));
@@ -339,7 +340,14 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     preferred: prefList.length ? prefList : parsedDescription.preferred,
     process: cleanProcessItems(parsedDescription.process),
   };
-  const originalSections = parseOriginalDescriptionSections(job.desc);
+  const originalSections = job.descriptionSections.length
+    ? job.descriptionSections
+      .map((section) => ({
+        title: section.title || '공고 원문',
+        body: section.body || '',
+      }))
+      .filter((section) => section.body)
+    : parseOriginalDescriptionSections(job.desc);
   const workItems = compactList(bullets.work, 6);
   const processItems = bullets.process.length ? bullets.process : ['지원', '서류 검토', '인터뷰', '최종 협의'];
   const allStack = [...new Set([...reqList, ...prefList])].slice(0, 14);
