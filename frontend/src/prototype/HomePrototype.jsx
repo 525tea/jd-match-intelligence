@@ -32,13 +32,21 @@ export function JobFlowHome({ t, go }) {
   const primaryProjectSummary = primaryProject.summary || '최근 분석된 프로젝트';
   const allMatchJobs = JF.matches.concat(JF.listings.filter((j) => !JF.matches.some((m) => m.companyKo === j.companyKo)).slice(0, 6));
   const popularJobs = JF.popular.concat(JF.listings.slice(0, 4));
-  const closingJobs = JF.listings.slice().sort((a, b) => Number(a.deadline.replace('D-', '')) - Number(b.deadline.replace('D-', '')));
+  const deadlineOrder = (deadline) => {
+    const text = String(deadline || '');
+    if (text.includes('오늘')) return 0;
+    const number = Number(text.replace(/[^\d]/g, ''));
+    return Number.isFinite(number) && number > 0 ? number : 999;
+  };
+  const closingJobs = JF.listings.slice().sort((a, b) => deadlineOrder(a.deadline) - deadlineOrder(b.deadline));
   const topMatch = JF.matches?.[0];
   const topGap = JF.gapSkills?.[0];
   const topClosing = closingJobs?.[0];
+  const topGapName = topGap?.skill || topGap?.name;
+  const topGapCount = topGap?.addedJobs ?? topGap?.count ?? 0;
   const heroStats = [
     ['추천 1순위', topMatch ? `${topMatch.companyKo} ${topMatch.score}%` : '추천 대기', topMatch ? `필수 ${topMatch.required ?? 0}% 충족` : '프로젝트 분석 후 표시'],
-    ['부족하면 열림', topGap ? `${topGap.name} +${topGap.count || 0}` : '갭 분석 대기', topGap ? '관련 공고 증가' : '분석 결과 없음'],
+    ['부족하면 열림', topGapName ? `${topGapName} +${topGapCount}` : '갭 분석 대기', topGapName ? '관련 공고 증가' : '분석 결과 없음'],
     ['마감 임박', topClosing?.deadline || '마감 정보 없음', topClosing ? '오늘 먼저 볼 공고' : '실시간 공고 기준 표시'],
   ];
 
@@ -74,7 +82,7 @@ export function JobFlowHome({ t, go }) {
           <Logo text={job.logo || job.companyKo.slice(0, 2)} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 13, fontWeight: v3 ? 560 : 600, color: featured ? ink : darkCard ? 'rgba(255,255,255,0.78)' : ink }}>{job.companyKo}</span><span style={{ marginLeft: 'auto', color: coralDeep, background: coralTint, border: '1px solid ' + coralTintBd, borderRadius: 12, padding: '3px 8px', fontSize: 11.5, fontWeight: 900 }}>{job.deadline}</span></div>
-            <div style={{ fontSize: 17, lineHeight: 1.34, fontWeight: v3 ? 560 : 700, letterSpacing: -0.45, marginTop: 6, minHeight: 46, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{job.fullTitle || job.title || '공고명 없음'}</div>
+            <div style={{ fontSize: 17, lineHeight: 1.34, fontWeight: 760, letterSpacing: -0.45, marginTop: 6, minHeight: 46, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'keep-all' }}>{job.fullTitle || job.title || '공고명 없음'}</div>
             <div style={{ fontSize: 12.5, color: featured ? 'rgba(20,21,26,0.58)' : darkCard ? 'rgba(255,255,255,0.62)' : muted, marginTop: 7, height: 18, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{job.role || job.title} · {job.level}</div>
           </div>
         </div>
@@ -111,7 +119,7 @@ export function JobFlowHome({ t, go }) {
         <div style={{ marginLeft: 'auto', display: narrow ? 'none' : 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>{login ? <><span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, color: greenInk, background: greenTint, border: '1px solid ' + greenTintBd, padding: '6px 12px', borderRadius: 20 }}><span style={{ width: 7, height: 7, borderRadius: 4, background: greenInk }} />GitHub 연동됨</span><div style={{ width: 36, height: 36, borderRadius: 18, background: ink, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, cursor: 'pointer' }} onClick={() => go('mypage')}>사</div></> : <><span onClick={() => go('login')} style={{ fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>로그인</span><span onClick={() => go('login')} style={{ fontSize: 14, fontWeight: 900, background: ink, color: '#fff', padding: '9px 18px', borderRadius: 22, cursor: 'pointer' }}>회원가입</span></>}</div>
       </div>
 
-      <main style={{ maxWidth: 1440, margin: '0 auto', padding: narrow ? '28px 18px 54px' : '36px 48px 64px' }}>
+      <main style={{ maxWidth: 1520, margin: '0 auto', padding: narrow ? '28px 18px 54px' : '36px 48px 64px' }}>
         <section style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : (v3 ? '0.92fr 1.08fr' : '1.05fr 0.82fr'), gap: 18, alignItems: 'stretch', marginBottom: 34 }}>
           <div style={{ background: green, borderRadius: 28, padding: narrow ? 26 : (v3 ? 28 : 34), minHeight: v3 ? 220 : 254, display: 'flex', flexDirection: 'column' }}>
             {login ? <>
