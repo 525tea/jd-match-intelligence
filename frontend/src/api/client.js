@@ -12,7 +12,7 @@ export const authStore = {
 };
 
 export const projectStore = {
-  getProjectId: () => localStorage.getItem(PROJECT_ID_KEY) || import.meta.env.VITE_DEFAULT_USER_PROJECT_ID || '1',
+  getProjectId: () => localStorage.getItem(PROJECT_ID_KEY) || import.meta.env.VITE_DEFAULT_USER_PROJECT_ID || '',
   setProjectId: (projectId) => projectId ? localStorage.setItem(PROJECT_ID_KEY, String(projectId)) : localStorage.removeItem(PROJECT_ID_KEY),
   clear: () => localStorage.removeItem(PROJECT_ID_KEY),
 };

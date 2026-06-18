@@ -4,7 +4,7 @@ import { JobFlowHome } from './prototype/HomePrototype.jsx';
 import { JobDetail } from './prototype/JobDetailPrototype.jsx';
 import { Onboarding } from './prototype/OnboardingPrototype.jsx';
 import { JobFlowScreens } from './prototype/ScreensPrototype.jsx';
-import { dedupeJobs, isUserFacingJob, loadJobFlowData, toPrototypeJob } from './prototype/adapters.js';
+import { dedupeJobs, isUserFacingJob, loadJobFlowData, mergePrototypeJobIntoState, toPrototypeJob } from './prototype/adapters.js';
 import { api, authStore } from './api/client.js';
 import { ConnectedLogin, ConnectedOAuth } from './pages/ConnectedAuth.jsx';
 
@@ -36,6 +36,7 @@ export default function App() {
   const [dataLoading, setDataLoading] = React.useState(true);
   const [route, setRoute] = React.useState(parseRoute);
   const [authenticated, setAuthenticated] = React.useState(Boolean(authStore.getToken()));
+  const fetchedJobDetailIds = React.useRef(new Set());
   const t = React.useMemo(() => ({
     ...initialTweaks,
     state: authenticated ? '로그인' : '비로그인',
@@ -165,6 +166,33 @@ export default function App() {
     };
     return () => { delete window.__jobflowApi; };
   }, [jf, refreshData, resolveJobId]);
+
+  React.useEffect(() => {
+    if (route.name !== 'detail') return;
+
+    const requestedJobId = route.params.jobId || resolveJobId(route.params.company);
+    if (!requestedJobId) return;
+
+    const cacheKey = String(requestedJobId);
+    if (fetchedJobDetailIds.current.has(cacheKey)) return;
+    fetchedJobDetailIds.current.add(cacheKey);
+
+    let alive = true;
+    setDataLoading(true);
+    api.job(requestedJobId)
+      .then((detail) => {
+        if (!alive || !detail) return;
+        setJf((prev) => mergePrototypeJobIntoState(prev, toPrototypeJob(detail)));
+      })
+      .catch(() => {
+        fetchedJobDetailIds.current.delete(cacheKey);
+      })
+      .finally(() => {
+        if (alive) setDataLoading(false);
+      });
+
+    return () => { alive = false; };
+  }, [route.name, route.params.jobId, route.params.company, resolveJobId]);
 
   React.useEffect(() => {
     const onHash = () => setRoute(parseRoute());

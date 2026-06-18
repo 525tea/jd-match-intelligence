@@ -170,16 +170,23 @@ const toExpTag = (tag) => ({
   sentence: tag.evidence || tag.sentence || tag.description || '프로젝트 분석 결과에서 관련 경험 태그로 추출되었습니다.',
 });
 
-const toUserJobCard = (item, index = 0) => toPrototypeJob({
-  id: item.jobId || item.job?.id,
-  jobId: item.jobId || item.job?.id,
-  title: item.jobTitle || item.job?.title || item.title,
-  companyName: item.companyName || item.job?.companyName,
-  deadlineAt: item.deadlineAt || item.job?.deadlineAt,
-  careerLevel: item.careerLevel || item.job?.careerLevel,
-  role: item.role || item.job?.role,
-  score: item.score ?? item.job?.score ?? 0,
-}, index);
+const toUserJobCard = (item, index = 0) => {
+  const rawJob = item.job || {};
+  return toPrototypeJob({
+    ...rawJob,
+    id: item.jobId || rawJob.id || item.id,
+    jobId: item.jobId || rawJob.id,
+    source: item.source || rawJob.source,
+    status: item.status || rawJob.status,
+    originalUrl: item.originalUrl || rawJob.originalUrl,
+    title: item.jobTitle || rawJob.title || item.title,
+    companyName: item.companyName || rawJob.companyName,
+    deadlineAt: item.deadlineAt || rawJob.deadlineAt,
+    careerLevel: item.careerLevel || rawJob.careerLevel,
+    role: item.role || rawJob.role,
+    score: item.score ?? rawJob.score ?? 0,
+  }, index);
+};
 
 const buildAnalyzedProject = (baseProject = {}, userProjectId, skills, tags, matches) => {
   const topSkills = skills.map((skill) => skill.name).filter(Boolean);
@@ -328,10 +335,45 @@ function attachLookup(next) {
   return next;
 }
 
+export function mergePrototypeJobIntoState(state, job) {
+  if (!job || !(job.jobId || job.id || job.companyKo)) return state;
+
+  const jobId = String(job.jobId || job.id || '');
+  const company = job.companyKo;
+  const sameJob = (candidate) => {
+    const candidateId = String(candidate?.jobId || candidate?.id || '');
+    return (jobId && candidateId === jobId) || (company && candidate?.companyKo === company);
+  };
+  const upsert = (list = [], appendWhenMissing = false) => {
+    let found = false;
+    const merged = list.map((candidate) => {
+      if (!sameJob(candidate)) return candidate;
+      found = true;
+      return { ...candidate, ...job };
+    });
+    return found || !appendWhenMissing ? merged : [job, ...merged];
+  };
+
+  return attachLookup({
+    ...state,
+    listings: upsert(state.listings || [], true),
+    matches: upsert(state.matches || []),
+    popular: upsert(state.popular || []),
+    closing: upsert(state.closing || []),
+    userJobs: {
+      ...(state.userJobs || {}),
+      saved: upsert(state.userJobs?.saved || []),
+      viewed: upsert(state.userJobs?.viewed || []),
+      ignored: upsert(state.userJobs?.ignored || []),
+    },
+  });
+}
+
 export async function loadJobFlowData(baseJF) {
   const next = clone(baseJF);
   const token = authStore.getToken();
   const userProjectId = projectStore.getProjectId();
+  const hasUserProjectId = Boolean(userProjectId);
   next.tagLabel = {
     ...(next.tagLabel || {}),
     CLOUD_INFRA: '클라우드/인프라',
@@ -376,22 +418,40 @@ export async function loadJobFlowData(baseJF) {
 
   if (!token) return attachLookup(next);
 
-  const authResults = await Promise.all([
+  const authLoaders = [
     settle('me', () => api.me()),
     settle('applications', () => api.applications()),
-    settle('recommendations', () => api.recommendations(userProjectId, { targetRoles: ['BACKEND', 'FULLSTACK'], limit: 12 })),
-    settle('matches', () => api.projectJobMatches(userProjectId, { targetRoles: ['BACKEND', 'FULLSTACK'], targetCareerLevel: 'MID', limit: 12 })),
-    settle('skills', () => api.projectSkills(userProjectId)),
-    settle('tags', () => api.projectExperienceTags(userProjectId)),
-    settle('gap', () => api.gapAnalysis(userProjectId, { targetRoles: ['BACKEND'], limit: 20 })),
     settle('saved', () => api.savedJobs()),
     settle('viewed', () => api.viewedJobs()),
     settle('ignored', () => api.ignoredJobs()),
-  ]);
+  ];
+
+  if (hasUserProjectId) {
+    authLoaders.push(
+      settle('recommendations', () => api.recommendations(userProjectId, { targetRoles: ['BACKEND', 'FULLSTACK'], limit: 12 })),
+      settle('matches', () => api.projectJobMatches(userProjectId, { targetRoles: ['BACKEND', 'FULLSTACK'], targetCareerLevel: 'MID', limit: 12 })),
+      settle('skills', () => api.projectSkills(userProjectId)),
+      settle('tags', () => api.projectExperienceTags(userProjectId)),
+      settle('gap', () => api.gapAnalysis(userProjectId, { targetRoles: ['BACKEND'], limit: 20 })),
+    );
+  }
+
+  const authResults = await Promise.all(authLoaders);
   next.__apiStatus = {
     ...(next.__apiStatus || {}),
     ...Object.fromEntries(authResults.map((result) => [result.key, result.ok ? 'ok' : 'unavailable'])),
   };
+
+  if (!hasUserProjectId) {
+    next.__apiStatus = {
+      ...(next.__apiStatus || {}),
+      recommendations: 'missing-project',
+      matches: 'missing-project',
+      skills: 'missing-project',
+      tags: 'missing-project',
+      gap: 'missing-project',
+    };
+  }
 
   const me = authResults.find((x) => x.key === 'me');
   if (me?.ok && me.data) {
@@ -404,7 +464,7 @@ export async function loadJobFlowData(baseJF) {
     };
   }
 
-  next.__userProjectId = userProjectId;
+  next.__userProjectId = userProjectId || null;
 
   const skillsResult = authResults.find((x) => x.key === 'skills');
   const skillRows = asList(skillsResult?.data);
