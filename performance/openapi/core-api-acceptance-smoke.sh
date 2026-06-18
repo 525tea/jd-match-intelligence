@@ -148,6 +148,25 @@ assert_json_success "${job_detail_response}" "GET /jobs/{jobId} should return su
 detail_job_id="$(jq -r '.data.id' "${job_detail_response}")"
 assert_equals "${detail_job_id}" "${job_id}" "Job detail id should match selected search result"
 
+if ! jq -e '.data | has("originalUrl")' "${job_detail_response}" >/dev/null; then
+  echo "Assertion failed: job detail should expose originalUrl field" >&2
+  cat "${job_detail_response}" >&2
+  exit 1
+fi
+
+if ! jq -e '(.data.descriptionSections | type == "array") and (.data.descriptionSections | length > 0)' "${job_detail_response}" >/dev/null; then
+  echo "Assertion failed: job detail should expose at least one structured description section" >&2
+  cat "${job_detail_response}" >&2
+  exit 1
+fi
+
+description_section_count="$(jq -r '.data.descriptionSections | length' "${job_detail_response}")"
+first_description_section_title="$(jq -r '.data.descriptionSections[0].title' "${job_detail_response}")"
+
+echo "job_detail_original_url_field_present=true"
+echo "job_detail_description_section_count=${description_section_count}"
+echo "first_description_section_title=${first_description_section_title}"
+
 echo
 echo "### POST /user/jobs/${job_id}/view"
 view_response="${tmp_dir}/user-job-view.json"
@@ -271,6 +290,7 @@ echo "application_id=${application_id}"
 echo "application_status=${updated_status}"
 echo "saved_job_verified=true"
 echo "application_flow_verified=true"
+echo "job_detail_description_section_count=${description_section_count}"
 
 echo
 echo "Core API acceptance smoke completed."

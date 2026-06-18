@@ -124,6 +124,30 @@ assert_equals "${jobs_status}" "200" "Frontend proxy GET /api/jobs/search should
 assert_json_success "${jobs_response}" "Frontend proxy GET /api/jobs/search should return success=true"
 assert_data_array_not_empty "${jobs_response}" "Frontend proxy GET /api/jobs/search should return at least one job"
 
+job_id="$(jq -r '.data[0].id' "${jobs_response}")"
+
+job_detail_response="${tmp_dir}/job-detail.json"
+job_detail_status="$(request_status "GET" "${api_url}/jobs/${job_id}" "${job_detail_response}")"
+
+echo "job_detail_status=${job_detail_status}"
+assert_equals "${job_detail_status}" "200" "Frontend proxy GET /api/jobs/{jobId} should return 200"
+assert_json_success "${job_detail_response}" "Frontend proxy GET /api/jobs/{jobId} should return success=true"
+
+if ! jq -e '.data | has("originalUrl")' "${job_detail_response}" >/dev/null; then
+  echo "Assertion failed: Frontend proxy job detail should expose originalUrl field" >&2
+  cat "${job_detail_response}" >&2
+  exit 1
+fi
+
+if ! jq -e '(.data.descriptionSections | type == "array") and (.data.descriptionSections | length > 0)' "${job_detail_response}" >/dev/null; then
+  echo "Assertion failed: Frontend proxy job detail should expose structured description sections" >&2
+  cat "${job_detail_response}" >&2
+  exit 1
+fi
+
+description_section_count="$(jq -r '.data.descriptionSections | length' "${job_detail_response}")"
+echo "job_detail_description_section_count=${description_section_count}"
+
 trends_response="${tmp_dir}/trends-skills.json"
 trends_status="$(
   curl --silent --show-error \
@@ -169,6 +193,8 @@ echo
 echo "### Frontend API Integration Smoke Summary"
 echo "frontend_html_ok=true"
 echo "jobs_search_status=200"
+echo "job_detail_status=200"
+echo "job_detail_description_section_count=${description_section_count}"
 echo "trend_skills_status=200"
 echo "auth_me_without_token_status=401"
 echo "auth_me_with_token_status=${auth_me_with_token_status}"
