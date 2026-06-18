@@ -21,7 +21,7 @@ function GithubMark({ size = 16 }) {
 
 export function ConnectedLogin({ go, onAuthenticated }) {
   const [mode, setMode] = React.useState('login');
-  const [form, setForm] = React.useState({ name: '사용자', email: 'user@example.com', password: '' });
+  const [form, setForm] = React.useState({ name: '', email: '', password: '' });
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const narrow = window.innerWidth < 980;
@@ -63,11 +63,15 @@ export function ConnectedLogin({ go, onAuthenticated }) {
       const token = await api.login({ email: demoEmail, password: demoPassword });
       authStore.setToken(token.accessToken);
       if (demoProjectId) projectStore.setProjectId(demoProjectId);
-      await onAuthenticated?.();
+      try {
+        await onAuthenticated?.();
+      } catch (refreshError) {
+        console.warn('Demo login succeeded, but data refresh failed.', refreshError);
+      }
       go('home');
     } catch (e) {
       authStore.clear();
-      setError('데모 계정 로그인이 실패했습니다. GitHub 로그인 또는 직접 로그인으로 계속해주세요.');
+      setError(e.message || '데모 계정 로그인이 실패했습니다. GitHub 로그인 또는 직접 로그인으로 계속해주세요.');
     } finally {
       setLoading(false);
     }

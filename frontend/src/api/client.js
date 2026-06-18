@@ -1,5 +1,3 @@
-import React from 'react';
-
 const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
 
 export const API_BASE_URL = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || '/api');
@@ -104,16 +102,3 @@ export const api = {
   cooccurrences: (skillId, params = {}) => request(`/trends/skills/${skillId}/cooccurrences`, { params }),
   skillExperienceTags: (skillId, params = {}) => request(`/trends/skills/${skillId}/experience-tags`, { params }),
 };
-
-export function useApiResource(loader, fallback, deps = []) {
-  const [state, setState] = React.useState({ data: fallback, loading: true, error: null, fromMock: false });
-  React.useEffect(() => {
-    let alive = true;
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    loader()
-      .then((data) => alive && setState({ data: data ?? fallback, loading: false, error: null, fromMock: false }))
-      .catch((error) => alive && setState({ data: fallback, loading: false, error, fromMock: true }));
-    return () => { alive = false; };
-  }, deps);
-  return state;
-}

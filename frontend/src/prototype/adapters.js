@@ -28,6 +28,14 @@ const careerLabel = (career, min, max) => {
 
 const roleLabel = (role, detail) => detail || ({ BACKEND: 'Backend Engineer', FRONTEND: 'Frontend Engineer', FULLSTACK: 'Full Stack Engineer', DEVOPS: 'DevOps Engineer', DATA_ENGINEER: 'Data Engineer', AI_ENGINEER: 'AI Engineer', ML_ENGINEER: 'ML Engineer', SECURITY: 'Security Engineer' }[role] || role || 'Software Engineer');
 
+const compactDetail = (value) => {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (text.length > 36) return '';
+  if (text.split(/\s+/).length > 4) return '';
+  return text;
+};
+
 const tagLabel = (code) => ({
   EVENT_DRIVEN: '이벤트 드리븐', CACHE_STRATEGY: '캐시 전략', BATCH_PROCESSING: '배치 처리',
   HIGH_TRAFFIC: '대용량 트래픽', DISTRIBUTED_SYSTEM: '분산 시스템', CI_CD: 'CI/CD',
@@ -39,7 +47,7 @@ const tagLabel = (code) => ({
 const skillNames = (skills) => (skills || []).map((s) => s.skillName || s.name || s).filter(Boolean);
 const tagCodes = (tags) => (tags || []).map((t) => t.tagCode || t.code || t).filter(Boolean);
 const firstNonEmpty = (...items) => items.find((item) => Array.isArray(item) ? item.length : item !== undefined && item !== null && item !== '');
-const scoreOf = (job, fallback = 72) => Math.round(Number(
+const scoreOf = (job, fallback = 0) => Math.round(Number(
   job?.score?.totalScore
   ?? job?.score?.skillMatchScore
   ?? job?.score?.matchScore
@@ -55,8 +63,22 @@ const parseDdayNumber = (value) => {
   return Number.isFinite(n) && n > 0 ? n : 999;
 };
 
+const USER_FACING_JOB_SOURCES = new Set(['WANTED', 'JUMPIT']);
+
+export const isUserFacingJob = (job = {}) => {
+  const rawJob = job.job || job;
+  const source = rawJob.source || job.source;
+  const status = rawJob.status || job.status;
+  const text = `${rawJob.title || job.title || ''} ${rawJob.companyName || job.companyName || ''} ${source || ''}`.toLowerCase();
+  const fixtureLike = /smoke|mock|baseline|example|jobflow|manual|daily digest/.test(text);
+  const visibleSource = !source || USER_FACING_JOB_SOURCES.has(source);
+  const visibleStatus = !status || status === 'OPEN';
+  return visibleSource && visibleStatus && !fixtureLike;
+};
+
 export function toPrototypeJob(job, index = 0) {
   const rawJob = job.job || job;
+  const displayRole = roleLabel(rawJob.role || job.role, compactDetail(rawJob.roleDetail || job.roleDetail));
   const companyKo = rawJob.companyName || rawJob.companyKo || job.companyName || '회사명';
   const skills = skillNames(rawJob.skills || job.skills);
   const matched = [
@@ -68,46 +90,57 @@ export function toPrototypeJob(job, index = 0) {
     ...(job.missingPreferredSkills || []),
   ];
   const visibleSkills = matched.length || missing.length ? matched : skills;
-  const score = scoreOf(job, Math.max(58, 92 - index * 4));
+  const score = scoreOf(job);
   return {
     id: rawJob.id || rawJob.jobId || job.jobId || job.id,
     jobId: rawJob.jobId || rawJob.id || job.jobId || job.id,
+    source: rawJob.source || job.source,
+    status: rawJob.status || job.status,
     sourceId: rawJob.sourceId || job.sourceId,
+    originalUrl: rawJob.originalUrl || rawJob.original_url || rawJob.url || job.originalUrl || job.original_url || job.url || '',
     company: rawJob.company || job.company || companyKo,
     companyKo,
     logo: rawJob.logo || job.logo || initials(companyKo),
-    fullTitle: rawJob.fullTitle || rawJob.title || job.jobTitle || job.title || `${companyKo} 백엔드 엔지니어 채용`,
+    fullTitle: rawJob.fullTitle || rawJob.title || job.jobTitle || job.title || '제목 없음',
     title: rawJob.title || job.jobTitle || job.title || roleLabel(rawJob.role || job.role, rawJob.roleDetail || job.roleDetail),
-    role: roleLabel(rawJob.role || job.role, rawJob.roleDetail || job.roleDetail),
+    role: displayRole,
     level: careerLabel(rawJob.careerLevel || job.careerLevel, rawJob.minExperienceYears ?? job.minExperienceYears, rawJob.maxExperienceYears ?? job.maxExperienceYears),
     location: [rawJob.locationRegion || job.locationRegion, rawJob.locationCity || job.locationCity].filter(Boolean).join(' ') || '위치 협의',
     score,
     required: Math.round(Number(job.score?.requiredSkillRate ?? job.requiredMatchRate ?? score)),
-    preferred: Math.round(Number(job.score?.preferredSkillRate ?? job.preferredMatchRate ?? Math.max(40, score - 24))),
-    applicants: job.applicants || Math.max(8, 64 - index * 3),
+    preferred: Math.round(Number(job.score?.preferredSkillRate ?? job.preferredMatchRate ?? 0)),
+    applicants: job.applicants || 0,
     matched: [...new Set(visibleSkills)].slice(0, 5),
-    missing: [...new Set(missing.length ? missing : skills.slice(4, 6))].slice(0, 3),
+    missing: [...new Set(missing)].slice(0, 3),
     requiredSkills: firstNonEmpty(skillNames(rawJob.skills?.filter?.((s) => s.requirementType === 'REQUIRED')), skillNames(job.skills?.filter?.((s) => s.requirementType === 'REQUIRED')), [...new Set([...(job.matchedRequiredSkills || []), ...(job.missingRequiredSkills || [])])], visibleSkills),
     preferredSkills: firstNonEmpty(skillNames(rawJob.skills?.filter?.((s) => s.requirementType === 'PREFERRED')), skillNames(job.skills?.filter?.((s) => s.requirementType === 'PREFERRED')), [...new Set([...(job.matchedPreferredSkills || []), ...(job.missingPreferredSkills || [])])], []),
     tags: tagCodes(rawJob.experienceTags).length ? tagCodes(rawJob.experienceTags) : tagCodes(job.experienceTags).length ? tagCodes(job.experienceTags) : tagCodes(job.matchedExperienceTags).concat(tagCodes(job.missingExperienceTags)).slice(0, 3),
     deadline: dday(rawJob.deadlineAt || job.deadlineAt) || job.deadline || '상시',
-    views: job.views || Math.max(90, 326 - index * 17),
-    companyIntro: rawJob.companyIntro || job.companyIntro || `${companyKo}의 제품 개발 조직입니다.`,
-    desc: rawJob.description || job.description || '수집된 공고 원문을 기반으로 주요 업무와 요구 기술을 확인합니다.',
+    views: job.views || 0,
+    companyIntro: rawJob.companyIntro || job.companyIntro || '',
+    desc: rawJob.description || job.description || '공고 원문이 제공되지 않았습니다.',
   };
 }
 
 const toTrend = (trend, index = 0, ownedSkills = new Set()) => {
   const required = Number(trend.requiredCount || 0);
-  const total = Number(trend.jobCount || trend.totalJobs || 1284);
-  const rate = trend.rate || Math.min(92, Math.round((required / Math.max(1, total)) * 100) || trend.trendScore || 40 + index * 6);
+  const preferred = Number(trend.preferredCount || 0);
+  const total = Number(trend.jobCount || trend.totalJobs || 0);
+  const trendScore = Number(trend.trendScore ?? trend.score ?? 0);
+  const rate = Math.min(100, Math.round(Number(trend.rate ?? trendScore ?? (total ? (required / total) * 100 : 0))));
   const name = trend.skillName || trend.name;
   return {
+    id: trend.skillId || trend.id || index,
     name,
     rate,
-    growth: trend.growth || Math.max(2, 12 - index * 2),
+    growth: Number(trend.growth || 0),
     owned: ownedSkills.has(name) || Boolean(trend.owned),
-    insight: trend.insight || `${name} 요구가 최근 공고에서 꾸준히 등장하고 있습니다.`,
+    jobCount: total,
+    requiredCount: required,
+    preferredCount: preferred,
+    trendScore,
+    category: trend.skillCategory || trend.category,
+    insight: trend.insight || (name ? `${name}가 포함된 공고 ${total.toLocaleString()}건이 집계되었습니다. 필수 ${required.toLocaleString()}건, 우대 ${preferred.toLocaleString()}건 기준입니다.` : '트렌드 API 결과입니다.'),
   };
 };
 
@@ -144,48 +177,54 @@ const toUserJobCard = (item, index = 0) => toPrototypeJob({
   deadlineAt: item.deadlineAt || item.job?.deadlineAt,
   careerLevel: item.careerLevel || item.job?.careerLevel,
   role: item.role || item.job?.role,
-  score: 78 - index * 2,
+  score: item.score ?? item.job?.score ?? 0,
 }, index);
 
-const buildAnalyzedProject = (baseProject, userProjectId, skills, tags, matches) => {
+const buildAnalyzedProject = (baseProject = {}, userProjectId, skills, tags, matches) => {
   const topSkills = skills.map((skill) => skill.name).filter(Boolean);
   const topTags = tags.map((tag) => tag.label).filter(Boolean);
-  const projectName = userProjectId ? `project-${userProjectId}` : baseProject.name;
+  const projectName = userProjectId ? `project-${userProjectId}` : baseProject.name || '내 프로젝트';
+  const baseStats = baseProject.stats || {};
+  const baseSkillTotal = baseProject.skillsTotal || 0;
+  const baseTagTotal = baseProject.tagsTotal || 0;
+  const baseMatchedJobs = baseProject.matchedJobs || 0;
+  const basePreviewSkills = baseProject.previewSkills || [];
+  const baseDetailTags = baseProject.detailTags || [];
   return {
     ...baseProject,
     name: projectName,
     repo: `user project #${userProjectId || 'local'}`,
     connected: true,
     analyzedAt: '최근 분석',
-    skillsTotal: skills.length || baseProject.skillsTotal,
-    tagsTotal: tags.length || baseProject.tagsTotal,
-    matchedJobs: matches.length || baseProject.matchedJobs,
-    previewSkills: topSkills.slice(0, 5).length ? topSkills.slice(0, 5) : baseProject.previewSkills,
+    skillsTotal: skills.length || baseSkillTotal,
+    tagsTotal: tags.length || baseTagTotal,
+    matchedJobs: matches.length || baseMatchedJobs,
+    previewSkills: topSkills.slice(0, 5).length ? topSkills.slice(0, 5) : basePreviewSkills,
     repoVisual: `${projectName} · ${topSkills.slice(0, 3).join(' / ') || 'analysis ready'}`,
     summary: topSkills.length
       ? `${topSkills.slice(0, 4).join(', ')} 기반으로 분석된 사용자 프로젝트`
-      : baseProject.summary,
+      : baseProject.summary || '프로젝트 분석 결과를 불러왔습니다.',
     overview: [
       '백엔드 API의 project inventory 결과를 기반으로 구성한 프로젝트 분석 카드입니다.',
       topSkills.length ? `추출 스킬은 ${topSkills.slice(0, 6).join(', ')} 중심입니다.` : '',
       topTags.length ? `경험 태그는 ${topTags.slice(0, 4).join(', ')} 신호가 확인됩니다.` : '',
     ].filter(Boolean).join(' '),
-    domain: topTags.slice(0, 3).length ? topTags.slice(0, 3) : baseProject.domain,
-    architecture: topTags.length ? 'Static Analysis · Skill Inventory' : baseProject.architecture,
+    domain: topTags.slice(0, 3).length ? topTags.slice(0, 3) : baseProject.domain || [],
+    architecture: topTags.length ? 'Static Analysis · Skill Inventory' : baseProject.architecture || 'Static Analysis',
     stackGroups: [
       { label: 'Detected Skills', items: topSkills.slice(0, 8).map((name, index) => ({ n: name, pct: Math.max(52, 96 - index * 6) })) },
       ...(baseProject.stackGroups || []).slice(1),
     ],
     stats: {
-      ...(baseProject.stats || {}),
-      files: Math.max(baseProject.stats?.files || 0, skills.length),
-      tests: Math.max(baseProject.stats?.tests || 0, Math.round((tags.length / Math.max(1, skills.length)) * 100)),
+      ...baseStats,
+      files: Math.max(baseStats.files || 0, skills.length),
+      tests: Math.max(baseStats.tests || 0, Math.round((tags.length / Math.max(1, skills.length)) * 100)),
     },
     detailTags: tags.length ? tags.map((tag) => ({
       code: tag.code,
       label: tag.label,
       sentence: tag.sentence,
-    })) : baseProject.detailTags,
+    })) : baseDetailTags,
   };
 };
 
@@ -251,8 +290,26 @@ async function hydrateJobDetails(jobs, limit = 24) {
   details.forEach((result) => {
     if (result.ok && result.data?.id) byId.set(result.data.id, result.data);
   });
-  return jobs.map((job) => byId.get(job.id) || job);
+  return jobs.map((job) => {
+    const detail = byId.get(job.id);
+    return detail ? { ...detail, score: job.score ?? detail.score, source: job.source ?? detail.source, status: job.status ?? detail.status } : job;
+  });
 }
+
+export const dedupeJobs = (jobs = []) => {
+  const seen = new Set();
+  return jobs.filter((job) => {
+    const rawJob = job.job || job;
+    const key = [
+      String(rawJob.companyName || job.companyName || '').trim().toLowerCase(),
+      String(rawJob.title || job.title || '').trim().toLowerCase(),
+      String(rawJob.deadlineAt || job.deadlineAt || ''),
+    ].join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 function attachLookup(next) {
   const everyJob = [
@@ -282,17 +339,17 @@ export async function loadJobFlowData(baseJF) {
     RELIABILITY: '안정성',
   };
   const publicResults = await Promise.all([
-    settle('jobs', () => api.jobs()),
+    settle('jobs', () => api.searchJobs('백엔드', 40)),
     settle('trends', () => api.skillTrends({ limit: 8 })),
     settle('market', () => api.market({ role: 'BACKEND', limit: 5 })),
   ]);
-  next.__apiStatus = Object.fromEntries(publicResults.map((result) => [result.key, result.ok ? 'ok' : 'mock']));
+  next.__apiStatus = Object.fromEntries(publicResults.map((result) => [result.key, result.ok ? 'ok' : 'unavailable']));
 
   const jobs = publicResults.find((x) => x.key === 'jobs');
-  const jobRows = asList(jobs?.data);
+  const jobRows = asList(jobs?.data).filter(isUserFacingJob);
   if (jobs?.ok && jobRows.length) {
     const detailedJobs = await hydrateJobDetails(jobRows);
-    const mapped = detailedJobs.map(toPrototypeJob);
+    const mapped = dedupeJobs(detailedJobs.filter(isUserFacingJob)).map(toPrototypeJob);
     next.listings = mapped;
     next.popular = mapped.slice(0, 4);
     next.closing = mapped.slice().sort((a, b) => parseDdayNumber(a.deadline) - parseDdayNumber(b.deadline)).slice(0, 3);
@@ -312,7 +369,7 @@ export async function loadJobFlowData(baseJF) {
     const total = marketRows.reduce((sum, row) => sum + Number(row.jobCount || 0), 0);
     const open = marketRows.reduce((sum, row) => sum + Number(row.openJobCount || 0), 0);
     next.market.totalCount = total || next.market.totalCount;
-    next.market.avgOpenDays = marketRows[0]?.avgOpenDays || next.market.avgOpenDays || 18;
+    next.market.avgOpenDays = marketRows[0]?.avgOpenDays || next.market.avgOpenDays || 0;
     next.market.openJobCount = open || undefined;
   }
 
@@ -332,7 +389,7 @@ export async function loadJobFlowData(baseJF) {
   ]);
   next.__apiStatus = {
     ...(next.__apiStatus || {}),
-    ...Object.fromEntries(authResults.map((result) => [result.key, result.ok ? 'ok' : 'mock'])),
+    ...Object.fromEntries(authResults.map((result) => [result.key, result.ok ? 'ok' : 'unavailable'])),
   };
 
   const me = authResults.find((x) => x.key === 'me');
@@ -364,7 +421,9 @@ export async function loadJobFlowData(baseJF) {
   const recommendations = authResults.find((x) => x.key === 'recommendations');
   const matchRows = asList(matches?.data);
   const recommendationRows = asList(recommendations?.data);
-  const matchSource = matches?.ok && matchRows.length ? matchRows : recommendations?.ok && recommendationRows.length ? recommendationRows : null;
+  const displayableMatches = dedupeJobs(matchRows.filter(isUserFacingJob));
+  const displayableRecommendations = dedupeJobs(recommendationRows.filter(isUserFacingJob));
+  const matchSource = matches?.ok && displayableMatches.length ? displayableMatches : recommendations?.ok && displayableRecommendations.length ? displayableRecommendations : null;
   if (matchSource) {
     next.matches = matchSource.map(toPrototypeJob).slice(0, 8);
   }
@@ -396,7 +455,7 @@ export async function loadJobFlowData(baseJF) {
   const gap = authResults.find((x) => x.key === 'gap');
   if (gap?.ok && gap.data) {
     next.gapSkills = toGapSkills(gap.data, next.gapSkills);
-    const gapMatches = asList(gap.data.jobMatches);
+    const gapMatches = dedupeJobs(asList(gap.data.jobMatches).filter(isUserFacingJob));
     if (gapMatches.length && !matchSource) next.matches = gapMatches.map(toPrototypeJob).slice(0, 8);
   }
 

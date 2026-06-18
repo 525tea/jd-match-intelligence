@@ -4,7 +4,7 @@ import { JobFlowHome } from './prototype/HomePrototype.jsx';
 import { JobDetail } from './prototype/JobDetailPrototype.jsx';
 import { Onboarding } from './prototype/OnboardingPrototype.jsx';
 import { JobFlowScreens } from './prototype/ScreensPrototype.jsx';
-import { loadJobFlowData, toPrototypeJob } from './prototype/adapters.js';
+import { dedupeJobs, isUserFacingJob, loadJobFlowData, toPrototypeJob } from './prototype/adapters.js';
 import { api, authStore } from './api/client.js';
 import { ConnectedLogin, ConnectedOAuth } from './pages/ConnectedAuth.jsx';
 
@@ -33,6 +33,7 @@ function parseRoute() {
 
 export default function App() {
   const [jf, setJf] = React.useState(baseJF);
+  const [dataLoading, setDataLoading] = React.useState(true);
   const [route, setRoute] = React.useState(parseRoute);
   const [authenticated, setAuthenticated] = React.useState(Boolean(authStore.getToken()));
   const t = React.useMemo(() => ({
@@ -42,18 +43,26 @@ export default function App() {
   window.JF = jf;
 
   const refreshData = React.useCallback(async () => {
-    const data = await loadJobFlowData(baseJF);
-    setAuthenticated(Boolean(authStore.getToken()));
-    setJf(data);
-    return data;
+    setDataLoading(true);
+    try {
+      const data = await loadJobFlowData(baseJF);
+      setAuthenticated(Boolean(authStore.getToken()));
+      setJf(data);
+      return data;
+    } finally {
+      setDataLoading(false);
+    }
   }, []);
 
   React.useEffect(() => {
     let alive = true;
+    setDataLoading(true);
     loadJobFlowData(baseJF).then((data) => {
       if (!alive) return;
       setAuthenticated(Boolean(authStore.getToken()));
       setJf(data);
+    }).finally(() => {
+      if (alive) setDataLoading(false);
     });
     return () => { alive = false; };
   }, []);
@@ -124,7 +133,7 @@ export default function App() {
       },
       async searchJobs(keyword) {
         const rows = await api.searchJobs(keyword || '');
-        const mapped = rows.map(toPrototypeJob);
+        const mapped = dedupeJobs(rows.filter(isUserFacingJob)).map(toPrototypeJob);
         const everyJob = mapped.filter((job) => job.companyKo && (job.jobId || job.id));
         setJf((prev) => ({
           ...prev,
@@ -179,7 +188,7 @@ export default function App() {
   if (route.name === 'login') return <ConnectedLogin go={go} onAuthenticated={refreshData} />;
   if (route.name === 'oauth') return <ConnectedOAuth go={go} onAuthenticated={refreshData} />;
   if (route.name === 'home') return <JobFlowHome t={t} go={go} />;
-  if (route.name === 'detail') return <JobDetail t={t} go={go} jobId={route.params.jobId} company={route.params.company || resolveCompanyFromJobId(route.params.jobId)} />;
+  if (route.name === 'detail') return <JobDetail t={t} go={go} jobId={route.params.jobId} company={route.params.company || resolveCompanyFromJobId(route.params.jobId)} loading={dataLoading} />;
   if (route.name === 'onboarding') return <Onboarding t={t} go={go} />;
   return <JobFlowScreens t={t} go={go} screen={route.name} />;
 }
