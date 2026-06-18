@@ -1,5 +1,5 @@
 import React from 'react';
-import { api, authStore } from '../api/client.js';
+import { API_BASE_URL, api, authStore } from '../api/client.js';
 
 const ink = '#14151a';
 const muted = '#5b616e';
@@ -45,7 +45,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
   };
 
   const startOAuth = () => {
-    window.location.href = '/api/oauth2/authorization/github';
+    window.location.href = `${API_BASE_URL}/oauth2/authorization/github`;
   };
 
   const startDemo = async () => {
@@ -54,13 +54,13 @@ export function ConnectedLogin({ go, onAuthenticated }) {
     try {
       const token = await api.login({ email: 'frontend-demo@example.com', password: 'demo-password' });
       authStore.setToken(token.accessToken);
-    } catch (e) {
-      authStore.setToken('local-preview-token');
-      setError('백엔드 데모 계정 로그인이 실패해 로컬 미리보기 모드로 열었습니다.');
-    } finally {
       await onAuthenticated?.();
-      setLoading(false);
       go('home');
+    } catch (e) {
+      authStore.clear();
+      setError('데모 계정 로그인이 실패했습니다. GitHub 로그인 또는 직접 로그인으로 계속해주세요.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -82,7 +82,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
           <button disabled={loading} onClick={submit} style={{ font: 'inherit', cursor: loading ? 'default' : 'pointer', width: '100%', border: 'none', background: ink, color: '#fff', borderRadius: 12, padding: 14, fontWeight: 900 }}>{loading ? '처리 중...' : mode === 'signup' ? '가입하고 계속하기' : '이메일로 계속하기'}</button>
           <button onClick={startDemo} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + greenTintBd, background: greenTint, color: greenInk, borderRadius: 12, padding: 13, fontWeight: 900, marginTop: 10 }}>데모 계정으로 둘러보기</button>
           <button onClick={startOAuth} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + line, background: '#fff', borderRadius: 12, padding: 13, fontWeight: 850, marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><GithubMark />GitHub로 로그인</button>
-          <div style={{ color: faint, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>로그인 성공 시 accessToken을 저장하고 보호 API 요청에 Authorization 헤더를 자동으로 붙입니다. 데모 계정은 실제 /auth/login을 먼저 호출하고, 실패 시 로컬 미리보기로 전환합니다.</div>
+          <div style={{ color: faint, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>로그인 성공 시 accessToken을 저장하고 보호 API 요청에 Authorization 헤더를 자동으로 붙입니다. 데모 계정도 실제 /auth/login이 성공할 때만 로그인 상태로 전환합니다.</div>
         </section>
         <section style={{ background: ink, color: '#fff', borderRadius: 24, padding: 30, minHeight: 440, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>REPOSITORY MATCHING</span>
