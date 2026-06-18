@@ -64,7 +64,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
 
   const startDemo = async () => {
     if (!demoConfigured) {
-      setError('데모 계정이 설정되지 않았습니다. GitHub 로그인 또는 직접 로그인으로 계속해주세요.');
+      setError('데모 계정 환경변수가 없습니다. GitHub 로그인 또는 이메일 로그인으로 계속해주세요.');
       return;
     }
     setLoading(true);
@@ -82,7 +82,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
       go('home');
     } catch (e) {
       authStore.clear();
-      setError(e.message || '데모 계정 로그인이 실패했습니다. GitHub 로그인 또는 직접 로그인으로 계속해주세요.');
+      setError(e.message || '데모 계정 로그인이 실패했습니다. GitHub 로그인 또는 이메일 로그인으로 계속해주세요.');
     } finally {
       setLoading(false);
     }
@@ -105,7 +105,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
           <input value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="분석 프로젝트 ID (예: 2)" style={inputStyle} />
           {error && <div style={{ background: coralTint, border: '1px solid ' + coralTintBd, color: coralDeep, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 800, marginBottom: 10 }}>{error}</div>}
           <button disabled={loading} onClick={submit} style={{ font: 'inherit', cursor: loading ? 'default' : 'pointer', width: '100%', border: 'none', background: ink, color: '#fff', borderRadius: 12, padding: 14, fontWeight: 900 }}>{loading ? '처리 중...' : mode === 'signup' ? '가입하고 계속하기' : '이메일로 계속하기'}</button>
-          <button onClick={startDemo} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + greenTintBd, background: greenTint, color: greenInk, borderRadius: 12, padding: 13, fontWeight: 900, marginTop: 10 }}>{demoConfigured ? '데모 계정으로 둘러보기' : '데모 계정 설정 필요'}</button>
+          {demoConfigured && <button onClick={startDemo} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + greenTintBd, background: greenTint, color: greenInk, borderRadius: 12, padding: 13, fontWeight: 900, marginTop: 10 }}>데모 계정으로 둘러보기</button>}
           <button onClick={startOAuth} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + line, background: '#fff', borderRadius: 12, padding: 13, fontWeight: 850, marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><GithubMark />GitHub로 로그인</button>
           <div style={{ color: faint, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>로그인 성공 시 accessToken을 저장하고 보호 API 요청에 Authorization 헤더를 자동으로 붙입니다. 프로젝트 ID는 project inventory, JD 매칭, 갭 분석, 추천 API 조회 기준으로 사용합니다.</div>
         </section>
