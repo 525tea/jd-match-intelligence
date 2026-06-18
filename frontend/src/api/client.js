@@ -63,7 +63,7 @@ async function request(path, options = {}) {
   const text = await response.text();
   const payload = parseResponsePayload(text);
   if (!response.ok) {
-    const message = payload?.error?.message || payload?.message || payload?.error || `API 요청 실패 (${response.status})`;
+    const message = payload?.error?.message || payload?.message || payload?.error || `요청 실패 (${response.status})`;
     throw new ApiError(message, response.status, payload);
   }
   if (payload && Object.prototype.hasOwnProperty.call(payload, 'data')) return payload.data;
