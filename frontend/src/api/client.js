@@ -1,12 +1,21 @@
 import React from 'react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
+
+export const API_BASE_URL = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || '/api');
 const TOKEN_KEY = 'jobflow.accessToken';
+const PROJECT_ID_KEY = 'jobflow.userProjectId';
 
 export const authStore = {
   getToken: () => localStorage.getItem(TOKEN_KEY),
   setToken: (token) => token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY),
   clear: () => localStorage.removeItem(TOKEN_KEY),
+};
+
+export const projectStore = {
+  getProjectId: () => localStorage.getItem(PROJECT_ID_KEY) || import.meta.env.VITE_DEFAULT_USER_PROJECT_ID || '1',
+  setProjectId: (projectId) => projectId ? localStorage.setItem(PROJECT_ID_KEY, String(projectId)) : localStorage.removeItem(PROJECT_ID_KEY),
+  clear: () => localStorage.removeItem(PROJECT_ID_KEY),
 };
 
 export class ApiError extends Error {
@@ -45,7 +54,7 @@ async function request(path, options = {}) {
   const text = await response.text();
   const payload = text ? JSON.parse(text) : null;
   if (!response.ok) {
-    const message = payload?.message || payload?.error || `API 요청 실패 (${response.status})`;
+    const message = payload?.error?.message || payload?.message || payload?.error || `API 요청 실패 (${response.status})`;
     throw new ApiError(message, response.status, payload);
   }
   if (payload && Object.prototype.hasOwnProperty.call(payload, 'data')) return payload.data;

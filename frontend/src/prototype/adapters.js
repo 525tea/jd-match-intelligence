@@ -1,4 +1,4 @@
-import { api, authStore, unwrapList } from '../api/client.js';
+import { api, authStore, projectStore, unwrapList } from '../api/client.js';
 
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
@@ -217,6 +217,7 @@ function attachLookup(next) {
 export async function loadJobFlowData(baseJF) {
   const next = clone(baseJF);
   const token = authStore.getToken();
+  const userProjectId = projectStore.getProjectId();
   const publicResults = await Promise.all([
     settle('jobs', () => api.jobs()),
     settle('trends', () => api.skillTrends({ limit: 8 })),
@@ -257,11 +258,11 @@ export async function loadJobFlowData(baseJF) {
   const authResults = await Promise.all([
     settle('me', () => api.me()),
     settle('applications', () => api.applications()),
-    settle('recommendations', () => api.recommendations(1, { targetRoles: ['BACKEND'], limit: 12 })),
-    settle('matches', () => api.projectJobMatches(1, { targetRoles: ['BACKEND'], targetCareerLevel: 'NEWCOMER', limit: 12 })),
-    settle('skills', () => api.projectSkills(1)),
-    settle('tags', () => api.projectExperienceTags(1)),
-    settle('gap', () => api.gapAnalysis(1, { targetRoles: ['BACKEND'], limit: 20 })),
+    settle('recommendations', () => api.recommendations(userProjectId, { targetRoles: ['BACKEND'], limit: 12 })),
+    settle('matches', () => api.projectJobMatches(userProjectId, { targetRoles: ['BACKEND'], targetCareerLevel: 'NEWCOMER', limit: 12 })),
+    settle('skills', () => api.projectSkills(userProjectId)),
+    settle('tags', () => api.projectExperienceTags(userProjectId)),
+    settle('gap', () => api.gapAnalysis(userProjectId, { targetRoles: ['BACKEND'], limit: 20 })),
     settle('saved', () => api.savedJobs()),
     settle('viewed', () => api.viewedJobs()),
     settle('ignored', () => api.ignoredJobs()),
@@ -281,6 +282,8 @@ export async function loadJobFlowData(baseJF) {
       email: me.data.email,
     };
   }
+
+  next.__userProjectId = userProjectId;
 
   const skillsResult = authResults.find((x) => x.key === 'skills');
   const skillRows = asList(skillsResult?.data);
