@@ -26,7 +26,16 @@ const careerLabel = (career, min, max) => {
   return ({ ANY: '전체', NEWCOMER: '신입', JUNIOR: '신입~3년', MID: '3~7년', SENIOR: '시니어', LEAD: '리드' }[career] || career || '경력 무관');
 };
 
-const roleLabel = (role, detail) => detail || ({ BACKEND: 'Backend Engineer', FRONTEND: 'Frontend Engineer', FULLSTACK: 'Full Stack Engineer', DEVOPS: 'DevOps Engineer', DATA_ENGINEER: 'Data Engineer', AI_ENGINEER: 'AI Engineer', ML_ENGINEER: 'ML Engineer', SECURITY: 'Security Engineer' }[role] || role || 'Software Engineer');
+const roleLabel = (role, detail) => detail || ({
+  BACKEND: '백엔드',
+  FRONTEND: '프론트엔드',
+  FULLSTACK: '풀스택',
+  DEVOPS: 'DevOps',
+  DATA_ENGINEER: '데이터 엔지니어',
+  AI_ENGINEER: 'AI 엔지니어',
+  ML_ENGINEER: 'ML 엔지니어',
+  SECURITY: '보안 엔지니어',
+}[role] || role || '소프트웨어 엔지니어');
 
 const compactDetail = (value) => {
   const text = String(value || '').trim();
