@@ -141,7 +141,7 @@ const toTrend = (trend, index = 0, ownedSkills = new Set()) => {
     preferredCount: preferred,
     trendScore,
     category: trend.skillCategory || trend.category,
-    insight: trend.insight || (name ? `${name}가 포함된 공고 ${total.toLocaleString()}건이 집계되었습니다. 필수 ${required.toLocaleString()}건, 우대 ${preferred.toLocaleString()}건 기준입니다.` : '트렌드 API 결과입니다.'),
+    insight: trend.insight || (name ? `${name}가 포함된 공고 ${total.toLocaleString()}건이 집계되었습니다. 필수 ${required.toLocaleString()}건, 우대 ${preferred.toLocaleString()}건 기준입니다.` : '이번 달 공고 집계 결과입니다.'),
   };
 };
 

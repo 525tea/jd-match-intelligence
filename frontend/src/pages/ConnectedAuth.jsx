@@ -110,7 +110,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
           <div style={{ color: faint, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>로그인하면 저장 공고, 지원 현황, 프로젝트 분석, JD 매칭, 갭 분석 화면이 계정 기준으로 연결됩니다. 프로젝트 ID는 분석 결과를 불러올 때 사용합니다.</div>
         </section>
         <section style={{ background: ink, color: '#fff', borderRadius: 24, padding: 30, minHeight: 440, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>REPOSITORY MATCHING</span>
+          <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>레포 매칭</span>
           <div style={{ marginTop: 42, fontSize: narrow ? 30 : 40, fontWeight: 900, letterSpacing: -1.4, lineHeight: 1.08 }}>레포지토리에서<br />스킬 근거를 읽고<br /><span style={{ color: green }}>공고를 정렬합니다.</span></div>
           <div style={{ marginTop: 'auto', display: 'grid', gap: 10 }}>{['코드 기반 스킬 추출', '경험 태그 자동 요약', '공고별 매칭률 계산'].map((x, i) => <div key={x} style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.82)', fontSize: 14, fontWeight: 800 }}><span style={{ width: 26, height: 26, borderRadius: 13, background: 'rgba(185,236,42,0.16)', color: green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 1000 }}>{i + 1}</span>{x}</div>)}</div>
         </section>
@@ -129,7 +129,7 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
     const code = new URLSearchParams(window.location.search).get('code');
     if (!code) {
       setStatus('error');
-      setMessage('OAuth code가 없습니다. 다시 로그인해주세요.');
+      setMessage('로그인 결과를 확인할 수 없습니다. 다시 로그인해주세요.');
       return;
     }
     api.oauthToken({ code })
@@ -142,7 +142,7 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
       })
       .catch((e) => {
         setStatus('error');
-        setMessage(e.message || 'OAuth 로그인이 완료되지 않았습니다.');
+        setMessage(e.message || 'GitHub 로그인이 완료되지 않았습니다.');
       });
   }, []);
 

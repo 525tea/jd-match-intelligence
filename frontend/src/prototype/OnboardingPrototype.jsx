@@ -58,7 +58,7 @@ export function Onboarding({ t, go }) {
       {/* progress */}
       <div style={{ maxWidth: 620, margin: '0 auto', padding: '0 32px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: faint, marginBottom: 8 }}>
-          <span>STEP {Math.min(step, 4)} / 4</span>
+          <span>단계 {Math.min(step, 4)} / 4</span>
           <span>{['직무', '경력', '기술 스택', '결과'][Math.min(step, 4) - 1]}</span>
         </div>
         <div style={{ height: 6, background: soft, borderRadius: 4, overflow: 'hidden' }}>

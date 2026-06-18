@@ -137,7 +137,7 @@ export function JobFlowHome({ t, go }) {
           </div>
           <div style={{ display: 'flex' }}>
             <div style={{ background: ink, color: '#fff', borderRadius: 28, padding: v3 ? 24 : 28, display: 'flex', flexDirection: 'column', boxShadow: v3 ? '0 10px 28px rgba(20,21,26,0.14)' : '0 18px 44px rgba(20,21,26,0.2)', flex: 1, minHeight: v3 ? 220 : 254, boxSizing: 'border-box' }}>
-            <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>REPOSITORY MATCHING</span>
+            <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>레포 매칭</span>
             {login ? <>
             <div style={{ marginTop: v3 ? 18 : 24, display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(255,255,255,0.12)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><GithubMark /></div><div><b>{primaryProjectName}</b><div style={{ color: 'rgba(255,255,255,0.58)', fontSize: 13 }}>{primaryProjectSummary} · 매칭 후보 {JF.matches.length}개</div></div></div>
             <div style={{ marginTop: v3 ? 18 : 26, display: 'grid', gridTemplateColumns: v3 && !narrow ? '1fr 1fr' : '1fr', gap: v3 ? 14 : 18 }}>
