@@ -269,7 +269,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const TagPill = ({ children, muted: dull }) => { const tone = tagTone; const P = ({ '보라': { bg: '#efeaff', fg: '#5b3fd6', bd: '#dcd2fb' }, '라임': { bg: '#eef8cf', fg: '#3f5c08', bd: '#dbeca8' }, '검정': { bg: '#14151a', fg: '#ffffff', bd: '#14151a' } })[tone] || { bg: '#efeaff', fg: '#5b3fd6', bd: '#dcd2fb' }; return <span style={{ fontSize: 12, fontWeight: 720, padding: '5px 9px', borderRadius: 999, background: P.bg, color: P.fg, border: '1px solid ' + P.bd, whiteSpace: 'nowrap', opacity: dull ? 0.82 : 1 }}>#{children}</span>; };
   const Stat = ({ label, value, tone }) => <div style={{ background: tone === 'green' ? greenTint : tone === 'coral' ? coralTint : soft, border: '1px solid ' + (tone === 'green' ? greenTintBd : tone === 'coral' ? coralTintBd : line), borderRadius: 14, padding: '13px 14px' }}><b style={{ fontSize: 23, color: tone === 'coral' ? coralDeep : ink, ...num }}>{value}</b><div style={{ color: tone === 'green' ? greenInk : muted, fontSize: 11.5, fontWeight: 800, marginTop: 2 }}>{label}</div></div>;
   const Bar = ({ label, value }) => <div style={{ marginBottom: 12 }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.65)', marginBottom: 5 }}><span>{label}</span><span style={{ color: '#fff', ...num }}>{value}%</span></div><div style={{ height: 9, background: 'rgba(255,255,255,0.12)', borderRadius: 5, overflow: 'hidden' }}><div style={{ width: value + '%', height: '100%', background: green, borderRadius: 5 }} /></div></div>;
-  const btn = (label, active, onClick, primary, icon) => <button className="jf-cta" onClick={onClick} disabled={active} style={{ font: 'inherit', flex: 1, cursor: active ? 'default' : 'pointer', borderRadius: 12, padding: '13px', fontSize: 14.5, fontWeight: 760, border: primary ? 'none' : '1px solid ' + line, background: active ? soft : primary ? green : card, color: active ? muted : ink, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>{icon}{label}</button>;
+  const btn = (label, active, onClick, primary, icon) => <button className="jf-cta" onClick={onClick} disabled={active} style={{ font: 'inherit', flex: narrow ? '1 1 calc(50% - 6px)' : 1, minWidth: narrow ? 'calc(50% - 6px)' : 0, cursor: active ? 'default' : 'pointer', borderRadius: 12, padding: '13px 12px', fontSize: 14.5, fontWeight: 760, lineHeight: 1.15, border: primary ? 'none' : '1px solid ' + line, background: active ? soft : primary ? green : card, color: active ? muted : ink, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, whiteSpace: 'nowrap' }}>{icon}{label}</button>;
   const openOriginalJob = () => {
     if (!job.originalUrl) {
       fire('원본 공고 URL이 없습니다.');
@@ -281,6 +281,53 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     .replace(/^\d+\.\s*/u, '')
     .replace(/\s+/g, ' ')
     .trim();
+  const stripListMarker = (value) => String(value || '').replace(/^[-•]\s*/u, '').replace(/^\d+\.\s*/u, '').trim();
+  const shortJdFragments = new Set([
+    '추천',
+    '추천 추론',
+    '검색',
+    '데이터베이스 설계',
+    '인프라 및 성능 최적화',
+    '서버 개발',
+    '운영 실험 자동화',
+  ]);
+  const shouldJoinWithNextLine = (current, next) => {
+    if (!next) return false;
+    if (shortJdFragments.has(current)) return true;
+    if (/^[가-힣\s]{1,8}$/u.test(current) && !/[.?!。]$/u.test(current)) return true;
+    return false;
+  };
+  const shouldAppendToPreviousLine = (previous, current) => {
+    if (!previous) return false;
+    if (/^(운영|구현|서빙|검색|튜닝|서버|클라이언트)\s+/u.test(current) && /(설계|구현|추천|추론|클라이언트|데이터베이스 설계)$/u.test(previous)) return true;
+    if (/^(검색 시스템|서빙 API|튜닝 MySQL|운영 Docker|운영 Prometheus|운영 Redis)/u.test(current) && /(추천|추론|데이터베이스 설계|설계|설계·구현)$/u.test(previous)) return true;
+    return false;
+  };
+  const joinJdFragments = (left, right) => {
+    const previous = stripListMarker(left);
+    const current = stripListMarker(right);
+    const separator = /[A-Za-z0-9)]$/u.test(previous) || /^[A-Za-z0-9]/u.test(current) ? ' ' : '·';
+    return `${previous}${separator}${current}`;
+  };
+  const compactOriginalLines = (rawLines) => {
+    const cleaned = rawLines.map(stripListMarker).filter(Boolean);
+    const result = [];
+    for (let index = 0; index < cleaned.length; index += 1) {
+      const current = cleaned[index];
+      const next = cleaned[index + 1];
+      if (next && shouldJoinWithNextLine(current, next)) {
+        result.push(joinJdFragments(current, next));
+        index += 1;
+        continue;
+      }
+      if (result.length && shouldAppendToPreviousLine(result[result.length - 1], current)) {
+        result[result.length - 1] = joinJdFragments(result[result.length - 1], current);
+        continue;
+      }
+      result.push(current);
+    }
+    return result;
+  };
   const TextSection = ({ title, children }) => <section style={{ paddingTop: 24, marginTop: 24, borderTop: '1px solid ' + line }}>
     <h2 style={{ margin: 0, color: muted, fontSize: 16, fontWeight: 900, letterSpacing: -0.2 }}>{title}</h2>
     <div style={{ marginTop: 11 }}>{children}</div>
@@ -293,22 +340,10 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
         .trim()
       : '';
     const rawLines = normalized.split('\n').map(l => l.trim()).filter(Boolean);
-    const lines = rawLines.reduce((acc, line) => {
-      const clean = line.replace(/^[-•]\s*/, '').trim();
-      if (acc.length && /^운영\s+/.test(clean) && /설계·구현$/.test(acc[acc.length - 1])) {
-        acc[acc.length - 1] = `${acc[acc.length - 1]}·${clean}`;
-      } else if (acc.length && clean.length <= 4 && /^[가-힣A-Za-z/+.-]+$/.test(clean)) {
-        acc[acc.length - 1] = `${acc[acc.length - 1]}·${clean}`;
-      } else {
-        acc.push(line);
-      }
-      return acc;
-    }, []);
-    const bulletLines = lines.filter(l => /^[-•]\s+/.test(l));
-    const orderedLines = lines.filter(l => /^\d+\.\s+/.test(l));
     const listLikeTitle = /주요|업무|자격|요건|우대|복지|혜택|채용|절차|팀 소개|기업\/서비스 소개/.test(title);
-    const isBulletSection = bulletLines.length >= 2 || orderedLines.length >= 2 || (listLikeTitle && lines.length >= 2);
     const isSkillSection = /기술스택|기술 스택|스킬/.test(title);
+    const lines = isSkillSection ? rawLines.map(stripListMarker) : compactOriginalLines(rawLines);
+    const isBulletSection = listLikeTitle && lines.length >= 2;
     const skillItems = isSkillSection ? [...new Set(normalized.split(/\s+/).map((x) => x.trim()).filter(Boolean))].slice(0, 24) : [];
     const showTitle = !(index === 0 && title === '공고 원문');
     return (
@@ -319,10 +354,10 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
         {body && (isSkillSection
           ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{skillItems.map((skill) => <Pill key={skill} owned={has(skill)} miss={!has(skill)}>{skill}</Pill>)}</div>
           : isBulletSection
-          ? <ul style={{ margin: 0, paddingLeft: 20, color: '#30343c', fontSize: narrow ? 15 : 16, lineHeight: 1.78, letterSpacing: -0.12, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
-              {lines.map((l, i) => <li key={i} style={{ margin: '3px 0' }}>{l.replace(/^[-•]\s*/, '').replace(/^\d+\.\s*/, '')}</li>)}
+          ? <ul style={{ margin: 0, paddingLeft: 20, color: '#30343c', fontSize: narrow ? 15 : 16, lineHeight: 1.82, letterSpacing: -0.12, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
+              {lines.map((line, i) => <li key={line + i} style={{ margin: '5px 0', paddingLeft: 2 }}>{line}</li>)}
             </ul>
-          : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15 : 16, lineHeight: 1.78, letterSpacing: -0.12, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{normalized}</p>
+          : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15 : 16, lineHeight: 1.78, letterSpacing: -0.12, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{lines.join('\n')}</p>
         )}
       </section>
     );
@@ -348,6 +383,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       }))
       .filter((section) => section.body)
     : parseOriginalDescriptionSections(job.desc);
+  const mainOriginalSections = originalSections.filter((section) => !/기술스택|기술 스택|스킬/.test(section.title));
   const processItems = bullets.process;
 
   return (
@@ -358,7 +394,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
         <span className="jf-link" style={{ marginLeft: 'auto', display: narrow ? 'none' : 'inline', fontSize: 13.5, fontWeight: 700, color: muted, cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => go('jobs')}>← 공고 목록</span>
       </div>
 
-      <div style={{ maxWidth: 1440, margin: '0 auto', padding: narrow ? '28px 18px 64px' : '36px 48px 64px' }}>
+      <div style={{ maxWidth: 1520, margin: '0 auto', padding: narrow ? '24px 14px 64px' : '36px 48px 64px' }}>
         <section style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'minmax(0, 1fr) 380px', gap: 24, alignItems: 'start' }}>
           <div>
             <div style={{ background: card, border: '1px solid ' + line, borderRadius: 26, padding: narrow ? 20 : 28, boxShadow: '0 18px 44px rgba(20,21,26,0.08)', display: 'grid', gap: 20 }}>
@@ -388,8 +424,8 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
               <div>
                 <h2 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 22 : 26, fontWeight: 950, letterSpacing: -0.55 }}>공고 원문</h2>
                 <div style={{ marginTop: 18 }}>
-                  {originalSections.length
-                    ? originalSections.map((section, index) => <OriginalSection key={section.title + index} title={section.title} body={section.body} index={index} />)
+                  {mainOriginalSections.length
+                    ? mainOriginalSections.map((section, index) => <OriginalSection key={section.title + index} title={section.title} body={section.body} index={index} />)
                     : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.25, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{formatOriginalDescription(job.desc)}</p>}
                 </div>
               </div>
