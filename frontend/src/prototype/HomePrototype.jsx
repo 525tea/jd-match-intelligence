@@ -33,6 +33,14 @@ export function JobFlowHome({ t, go }) {
   const allMatchJobs = JF.matches.concat(JF.listings.filter((j) => !JF.matches.some((m) => m.companyKo === j.companyKo)).slice(0, 6));
   const popularJobs = JF.popular.concat(JF.listings.slice(0, 4));
   const closingJobs = JF.listings.slice().sort((a, b) => Number(a.deadline.replace('D-', '')) - Number(b.deadline.replace('D-', '')));
+  const topMatch = JF.matches?.[0];
+  const topGap = JF.gapSkills?.[0];
+  const topClosing = closingJobs?.[0];
+  const heroStats = [
+    ['추천 1순위', topMatch ? `${topMatch.companyKo} ${topMatch.score}%` : '추천 대기', topMatch ? `필수 ${topMatch.required ?? 0}% 충족` : '프로젝트 분석 후 표시'],
+    ['부족하면 열림', topGap ? `${topGap.name} +${topGap.count || 0}` : '갭 분석 대기', topGap ? '관련 공고 증가' : '분석 결과 없음'],
+    ['마감 임박', topClosing?.deadline || '마감 정보 없음', topClosing ? '오늘 먼저 볼 공고' : '실시간 공고 기준 표시'],
+  ];
 
   const pageSlice = (items, page, size) => items.slice(page * size, page * size + size);
   const nextPage = (setter, items, page, size) => setter((page + 1) * size >= items.length ? 0 : page + 1);
@@ -48,8 +56,8 @@ export function JobFlowHome({ t, go }) {
   const FloatingStat = ({ label, value, desc }) => <div style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid ' + line, borderRadius: 17, padding: '13px 15px', boxShadow: '0 14px 34px rgba(20,21,26,0.12)', minWidth: 138 }}><b style={{ fontSize: 23, letterSpacing: -0.8, ...num }}>{value}</b><div style={{ fontSize: 12, color: ink, fontWeight: 800, marginTop: 1 }}>{label}</div><div style={{ fontSize: 11.5, color: faint, marginTop: 3, whiteSpace: 'nowrap' }}>{desc}</div></div>;
 
   const JobCard = ({ job, featured, darkSection, urgent }) => {
-    const score = job.score || (JF.matches.find((m) => m.companyKo === job.companyKo) || {}).score || 72;
-    const tags = (job.tags || ['EVENT_DRIVEN', 'CI_CD']).map((c) => JF.tagLabel[c] || c);
+    const score = job.score || (JF.matches.find((m) => m.companyKo === job.companyKo) || {}).score || 0;
+    const tags = (job.tags || []).map((c) => JF.tagLabel[c] || c);
     const ownedSkills = job.matched || job.skills || [];
     const missingSkills = job.missing || [];
     const darkCard = darkSection && !featured;
@@ -66,7 +74,7 @@ export function JobFlowHome({ t, go }) {
           <Logo text={job.logo || job.companyKo.slice(0, 2)} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 13, fontWeight: v3 ? 560 : 600, color: featured ? ink : darkCard ? 'rgba(255,255,255,0.78)' : ink }}>{job.companyKo}</span><span style={{ marginLeft: 'auto', color: coralDeep, background: coralTint, border: '1px solid ' + coralTintBd, borderRadius: 12, padding: '3px 8px', fontSize: 11.5, fontWeight: 900 }}>{job.deadline}</span></div>
-            <div style={{ fontSize: 17, lineHeight: 1.34, fontWeight: v3 ? 560 : 700, letterSpacing: -0.45, marginTop: 6, minHeight: 46, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{job.fullTitle || `${job.companyKo} ${job.title} 채용`}</div>
+            <div style={{ fontSize: 17, lineHeight: 1.34, fontWeight: v3 ? 560 : 700, letterSpacing: -0.45, marginTop: 6, minHeight: 46, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{job.fullTitle || job.title || '공고명 없음'}</div>
             <div style={{ fontSize: 12.5, color: featured ? 'rgba(20,21,26,0.58)' : darkCard ? 'rgba(255,255,255,0.62)' : muted, marginTop: 7, height: 18, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{job.role || job.title} · {job.level}</div>
           </div>
         </div>
@@ -103,14 +111,14 @@ export function JobFlowHome({ t, go }) {
         <div style={{ marginLeft: 'auto', display: narrow ? 'none' : 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>{login ? <><span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, color: greenInk, background: greenTint, border: '1px solid ' + greenTintBd, padding: '6px 12px', borderRadius: 20 }}><span style={{ width: 7, height: 7, borderRadius: 4, background: greenInk }} />GitHub 연동됨</span><div style={{ width: 36, height: 36, borderRadius: 18, background: ink, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, cursor: 'pointer' }} onClick={() => go('mypage')}>사</div></> : <><span onClick={() => go('login')} style={{ fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>로그인</span><span onClick={() => go('login')} style={{ fontSize: 14, fontWeight: 900, background: ink, color: '#fff', padding: '9px 18px', borderRadius: 22, cursor: 'pointer' }}>회원가입</span></>}</div>
       </div>
 
-      <main style={{ maxWidth: 1220, margin: '0 auto', padding: narrow ? '28px 18px 54px' : '36px 40px 64px' }}>
+      <main style={{ maxWidth: 1440, margin: '0 auto', padding: narrow ? '28px 18px 54px' : '36px 48px 64px' }}>
         <section style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : (v3 ? '0.92fr 1.08fr' : '1.05fr 0.82fr'), gap: 18, alignItems: 'stretch', marginBottom: 34 }}>
           <div style={{ background: green, borderRadius: 28, padding: narrow ? 26 : (v3 ? 28 : 34), minHeight: v3 ? 220 : 254, display: 'flex', flexDirection: 'column' }}>
             {login ? <>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.55)', borderRadius: 20, padding: '7px 11px', fontSize: 12, fontWeight: 900 }}>매칭률 높은 공고 {JF.matches.length}개</div>
             <h1 style={{ fontSize: narrow ? 30 : (v3 ? 34 : 38), lineHeight: 1.08, letterSpacing: -1.6, margin: v3 ? '18px 0 10px' : '24px 0 12px', maxWidth: 620 }}>{v3 ? <>매칭률 높은 공고 {JF.matches.length}개를 발견했어요.</> : <>{JF.user.name}님, 매칭률 높은<br />공고 {JF.matches.length}개를 발견했어요.</>}</h1>
             <p style={{ color: 'rgba(20,21,26,0.65)', fontSize: 15.5, lineHeight: 1.6, maxWidth: 560 }}><b>{primaryProjectName}</b> 분석 결과와 {JF.market.totalCount.toLocaleString()}개 통합 공고를 비교해, 오늘 먼저 볼 후보를 추렸어요.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(3, 1fr)', gap: 8, margin: '12px 0 18px' }}>{[['추천 1순위', '코어페이 94%', '필수 4/4 충족'], ['부족하면 열림', 'Kubernetes +7', '관련 공고 증가'], ['마감 임박', 'D-4', '오늘 먼저 볼 공고']].map(([a,b,c]) => <div key={a} style={{ background: 'rgba(255,255,255,0.36)', border: '1px solid rgba(255,255,255,0.46)', borderRadius: 15, padding: '10px 12px' }}><div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(20,21,26,0.56)' }}>{a}</div><div style={{ fontSize: 15, fontWeight: 850, marginTop: 3 }}>{b}</div><div style={{ fontSize: 11.5, color: 'rgba(20,21,26,0.58)', marginTop: 2 }}>{c}</div></div>)}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(3, 1fr)', gap: 8, margin: '12px 0 18px' }}>{heroStats.map(([a,b,c]) => <div key={a} style={{ background: 'rgba(255,255,255,0.36)', border: '1px solid rgba(255,255,255,0.46)', borderRadius: 15, padding: '10px 12px' }}><div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(20,21,26,0.56)' }}>{a}</div><div style={{ fontSize: 15, fontWeight: 850, marginTop: 3 }}>{b}</div><div style={{ fontSize: 11.5, color: 'rgba(20,21,26,0.58)', marginTop: 2 }}>{c}</div></div>)}</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 'auto' }}><button onClick={() => go('jobs')} style={{ font: 'inherit', cursor: 'pointer', border: 'none', background: ink, color: '#fff', borderRadius: 24, padding: '12px 18px', fontWeight: 900 }}>추천 공고 보러가기</button><button onClick={() => go('projects')} style={{ font: 'inherit', cursor: 'pointer', border: '1px solid rgba(20,21,26,0.18)', background: '#fff', color: ink, borderRadius: 24, padding: '12px 18px', fontWeight: 900 }}>스택 추출하기</button></div>
             </> : <>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.55)', borderRadius: 20, padding: '7px 11px', fontSize: 12, fontWeight: 900 }}>실시간 수집 공고 {JF.market.totalCount.toLocaleString()}개</div>
