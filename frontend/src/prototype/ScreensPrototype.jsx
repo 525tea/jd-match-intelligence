@@ -462,9 +462,10 @@ export function JobFlowScreens({ t, go, screen }) {
   };
   const trendsScreen = () => {
     const trendRows = JF.trends.slice().sort((a, b) => (b.jobCount || 0) - (a.jobCount || 0));
-    const topTrend = selectedTrend.name === '트렌드 없음' ? trendRows[0] || selectedTrend : selectedTrend;
+    const topTrend = trendRows.find((item) => item.name === trendSkill) || trendRows[0] || selectedTrend;
     const maxJobCount = Math.max(1, ...trendRows.map((tr) => tr.jobCount || 0));
     const missingRows = trendRows.filter((tr) => !tr.owned);
+    const selectedTrendDemand = `${(topTrend.jobCount || 0).toLocaleString()}개`;
     const BarRow = ({ tr }) => {
       const width = Math.max(3, Math.round(((tr.jobCount || 0) / maxJobCount) * 100));
       return <button onClick={() => setTrendSkill(tr.name)} style={{ font: 'inherit', cursor: 'pointer', border: 'none', background: 'transparent', color: '#fff', display: 'grid', gridTemplateColumns: narrow ? '86px 1fr 58px' : '112px 1fr 72px', gap: 12, alignItems: 'center', padding: '8px 0', width: '100%', textAlign: 'left' }}>
@@ -496,7 +497,7 @@ export function JobFlowScreens({ t, go, screen }) {
           <CountCard label="이번 달 집계 공고" value={`${(JF.market.totalCount || 0).toLocaleString()}개`} />
           <CountCard label="트렌드 스킬" value={`${trendRows.length.toLocaleString()}개`} />
           <CountCard label="내 보유 스킬" value={`${trendRows.filter((x) => x.owned).length}/${trendRows.length}`} />
-          <CountCard label="선택 스킬 점수" value={`${Math.round(topTrend.trendScore || topTrend.rate || 0)}`} tone="dark" />
+          <CountCard label="선택 스킬 관련 공고" value={selectedTrendDemand} tone="dark" />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr 1fr', gap: 16 }}>
           <div style={tile}><H>내 스킬과의 차이</H>{missingRows.length ? missingRows.map((tr) => <div key={tr.name} onClick={() => setTrendSkill(tr.name)} style={{ padding: '12px 0', borderTop: '1px solid ' + line, cursor: 'pointer' }}><b style={{ color: coralDeep }}>{tr.name} 근거 부족</b><div style={{ color: muted, fontSize: 13, lineHeight: 1.55, marginTop: 4 }}>{tr.insight}</div><button onClick={(e) => { e.stopPropagation(); go('jobs'); }} style={{ marginTop: 8, font: 'inherit', border: '1px solid ' + line, background: '#fff', borderRadius: 12, padding: '7px 10px', fontSize: 12, fontWeight: 850, cursor: 'pointer' }}>{tr.name} 요구 공고 보기</button></div>) : <div style={{ color: muted, fontSize: 13.5, lineHeight: 1.6 }}>현재 표시된 상위 스킬은 모두 프로젝트에 근거가 있습니다.</div>}</div>
@@ -521,8 +522,8 @@ export function JobFlowScreens({ t, go, screen }) {
     const mono = "ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace";
     const apiStatusEntries = Object.entries(JF.__apiStatus || {});
     const apiOkCount = apiStatusEntries.filter(([, status]) => status === 'ok').length;
-    const apiFallbackCount = apiStatusEntries.filter(([, status]) => status !== 'ok').length;
-    const apiHealthLabel = apiStatusEntries.length && apiFallbackCount === 0 ? 'API CONNECTED' : apiStatusEntries.length ? 'PARTIAL API' : 'PREVIEW MODE';
+    const apiUnavailableCount = apiStatusEntries.filter(([, status]) => status !== 'ok').length;
+    const apiHealthLabel = apiStatusEntries.length && apiUnavailableCount === 0 ? 'API CONNECTED' : apiStatusEntries.length ? 'PARTIAL API' : 'PREVIEW MODE';
     const apiHealthOk = apiStatusEntries.length > 0 && apiOkCount > 0;
     const services = [['api-gateway', apiHealthOk ? 'UP' : 'CHECK', 8081], ['backend', apiHealthOk ? 'UP' : 'CHECK', 8080], ['mysql-primary', 'CONFIGURED', 3306], ['redis-cache', 'CONFIGURED', 6379], ['elasticsearch', 'CONFIGURED', 9200], ['prometheus', 'CONFIGURED', 9090], ['grafana', 'CONFIGURED', 3001], ['zipkin', 'CONFIGURED', 9411]];
     const smokes = apiStatusEntries.map(([name, status]) => [name, status === 'ok' ? 'OK' : 'CHECK', status, '-']);
@@ -536,13 +537,13 @@ export function JobFlowScreens({ t, go, screen }) {
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontFamily: mono, color: apiHealthOk ? green : coral, fontSize: 13, fontWeight: 800 }}><Dot ok={apiHealthOk} /> {apiHealthLabel}</span>
           <span style={{ fontFamily: mono, color: '#5f6b7d', fontSize: 12.5 }}>env=<span style={{ color: '#aeb7c4' }}>local-demo</span></span>
           <span style={{ fontFamily: mono, color: '#5f6b7d', fontSize: 12.5 }}>api_ok=<span style={{ color: green }}>{apiOkCount}</span></span>
-          <span style={{ fontFamily: mono, color: '#5f6b7d', fontSize: 12.5 }}>fallback=<span style={{ color: apiFallbackCount ? coral : green }}>{apiFallbackCount}</span></span>
+          <span style={{ fontFamily: mono, color: '#5f6b7d', fontSize: 12.5 }}>unavailable=<span style={{ color: apiUnavailableCount ? coral : green }}>{apiUnavailableCount}</span></span>
           <span style={{ marginLeft: 'auto', fontFamily: mono, color: '#5f6b7d', fontSize: 12.5 }}>project <span style={{ color: '#aeb7c4' }}>{JF.__userProjectId || 'preview'}</span></span>
         </div>
         {/* KPI row */}
         <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr 1fr' : 'repeat(4, 1fr)', gap: 12 }}>
           <KPI label="REAL JOBS INDEXED" value={String(JF.market?.totalCount || JF.listings?.length || 0)} sub="gateway API" seed={1} />
-          <KPI label="API ENDPOINTS OK" value={String(apiOkCount)} sub={`${apiFallbackCount} unavailable`} seed={2} />
+          <KPI label="API ENDPOINTS OK" value={String(apiOkCount)} sub={`${apiUnavailableCount} unavailable`} seed={2} />
           <KPI label="PROJECTS LOADED" value={String(JF.projectList?.length || 0)} sub="current user context" seed={3} />
           <KPI label="APPLICATIONS" value={String(JF.applications?.length || 0)} sub="application API" seed={4} />
         </div>
@@ -561,7 +562,7 @@ export function JobFlowScreens({ t, go, screen }) {
         {/* smoke + quality */}
         <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1.25fr 0.75fr', gap: 14, marginTop: 14 }}>
           <section style={{ background: '#0e1116', border: '1px solid #1c2230', borderRadius: 16, padding: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontFamily: mono, color: '#5f6b7d', fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>API CHECK RESULTS</span><span style={{ fontFamily: mono, color: apiFallbackCount ? coral : green, fontSize: 11, fontWeight: 800 }}>{apiStatusEntries.length ? `${apiOkCount} ok · ${apiFallbackCount} unavailable` : 'not checked'}</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontFamily: mono, color: '#5f6b7d', fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>API CHECK RESULTS</span><span style={{ fontFamily: mono, color: apiUnavailableCount ? coral : green, fontSize: 11, fontWeight: 800 }}>{apiStatusEntries.length ? `${apiOkCount} ok · ${apiUnavailableCount} unavailable` : 'not checked'}</span></div>
             <div>{smokes.map(([name, st, val, dur]) => <div key={name} style={{ display: 'grid', gridTemplateColumns: '16px 1fr auto 64px', gap: 10, alignItems: 'center', padding: '10px 0', borderTop: '1px solid #161b24' }}><span style={{ color: green, fontFamily: mono, fontWeight: 900, fontSize: 13 }}>✓</span><span style={{ fontFamily: mono, fontSize: 12.5, color: '#dfe5ec' }}>{name}</span><span style={{ fontFamily: mono, fontSize: 11.5, color: '#8b95a4' }}>{val}</span><span style={{ fontFamily: mono, fontSize: 11.5, color: '#5f6b7d', textAlign: 'right' }}>{dur}</span></div>)}</div>
           </section>
           <section style={{ display: 'grid', gap: 12, gridAutoRows: 'min-content' }}>
