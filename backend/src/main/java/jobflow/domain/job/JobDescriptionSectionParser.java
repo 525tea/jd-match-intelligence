@@ -46,7 +46,21 @@ public class JobDescriptionSectionParser {
             new SectionDefinition(
                     "HIRING_PROCESS",
                     "채용절차 및 기타 지원 유의사항",
-                    List.of("채용절차 및 기타 지원 유의사항", "채용 절차 및 기타 지원 유의사항", "채용절차", "채용 절차", "전형절차", "전형 절차", "process")
+                    List.of(
+                            "채용절차 및 기타 지원 유의사항",
+                            "채용 절차 및 기타 지원 유의사항",
+                            "채용전형",
+                            "채용 전형",
+                            "채용절차",
+                            "채용 절차",
+                            "채용 프로세스",
+                            "전형절차",
+                            "전형 절차",
+                            "전형 과정",
+                            "지원 유의사항",
+                            "기타 지원 유의사항",
+                            "process"
+                    )
             ),
             new SectionDefinition(
                     "COMPANY_INTRO",

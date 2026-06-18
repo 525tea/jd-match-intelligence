@@ -311,4 +311,33 @@ class WantedJobPostingParserTest {
         assertThat(posting.minExperienceYears()).isEqualTo(3);
         assertThat(posting.maxExperienceYears()).isEqualTo(7);
     }
+
+    @Test
+    @DisplayName("원티드 채용 전형 필드를 description에 포함한다")
+    void includeHiringProcessInDescription() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "367438",
+                "https://www.wanted.co.kr/wd/367438",
+                "https://www.wanted.co.kr/api/v4/jobs/367438",
+                """
+                        {
+                          "job": {
+                            "position": "백엔드 엔지니어",
+                            "company": {"name": "Example AI"},
+                            "detail": {
+                              "requirements": "Java 백엔드 개발 경험",
+                              "hiring_process": "서류 검토 > 직무 인터뷰 > 최종 인터뷰"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.description())
+                .contains("[채용절차 및 기타 지원 유의사항]")
+                .contains("서류 검토 > 직무 인터뷰 > 최종 인터뷰");
+    }
 }

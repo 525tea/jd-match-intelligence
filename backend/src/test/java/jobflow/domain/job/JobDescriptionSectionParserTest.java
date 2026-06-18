@@ -98,4 +98,24 @@ class JobDescriptionSectionParserTest {
         assertThat(sections.get(0).title()).isEqualTo("공고 원문");
         assertThat(sections.get(0).body()).isEqualTo("Spring Boot 기반 API 개발자를 채용합니다.");
     }
+
+    @Test
+    @DisplayName("채용전형 제목을 채용절차 표준 섹션으로 변환한다")
+    void parseHiringProcessAlias() {
+        String description = """
+                [자격 요건]
+                Java 개발 경험
+
+                [채용전형]
+                서류 검토 > 직무 인터뷰 > 최종 인터뷰
+                """;
+
+        List<JobDescriptionSectionResponse> sections = parser.parse(description);
+
+        assertThat(sections)
+                .extracting(JobDescriptionSectionResponse::type)
+                .containsExactly("REQUIREMENTS", "HIRING_PROCESS");
+        assertThat(sections.get(1).title()).isEqualTo("채용절차 및 기타 지원 유의사항");
+        assertThat(sections.get(1).body()).contains("직무 인터뷰");
+    }
 }
