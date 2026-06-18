@@ -20,7 +20,7 @@ fi
 
 if [[ -z "${ACCESS_TOKEN}" ]]; then
   echo "ACCESS_TOKEN is required." >&2
-  echo "Get a JobFlow JWT through OAuth, then run ACCESS_TOKEN='...' bash $0" >&2
+  echo "Get a JWT token through OAuth, then run ACCESS_TOKEN='...' bash $0" >&2
   exit 1
 fi
 
