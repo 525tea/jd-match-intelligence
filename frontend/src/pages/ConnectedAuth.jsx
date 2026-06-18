@@ -1,5 +1,5 @@
 import React from 'react';
-import { API_BASE_URL, api, authStore } from '../api/client.js';
+import { API_BASE_URL, api, authStore, projectStore } from '../api/client.js';
 
 const ink = '#14151a';
 const muted = '#5b616e';
@@ -25,6 +25,10 @@ export function ConnectedLogin({ go, onAuthenticated }) {
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const narrow = window.innerWidth < 980;
+  const demoEmail = import.meta.env.VITE_DEMO_EMAIL;
+  const demoPassword = import.meta.env.VITE_DEMO_PASSWORD;
+  const demoProjectId = import.meta.env.VITE_DEMO_PROJECT_ID;
+  const demoConfigured = Boolean(demoEmail && demoPassword);
 
   const submit = async () => {
     setLoading(true);
@@ -49,11 +53,16 @@ export function ConnectedLogin({ go, onAuthenticated }) {
   };
 
   const startDemo = async () => {
+    if (!demoConfigured) {
+      setError('데모 계정이 설정되지 않았습니다. GitHub 로그인 또는 직접 로그인으로 계속해주세요.');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
-      const token = await api.login({ email: 'frontend-demo@example.com', password: 'demo-password' });
+      const token = await api.login({ email: demoEmail, password: demoPassword });
       authStore.setToken(token.accessToken);
+      if (demoProjectId) projectStore.setProjectId(demoProjectId);
       await onAuthenticated?.();
       go('home');
     } catch (e) {
@@ -80,7 +89,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
           <input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="비밀번호" type="password" style={inputStyle} />
           {error && <div style={{ background: coralTint, border: '1px solid ' + coralTintBd, color: coralDeep, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 800, marginBottom: 10 }}>{error}</div>}
           <button disabled={loading} onClick={submit} style={{ font: 'inherit', cursor: loading ? 'default' : 'pointer', width: '100%', border: 'none', background: ink, color: '#fff', borderRadius: 12, padding: 14, fontWeight: 900 }}>{loading ? '처리 중...' : mode === 'signup' ? '가입하고 계속하기' : '이메일로 계속하기'}</button>
-          <button onClick={startDemo} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + greenTintBd, background: greenTint, color: greenInk, borderRadius: 12, padding: 13, fontWeight: 900, marginTop: 10 }}>데모 계정으로 둘러보기</button>
+          <button onClick={startDemo} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + greenTintBd, background: greenTint, color: greenInk, borderRadius: 12, padding: 13, fontWeight: 900, marginTop: 10 }}>{demoConfigured ? '데모 계정으로 둘러보기' : '데모 계정 설정 필요'}</button>
           <button onClick={startOAuth} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + line, background: '#fff', borderRadius: 12, padding: 13, fontWeight: 850, marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><GithubMark />GitHub로 로그인</button>
           <div style={{ color: faint, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>로그인 성공 시 accessToken을 저장하고 보호 API 요청에 Authorization 헤더를 자동으로 붙입니다. 데모 계정도 실제 /auth/login이 성공할 때만 로그인 상태로 전환합니다.</div>
         </section>
