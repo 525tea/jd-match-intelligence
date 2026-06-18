@@ -210,7 +210,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
         <div style={{ maxWidth: 760, margin: '0 auto', padding: narrow ? '70px 18px' : '96px 40px', textAlign: 'center' }}>
           <div style={{ margin: '0 auto 18px', width: 64, height: 64, borderRadius: 22, background: soft, color: muted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 900 }}>…</div>
           <h1 style={{ fontSize: narrow ? 26 : 34, letterSpacing: -1, margin: 0 }}>공고 데이터를 불러오는 중입니다</h1>
-          <p style={{ color: muted, fontSize: 15, lineHeight: 1.7, margin: '12px auto 22px', maxWidth: 440 }}>실제 API에서 공고 목록을 받은 뒤 상세 내용을 표시합니다.</p>
+          <p style={{ color: muted, fontSize: 15, lineHeight: 1.7, margin: '12px auto 22px', maxWidth: 440 }}>공고 목록을 불러온 뒤 상세 내용을 표시합니다.</p>
         </div>
       </div>
     );
@@ -225,7 +225,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
         <div style={{ maxWidth: 760, margin: '0 auto', padding: narrow ? '70px 18px' : '96px 40px', textAlign: 'center' }}>
           <div style={{ margin: '0 auto 18px', width: 64, height: 64, borderRadius: 22, background: soft, color: muted, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, fontWeight: 900 }}>?</div>
           <h1 style={{ fontSize: narrow ? 26 : 34, letterSpacing: -1, margin: 0 }}>공고 데이터를 찾을 수 없습니다</h1>
-          <p style={{ color: muted, fontSize: 15, lineHeight: 1.7, margin: '12px auto 22px', maxWidth: 440 }}>목록에서 실제 API로 불러온 공고를 선택하면 상세와 매칭 근거를 확인할 수 있어요.</p>
+          <p style={{ color: muted, fontSize: 15, lineHeight: 1.7, margin: '12px auto 22px', maxWidth: 440 }}>목록에서 공고를 선택하면 상세 내용과 매칭 근거를 확인할 수 있어요.</p>
           <button onClick={() => go('jobs')} style={{ font: 'inherit', cursor: 'pointer', border: 'none', background: ink, color: '#fff', borderRadius: 22, padding: '12px 18px', fontWeight: 900 }}>공고 목록으로 이동</button>
         </div>
       </div>

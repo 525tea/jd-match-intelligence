@@ -107,7 +107,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
           <button disabled={loading} onClick={submit} style={{ font: 'inherit', cursor: loading ? 'default' : 'pointer', width: '100%', border: 'none', background: ink, color: '#fff', borderRadius: 12, padding: 14, fontWeight: 900 }}>{loading ? '처리 중...' : mode === 'signup' ? '가입하고 계속하기' : '이메일로 계속하기'}</button>
           {demoConfigured && <button onClick={startDemo} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + greenTintBd, background: greenTint, color: greenInk, borderRadius: 12, padding: 13, fontWeight: 900, marginTop: 10 }}>데모 계정으로 둘러보기</button>}
           <button onClick={startOAuth} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + line, background: '#fff', borderRadius: 12, padding: 13, fontWeight: 850, marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><GithubMark />GitHub로 로그인</button>
-          <div style={{ color: faint, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>로그인 성공 시 accessToken을 저장하고 보호 API 요청에 Authorization 헤더를 자동으로 붙입니다. 프로젝트 ID는 project inventory, JD 매칭, 갭 분석, 추천 API 조회 기준으로 사용합니다.</div>
+          <div style={{ color: faint, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>로그인하면 저장 공고, 지원 현황, 프로젝트 분석, JD 매칭, 갭 분석 화면이 계정 기준으로 연결됩니다. 프로젝트 ID는 분석 결과를 불러올 때 사용합니다.</div>
         </section>
         <section style={{ background: ink, color: '#fff', borderRadius: 24, padding: 30, minHeight: 440, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>REPOSITORY MATCHING</span>
@@ -123,7 +123,7 @@ const inputStyle = { width: '100%', font: 'inherit', fontSize: 14, padding: '13p
 
 export function ConnectedOAuth({ go, onAuthenticated }) {
   const [status, setStatus] = React.useState('processing');
-  const [message, setMessage] = React.useState('authorization code를 토큰으로 교환하고 사용자 정보를 불러옵니다.');
+  const [message, setMessage] = React.useState('GitHub 로그인 결과를 확인하고 사용자 정보를 불러옵니다.');
 
   React.useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('code');
