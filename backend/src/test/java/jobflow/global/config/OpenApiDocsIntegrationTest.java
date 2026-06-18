@@ -30,13 +30,37 @@ class OpenApiDocsIntegrationTest {
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.bearerFormat").value("JWT"))
+
                 .andExpect(jsonPath("$.paths", hasKey("/auth/login")))
+                .andExpect(jsonPath("$.paths", hasKey("/auth/signup")))
+                .andExpect(jsonPath("$.paths", hasKey("/auth/me")))
+                .andExpect(jsonPath("$.paths", hasKey("/auth/oauth2/token")))
+
+                .andExpect(jsonPath("$.paths", hasKey("/jobs")))
                 .andExpect(jsonPath("$.paths", hasKey("/jobs/search")))
+                .andExpect(jsonPath("$.paths", hasKey("/jobs/{jobId}")))
+
+                .andExpect(jsonPath("$.paths", hasKey("/user/jobs/{jobId}/view")))
+                .andExpect(jsonPath("$.paths", hasKey("/user/jobs/{jobId}/save")))
+                .andExpect(jsonPath("$.paths", hasKey("/user/jobs/{jobId}/ignore")))
+                .andExpect(jsonPath("$.paths", hasKey("/user/jobs/saved")))
+                .andExpect(jsonPath("$.paths", hasKey("/user/jobs/viewed")))
+                .andExpect(jsonPath("$.paths", hasKey("/user/jobs/ignored")))
+
+                .andExpect(jsonPath("$.paths", hasKey("/applications")))
+                .andExpect(jsonPath("$.paths", hasKey("/applications/{applicationId}")))
+                .andExpect(jsonPath("$.paths", hasKey("/applications/{applicationId}/status")))
+
                 .andExpect(jsonPath("$.paths", hasKey("/projects/{userProjectId}/skills")))
                 .andExpect(jsonPath("$.paths", hasKey("/projects/{userProjectId}/experience-tags")))
                 .andExpect(jsonPath("$.paths", hasKey("/projects/{userProjectId}/job-matches")))
                 .andExpect(jsonPath("$.paths", hasKey("/gap-analysis/projects/{userProjectId}")))
-                .andExpect(jsonPath("$.paths", hasKey("/recommendations/jobs")));
+                .andExpect(jsonPath("$.paths", hasKey("/recommendations/jobs")))
+
+                .andExpect(jsonPath("$.paths", hasKey("/trends/skills")))
+                .andExpect(jsonPath("$.paths", hasKey("/trends/skills/{skillId}/cooccurrences")))
+                .andExpect(jsonPath("$.paths", hasKey("/trends/skills/{skillId}/experience-tags")))
+                .andExpect(jsonPath("$.paths", hasKey("/trends/market")));
     }
 
     @Test
