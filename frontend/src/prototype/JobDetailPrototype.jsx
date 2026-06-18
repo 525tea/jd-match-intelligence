@@ -295,14 +295,12 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const shouldJoinWithNextLine = (current, next) => {
     if (!next) return false;
     if (shortJdFragments.has(current)) return true;
-    if (/^[가-힣\s]{1,8}$/u.test(current) && !/[.?!。]$/u.test(current)) return true;
     return false;
   };
   const shouldAppendToPreviousLine = (previous, current) => {
     if (!previous) return false;
-    if (/^(운영|구현|서빙|검색|튜닝|서버|클라이언트|개발|문서화|최적화|관리|처리|배포|모니터링|알림|캐싱)\s+/u.test(current) && /(설계|구현|추천|추론|클라이언트|서버|운영|개발|최적화|데이터베이스 설계)$/u.test(previous)) return true;
+    if (/^(운영|구현|구현·운영|서빙|검색|튜닝|서버|클라이언트|개발|문서화|최적화|관리|처리|배포|모니터링|알림|캐싱)(?:\s+|·|$)/u.test(current) && /(설계|구현|추천|추론|클라이언트|서버|운영|개발|최적화|데이터베이스 설계)$/u.test(previous)) return true;
     if (/^(검색 시스템|서빙 API|튜닝 MySQL|운영 Docker|운영 Prometheus|운영 Redis|API 개발|스키마 문서화|파이프라인 개발자 포지션)/u.test(current) && /(추천|추론|데이터베이스 설계|설계|설계·구현|OpenAPI|Swagger|GraphQL)$/u.test(previous)) return true;
-    if (/^[가-힣\s]{1,12}$/u.test(previous) && !/[.?!。]$/u.test(previous) && /^[가-힣A-Za-z0-9]/u.test(current)) return true;
     return false;
   };
   const joinJdFragments = (left, right) => {
@@ -473,7 +471,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
               <div style={{ background: ink, color: '#fff', borderRadius: 22, padding: 24, boxShadow: '0 14px 30px rgba(20,21,26,0.16)' }}>
                 <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>매칭 리포트</span>
                 <div style={{ fontSize: 19, fontWeight: 900, margin: '12px 0 8px', lineHeight: 1.3 }}>내 스킬과 이 공고의<br />매칭률이 궁금하다면</div>
-                <p style={{ color: 'rgba(255,255,255,0.62)', fontSize: 13.5, lineHeight: 1.6, margin: '0 0 16px' }}>GitHub 레포를 연결하거나 스킬을 입력하면 필수·우대 스킬 충족률이 여기에 채워져요.</p>
+                <p style={{ color: 'rgba(255,255,255,0.62)', fontSize: 13.5, lineHeight: 1.6, margin: '0 0 16px' }}>GitHub 프로젝트를 연결하거나 스킬을 입력하면 필수·우대 스킬 충족률이 여기에 채워져요.</p>
                 <button onClick={() => go('login')} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: 'none', background: green, color: ink, borderRadius: 12, padding: 12, fontWeight: 900 }}>GitHub 연결하고 매칭 보기</button>
               </div>
 

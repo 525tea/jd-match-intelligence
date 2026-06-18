@@ -142,12 +142,12 @@ export function Onboarding({ t, go }) {
 
             <div style={{ background: ink, color: '#fff', borderRadius: 16, padding: '22px 24px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 220 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>레포지토리 연결하면 더 정확해져요</div>
-                <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.7)' }}>GitHub 레포지토리에서 스킬을 자동 추출해 매칭률까지 계산해드려요.</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>프로젝트를 연결하면 더 정확해져요</div>
+                <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.7)' }}>GitHub 저장소에서 스킬을 자동 추출해 매칭률까지 계산해드려요.</div>
               </div>
               <button className="jf-cta" onClick={() => go('home')} style={{ font: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, background: green, color: ink, border: 'none', fontSize: 14.5, fontWeight: 700, padding: '12px 20px', borderRadius: 24 }}>
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.34c-2.23.49-2.7-1.07-2.7-1.07-.36-.93-.89-1.18-.89-1.18-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.03 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
-                레포지토리 연결하기
+                프로젝트 연결하기
               </button>
             </div>
           </>

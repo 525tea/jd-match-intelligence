@@ -111,7 +111,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
         </section>
         <section style={{ background: ink, color: '#fff', borderRadius: 24, padding: 30, minHeight: 440, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>프로젝트 매칭</span>
-          <div style={{ marginTop: 42, fontSize: narrow ? 30 : 40, fontWeight: 900, letterSpacing: -1.4, lineHeight: 1.08 }}>레포지토리에서<br />스킬 근거를 읽고<br /><span style={{ color: green }}>공고를 정렬합니다.</span></div>
+          <div style={{ marginTop: 42, fontSize: narrow ? 30 : 40, fontWeight: 900, letterSpacing: -1.4, lineHeight: 1.08 }}>프로젝트에서<br />스킬 근거를 읽고<br /><span style={{ color: green }}>공고를 정렬합니다.</span></div>
           <div style={{ marginTop: 'auto', display: 'grid', gap: 10 }}>{['코드 기반 스킬 추출', '경험 태그 자동 요약', '공고별 매칭률 계산'].map((x, i) => <div key={x} style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'rgba(255,255,255,0.82)', fontSize: 14, fontWeight: 800 }}><span style={{ width: 26, height: 26, borderRadius: 13, background: 'rgba(185,236,42,0.16)', color: green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 1000 }}>{i + 1}</span>{x}</div>)}</div>
         </section>
       </div>
