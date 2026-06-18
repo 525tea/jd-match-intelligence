@@ -30,8 +30,8 @@ export const mockUser = { id: 1, name: '사용자', email: 'user@example.com', r
 export const mockProjects = [
   {
     userProjectId: 1,
-    name: 'commerce-api',
-    repo: 'github.com/example-org/commerce-api',
+    name: 'sample-api',
+    repo: 'github.com/example-org/sample-api',
     connected: true,
     analyzedAt: '2시간 전',
     matchedJobs: 18,
@@ -49,8 +49,8 @@ export const mockProjects = [
   },
   {
     userProjectId: 2,
-    name: 'search-indexer',
-    repo: 'github.com/example-org/search-indexer',
+    name: 'search-service',
+    repo: 'github.com/example-org/search-service',
     connected: true,
     analyzedAt: '어제',
     matchedJobs: 12,

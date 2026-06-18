@@ -35,6 +35,9 @@ export function JobDetail({ t, go, company, jobId }) {
   ];
   const targetById = jobId ? allJobs.find((x) => String(x.jobId || x.id) === String(jobId)) : null;
   const targetCompany = company || targetById?.companyKo || '코어페이';
+  const primaryProject = JF.projectList?.[0] || {};
+  const currentProjectName = primaryProject.name || '내 프로젝트';
+  const currentProjectSkillSummary = (primaryProject.previewSkills || JF.skills?.map((skill) => skill.name) || []).slice(0, 4).join(', ') || '프로젝트 분석 스킬';
   const userSkills = new Set(JF.skills.map((s) => s.name));
   const m = targetById || JF.matches.find((x) => x.companyKo === targetCompany);
   const l = !m && (JF.listings.find((x) => x.companyKo === targetCompany) || JF.popular.find((x) => x.companyKo === targetCompany) || JF.closing.find((x) => x.companyKo === targetCompany));
@@ -151,13 +154,13 @@ export function JobDetail({ t, go, company, jobId }) {
           {login ? (
             <aside style={{ display: 'grid', gap: 14, position: narrow ? 'static' : 'sticky', top: 86 }}>
               <div style={{ background: ink, color: '#fff', borderRadius: 22, padding: 24, boxShadow: '0 14px 30px rgba(20,21,26,0.16)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>MATCH REPORT</span><select style={{ font: 'inherit', border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', borderRadius: 10, padding: '7px 9px', fontSize: 12, fontWeight: 800 }}><option>commerce-api 기준</option><option>search-indexer 기준</option></select></div>
-                <div style={{ marginTop: 16, color: 'rgba(255,255,255,0.72)', fontSize: 13 }}>commerce-api 레포 기준 매칭률</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>MATCH REPORT</span><select style={{ font: 'inherit', border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', borderRadius: 10, padding: '7px 9px', fontSize: 12, fontWeight: 800 }}><option>{currentProjectName} 기준</option></select></div>
+                <div style={{ marginTop: 16, color: 'rgba(255,255,255,0.72)', fontSize: 13 }}>{currentProjectName} 프로젝트 기준 매칭률</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, margin: '2px 0 16px' }}><span style={{ fontSize: 62, fontWeight: 900, letterSpacing: -3, color: green, lineHeight: 1, ...num }}>{score}</span><span style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.72)' }}>%</span></div>
                 <Bar label={`필수 스킬 충족 · ${reqMatched.length}/${reqList.length}`} value={requiredRate} />
                 <Bar label={`우대 스킬 충족 · ${prefMatched.length}/${prefList.length}`} value={preferredRate} />
                 <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11.5, fontWeight: 700, marginTop: 2 }}>필수 70% + 우대 30% 가중치 기준</div>
-                {v3 && <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 14, paddingTop: 14, color: 'rgba(255,255,255,0.76)', fontSize: 12.5, lineHeight: 1.6 }}><b style={{ color: green }}>왜 94%인가요?</b><br />commerce-api에서 Java, Spring Boot, JPA, MySQL 근거를 확인했고 Jenkins만 현재 레포 근거가 부족해요.</div>}
+                {v3 && <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 14, paddingTop: 14, color: 'rgba(255,255,255,0.76)', fontSize: 12.5, lineHeight: 1.6 }}><b style={{ color: green }}>왜 {score}%인가요?</b><br />{currentProjectName}에서 {currentProjectSkillSummary} 근거를 확인했고, 부족 스킬은 갭 분석에서 우선순위로 볼 수 있어요.</div>}
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 16, paddingTop: 15, display: 'grid', gap: 12 }}>
                   <div><div style={{ fontSize: 11.5, fontWeight: 800, color: green, marginBottom: 7 }}>이미 충족한 스킬</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{ownedSkills.length ? ownedSkills.map((s) => <span key={s} style={{ fontSize: 12, fontWeight: 800, padding: '4px 9px', borderRadius: 8, background: 'rgba(185,236,42,0.14)', color: green, border: '1px solid rgba(185,236,42,0.28)', whiteSpace: 'nowrap' }}>✓ {s}</span>) : <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12.5 }}>없음</span>}</div></div>
                   <div><div style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.62)', marginBottom: 7 }}>보강하면 좋은 스킬</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{missingSkills.length ? missingSkills.map((s) => <span key={s} style={{ fontSize: 12, fontWeight: 800, padding: '4px 9px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.62)', border: '1px solid rgba(255,255,255,0.14)', whiteSpace: 'nowrap' }}>+ {s}</span>) : <span style={{ color: green, fontSize: 12.5, fontWeight: 700 }}>모두 충족했어요</span>}</div></div>

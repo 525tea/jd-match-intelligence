@@ -6,9 +6,9 @@ export const JF = {
   projects: { analyzed: 3, pending: 1, skillsTotal: 24, tagsTotal: 7 },
   projectList: [
     {
-      name: 'commerce-api', repo: 'github.com/example-org/commerce-api', connected: true, analyzedAt: '2시간 전', skillsTotal: 24, tagsTotal: 7, matchedJobs: 18,
+      name: 'sample-api', repo: 'github.com/example-org/sample-api', connected: true, analyzedAt: '2시간 전', skillsTotal: 24, tagsTotal: 7, matchedJobs: 18,
       previewSkills: ['Java', 'Spring Boot', 'JPA', 'Kafka'],
-      repoVisual: 'commerce-api / main · Java 78%',
+      repoVisual: 'sample-api / main · Java 78%',
       summary: '결제 승인, 정산, 이벤트 발행 흐름이 분리된 커머스 결제 API',
       overview: '결제 승인 → 정산 → 이벤트 발행으로 책임이 분리된 커머스 결제 API입니다. 헥사고날 구조로 도메인과 인프라를 분리했고, Kafka로 주문·정산 이벤트를 비동기 전파합니다. 대용량 결제 트래픽을 가정한 멱등 처리와 재시도 설계가 들어 있습니다.',
       domain: ['결제 승인', '정산', '이벤트 발행'],
@@ -28,15 +28,15 @@ export const JF = {
         { path: 'common', share: 12 },
       ],
       detailTags: [
-        { code: 'EVENT_DRIVEN', label: '이벤트 드리븐', sentence: 'commerce-api의 결제 모듈에서 주문·정산 이벤트를 Kafka로 발행/구독하는 이벤트 드리븐 아키텍처를 구현했습니다.' },
+        { code: 'EVENT_DRIVEN', label: '이벤트 드리븐', sentence: 'sample-api의 결제 모듈에서 주문·정산 이벤트를 Kafka로 발행/구독하는 이벤트 드리븐 아키텍처를 구현했습니다.' },
         { code: 'CI_CD', label: 'CI/CD', sentence: 'GitHub Actions로 테스트·빌드·ECS 배포 파이프라인을 구성해 메인 머지 시 자동 배포되도록 했습니다.' },
         { code: 'IDEMPOTENCY', label: '멱등 처리', sentence: '결제 승인 API에 멱등 키와 재시도 전략을 적용해 중복 결제를 방지했습니다.' },
       ],
     },
     {
-      name: 'search-indexer', repo: 'github.com/example-org/search-indexer', connected: true, analyzedAt: '어제', skillsTotal: 20, tagsTotal: 6, matchedJobs: 12,
+      name: 'search-service', repo: 'github.com/example-org/search-service', connected: true, analyzedAt: '어제', skillsTotal: 20, tagsTotal: 6, matchedJobs: 12,
       previewSkills: ['Java', 'Redis', 'Elasticsearch', 'Docker'],
-      repoVisual: 'search-indexer / main · Search 64%',
+      repoVisual: 'search-service / main · Search 64%',
       summary: '공고 검색과 추천 후보 생성을 위한 검색 인덱싱 서비스',
       overview: '공고 데이터를 색인하고 추천 후보를 생성하는 검색 인덱싱 서비스입니다. 변경 이벤트를 받아 증분 색인하고, Redis 캐시로 인기 검색 응답을 가속합니다.',
       domain: ['검색 색인', '추천 후보', '캐시'],
@@ -110,7 +110,7 @@ export const JF = {
   ],
 
   expTags: [
-    { code: 'EVENT_DRIVEN', label: '이벤트 드리븐', sentence: 'commerce-api의 결제 모듈에서 승인 이벤트를 Kafka 토픽으로 분리해 후속 정산 흐름을 비동기 처리했습니다.' },
+    { code: 'EVENT_DRIVEN', label: '이벤트 드리븐', sentence: 'sample-api의 결제 모듈에서 승인 이벤트를 Kafka 토픽으로 분리해 후속 정산 흐름을 비동기 처리했습니다.' },
     { code: 'CACHE_STRATEGY', label: '캐시 전략', sentence: '상품·결제 조회 API에서 Redis 캐시를 사용해 반복 조회 부하를 줄이는 구조가 감지됐습니다.' },
     { code: 'CI_CD', label: 'CI/CD', sentence: '테스트와 빌드 파이프라인을 분리해 배포 전 검증 단계를 자동화한 흔적이 있습니다.' },
     { code: 'TESTING', label: '테스트', sentence: '결제 실패, 중복 승인, 정산 예외 케이스에 대한 테스트 코드가 반복적으로 확인됩니다.' },
