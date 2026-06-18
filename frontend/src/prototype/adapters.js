@@ -191,7 +191,7 @@ const toUserJobCard = (item, index = 0) => {
 const buildAnalyzedProject = (baseProject = {}, userProjectId, skills, tags, matches) => {
   const topSkills = skills.map((skill) => skill.name).filter(Boolean);
   const topTags = tags.map((tag) => tag.label).filter(Boolean);
-  const projectName = userProjectId ? `project-${userProjectId}` : baseProject.name || '내 프로젝트';
+  const projectName = userProjectId ? `분석 프로젝트 ${userProjectId}` : baseProject.name || '내 프로젝트';
   const baseStats = baseProject.stats || {};
   const baseSkillTotal = baseProject.skillsTotal || 0;
   const baseTagTotal = baseProject.tagsTotal || 0;
@@ -201,26 +201,26 @@ const buildAnalyzedProject = (baseProject = {}, userProjectId, skills, tags, mat
   return {
     ...baseProject,
     name: projectName,
-    repo: `user project #${userProjectId || 'local'}`,
+    repo: userProjectId ? `프로젝트 ID ${userProjectId}` : '연결된 프로젝트',
     connected: true,
     analyzedAt: '최근 분석',
     skillsTotal: skills.length || baseSkillTotal,
     tagsTotal: tags.length || baseTagTotal,
     matchedJobs: matches.length || baseMatchedJobs,
     previewSkills: topSkills.slice(0, 5).length ? topSkills.slice(0, 5) : basePreviewSkills,
-    repoVisual: `${projectName} · ${topSkills.slice(0, 3).join(' / ') || 'analysis ready'}`,
+    repoVisual: `${projectName} · ${topSkills.slice(0, 3).join(' / ') || '분석 완료'}`,
     summary: topSkills.length
       ? `${topSkills.slice(0, 4).join(', ')} 기반으로 분석된 사용자 프로젝트`
       : baseProject.summary || '프로젝트 분석 결과를 불러왔습니다.',
     overview: [
-      '백엔드 API의 project inventory 결과를 기반으로 구성한 프로젝트 분석 카드입니다.',
+      '연결된 프로젝트의 기술 스택과 경험 태그를 바탕으로 구성한 분석 카드입니다.',
       topSkills.length ? `추출 스킬은 ${topSkills.slice(0, 6).join(', ')} 중심입니다.` : '',
       topTags.length ? `경험 태그는 ${topTags.slice(0, 4).join(', ')} 신호가 확인됩니다.` : '',
     ].filter(Boolean).join(' '),
     domain: topTags.slice(0, 3).length ? topTags.slice(0, 3) : baseProject.domain || [],
-    architecture: topTags.length ? 'Static Analysis · Skill Inventory' : baseProject.architecture || 'Static Analysis',
+    architecture: topTags.length ? '코드 기반 스킬 분석' : baseProject.architecture || '스킬 분석',
     stackGroups: [
-      { label: 'Detected Skills', items: topSkills.slice(0, 8).map((name, index) => ({ n: name, pct: Math.max(52, 96 - index * 6) })) },
+      { label: '감지된 스킬', items: topSkills.slice(0, 8).map((name, index) => ({ n: name, pct: Math.max(52, 96 - index * 6) })) },
       ...(baseProject.stackGroups || []).slice(1),
     ],
     stats: {
