@@ -32,11 +32,23 @@ const tagLabel = (code) => ({
   EVENT_DRIVEN: '이벤트 드리븐', CACHE_STRATEGY: '캐시 전략', BATCH_PROCESSING: '배치 처리',
   HIGH_TRAFFIC: '대용량 트래픽', DISTRIBUTED_SYSTEM: '분산 시스템', CI_CD: 'CI/CD',
   TESTING: '테스트', AUTH: '인증/인가', OBSERVABILITY: '모니터링', IDEMPOTENCY: '멱등 처리',
+  CLOUD_INFRA: '클라우드/인프라', MONITORING: '모니터링', PERFORMANCE: '성능 최적화',
+  RELIABILITY: '안정성',
 }[code] || code);
 
 const skillNames = (skills) => (skills || []).map((s) => s.skillName || s.name || s).filter(Boolean);
 const tagCodes = (tags) => (tags || []).map((t) => t.tagCode || t.code || t).filter(Boolean);
-const scoreOf = (job, fallback = 72) => Math.round(Number(job?.score?.totalScore ?? job?.score?.skillMatchRate ?? job?.matchScore ?? job?.score ?? fallback));
+const firstNonEmpty = (...items) => items.find((item) => Array.isArray(item) ? item.length : item !== undefined && item !== null && item !== '');
+const scoreOf = (job, fallback = 72) => Math.round(Number(
+  job?.score?.totalScore
+  ?? job?.score?.skillMatchScore
+  ?? job?.score?.matchScore
+  ?? job?.score?.requiredSkillRate
+  ?? job?.matchScore
+  ?? job?.totalScore
+  ?? job?.score
+  ?? fallback
+));
 
 const parseDdayNumber = (value) => {
   const n = Number(String(value || '').replace(/\D/g, ''));
@@ -75,8 +87,8 @@ export function toPrototypeJob(job, index = 0) {
     applicants: job.applicants || Math.max(8, 64 - index * 3),
     matched: [...new Set(visibleSkills)].slice(0, 5),
     missing: [...new Set(missing.length ? missing : skills.slice(4, 6))].slice(0, 3),
-    requiredSkills: skillNames(rawJob.skills?.filter?.((s) => s.requirementType === 'REQUIRED')) || skillNames(job.skills?.filter?.((s) => s.requirementType === 'REQUIRED')) || visibleSkills,
-    preferredSkills: skillNames(rawJob.skills?.filter?.((s) => s.requirementType === 'PREFERRED')) || skillNames(job.skills?.filter?.((s) => s.requirementType === 'PREFERRED')) || [],
+    requiredSkills: firstNonEmpty(skillNames(rawJob.skills?.filter?.((s) => s.requirementType === 'REQUIRED')), skillNames(job.skills?.filter?.((s) => s.requirementType === 'REQUIRED')), [...new Set([...(job.matchedRequiredSkills || []), ...(job.missingRequiredSkills || [])])], visibleSkills),
+    preferredSkills: firstNonEmpty(skillNames(rawJob.skills?.filter?.((s) => s.requirementType === 'PREFERRED')), skillNames(job.skills?.filter?.((s) => s.requirementType === 'PREFERRED')), [...new Set([...(job.matchedPreferredSkills || []), ...(job.missingPreferredSkills || [])])], []),
     tags: tagCodes(rawJob.experienceTags).length ? tagCodes(rawJob.experienceTags) : tagCodes(job.experienceTags).length ? tagCodes(job.experienceTags) : tagCodes(job.matchedExperienceTags).concat(tagCodes(job.missingExperienceTags)).slice(0, 3),
     deadline: dday(rawJob.deadlineAt || job.deadlineAt) || job.deadline || '상시',
     views: job.views || Math.max(90, 326 - index * 17),
@@ -101,9 +113,9 @@ const toTrend = (trend, index = 0, ownedSkills = new Set()) => {
 
 const toApplication = (app) => ({
   id: app.id || app.applicationId,
-  jobId: app.jobId,
-  company: app.companyName || app.company || '회사명',
-  title: app.jobTitle || app.title || '공고명',
+  jobId: app.jobId || app.job?.id,
+  company: app.companyName || app.job?.companyName || app.company || '회사명',
+  title: app.jobTitle || app.job?.title || app.title || '공고명',
   status: app.status || 'APPLIED',
   appliedAt: app.appliedAt,
   updatedAt: app.updatedAt,
@@ -125,13 +137,57 @@ const toExpTag = (tag) => ({
 });
 
 const toUserJobCard = (item, index = 0) => toPrototypeJob({
-  id: item.jobId,
-  jobId: item.jobId,
-  title: item.jobTitle || item.title,
-  companyName: item.companyName,
-  deadlineAt: item.deadlineAt,
+  id: item.jobId || item.job?.id,
+  jobId: item.jobId || item.job?.id,
+  title: item.jobTitle || item.job?.title || item.title,
+  companyName: item.companyName || item.job?.companyName,
+  deadlineAt: item.deadlineAt || item.job?.deadlineAt,
+  careerLevel: item.careerLevel || item.job?.careerLevel,
+  role: item.role || item.job?.role,
   score: 78 - index * 2,
 }, index);
+
+const buildAnalyzedProject = (baseProject, userProjectId, skills, tags, matches) => {
+  const topSkills = skills.map((skill) => skill.name).filter(Boolean);
+  const topTags = tags.map((tag) => tag.label).filter(Boolean);
+  const projectName = userProjectId ? `project-${userProjectId}` : baseProject.name;
+  return {
+    ...baseProject,
+    name: projectName,
+    repo: `user project #${userProjectId || 'local'}`,
+    connected: true,
+    analyzedAt: '최근 분석',
+    skillsTotal: skills.length || baseProject.skillsTotal,
+    tagsTotal: tags.length || baseProject.tagsTotal,
+    matchedJobs: matches.length || baseProject.matchedJobs,
+    previewSkills: topSkills.slice(0, 5).length ? topSkills.slice(0, 5) : baseProject.previewSkills,
+    repoVisual: `${projectName} · ${topSkills.slice(0, 3).join(' / ') || 'analysis ready'}`,
+    summary: topSkills.length
+      ? `${topSkills.slice(0, 4).join(', ')} 기반으로 분석된 사용자 프로젝트`
+      : baseProject.summary,
+    overview: [
+      '백엔드 API의 project inventory 결과를 기반으로 구성한 프로젝트 분석 카드입니다.',
+      topSkills.length ? `추출 스킬은 ${topSkills.slice(0, 6).join(', ')} 중심입니다.` : '',
+      topTags.length ? `경험 태그는 ${topTags.slice(0, 4).join(', ')} 신호가 확인됩니다.` : '',
+    ].filter(Boolean).join(' '),
+    domain: topTags.slice(0, 3).length ? topTags.slice(0, 3) : baseProject.domain,
+    architecture: topTags.length ? 'Static Analysis · Skill Inventory' : baseProject.architecture,
+    stackGroups: [
+      { label: 'Detected Skills', items: topSkills.slice(0, 8).map((name, index) => ({ n: name, pct: Math.max(52, 96 - index * 6) })) },
+      ...(baseProject.stackGroups || []).slice(1),
+    ],
+    stats: {
+      ...(baseProject.stats || {}),
+      files: Math.max(baseProject.stats?.files || 0, skills.length),
+      tests: Math.max(baseProject.stats?.tests || 0, Math.round((tags.length / Math.max(1, skills.length)) * 100)),
+    },
+    detailTags: tags.length ? tags.map((tag) => ({
+      code: tag.code,
+      label: tag.label,
+      sentence: tag.sentence,
+    })) : baseProject.detailTags,
+  };
+};
 
 const buildPipeline = (applications = []) => {
   const steps = [
@@ -218,6 +274,13 @@ export async function loadJobFlowData(baseJF) {
   const next = clone(baseJF);
   const token = authStore.getToken();
   const userProjectId = projectStore.getProjectId();
+  next.tagLabel = {
+    ...(next.tagLabel || {}),
+    CLOUD_INFRA: '클라우드/인프라',
+    MONITORING: '모니터링',
+    PERFORMANCE: '성능 최적화',
+    RELIABILITY: '안정성',
+  };
   const publicResults = await Promise.all([
     settle('jobs', () => api.jobs()),
     settle('trends', () => api.skillTrends({ limit: 8 })),
@@ -258,8 +321,8 @@ export async function loadJobFlowData(baseJF) {
   const authResults = await Promise.all([
     settle('me', () => api.me()),
     settle('applications', () => api.applications()),
-    settle('recommendations', () => api.recommendations(userProjectId, { targetRoles: ['BACKEND'], limit: 12 })),
-    settle('matches', () => api.projectJobMatches(userProjectId, { targetRoles: ['BACKEND'], targetCareerLevel: 'NEWCOMER', limit: 12 })),
+    settle('recommendations', () => api.recommendations(userProjectId, { targetRoles: ['BACKEND', 'FULLSTACK'], limit: 12 })),
+    settle('matches', () => api.projectJobMatches(userProjectId, { targetRoles: ['BACKEND', 'FULLSTACK'], targetCareerLevel: 'MID', limit: 12 })),
     settle('skills', () => api.projectSkills(userProjectId)),
     settle('tags', () => api.projectExperienceTags(userProjectId)),
     settle('gap', () => api.gapAnalysis(userProjectId, { targetRoles: ['BACKEND'], limit: 20 })),
@@ -304,6 +367,23 @@ export async function loadJobFlowData(baseJF) {
   const matchSource = matches?.ok && matchRows.length ? matchRows : recommendations?.ok && recommendationRows.length ? recommendationRows : null;
   if (matchSource) {
     next.matches = matchSource.map(toPrototypeJob).slice(0, 8);
+  }
+
+  if ((skillsResult?.ok && skillRows.length) || (tagsResult?.ok && tagRows.length) || matchSource) {
+    const analyzed = buildAnalyzedProject(
+      next.projectList[0],
+      userProjectId,
+      next.skills,
+      next.expTags,
+      next.matches || [],
+    );
+    next.projectList = [analyzed, ...next.projectList.slice(1)];
+    next.projects = {
+      ...next.projects,
+      analyzed: Math.max(next.projects?.analyzed || 0, 1),
+      skillsTotal: analyzed.skillsTotal,
+      tagsTotal: analyzed.tagsTotal,
+    };
   }
 
   const apps = authResults.find((x) => x.key === 'applications');

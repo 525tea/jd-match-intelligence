@@ -27,6 +27,9 @@ export function JobFlowHome({ t, go }) {
   const num = { fontFeatureSettings: '"tnum"', fontVariantNumeric: 'tabular-nums' };
 
   const nav = [['홈', 'home'], ['공고', 'jobs'], ['프로젝트', 'projects'], ['갭 분석', 'gap'], ['트렌드', 'trends']];
+  const primaryProject = JF.projectList?.[0] || {};
+  const primaryProjectName = primaryProject.name || '내 프로젝트';
+  const primaryProjectSummary = primaryProject.summary || '최근 분석된 프로젝트';
   const allMatchJobs = JF.matches.concat(JF.listings.filter((j) => !JF.matches.some((m) => m.companyKo === j.companyKo)).slice(0, 6));
   const popularJobs = JF.popular.concat(JF.listings.slice(0, 4));
   const closingJobs = JF.listings.slice().sort((a, b) => Number(a.deadline.replace('D-', '')) - Number(b.deadline.replace('D-', '')));
@@ -106,7 +109,7 @@ export function JobFlowHome({ t, go }) {
             {login ? <>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, alignSelf: 'flex-start', background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(255,255,255,0.55)', borderRadius: 20, padding: '7px 11px', fontSize: 12, fontWeight: 900 }}>매칭률 높은 공고 {JF.matches.length}개</div>
             <h1 style={{ fontSize: narrow ? 30 : (v3 ? 34 : 38), lineHeight: 1.08, letterSpacing: -1.6, margin: v3 ? '18px 0 10px' : '24px 0 12px', maxWidth: 620 }}>{v3 ? <>매칭률 높은 공고 {JF.matches.length}개를 발견했어요.</> : <>{JF.user.name}님, 매칭률 높은<br />공고 {JF.matches.length}개를 발견했어요.</>}</h1>
-            <p style={{ color: 'rgba(20,21,26,0.65)', fontSize: 15.5, lineHeight: 1.6, maxWidth: 560 }}><b>commerce-api</b> 레포와 {JF.market.totalCount.toLocaleString()}개 통합 공고를 비교해, 오늘 먼저 볼 후보를 추렸어요.</p>
+            <p style={{ color: 'rgba(20,21,26,0.65)', fontSize: 15.5, lineHeight: 1.6, maxWidth: 560 }}><b>{primaryProjectName}</b> 분석 결과와 {JF.market.totalCount.toLocaleString()}개 통합 공고를 비교해, 오늘 먼저 볼 후보를 추렸어요.</p>
             <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(3, 1fr)', gap: 8, margin: '12px 0 18px' }}>{[['추천 1순위', '코어페이 94%', '필수 4/4 충족'], ['부족하면 열림', 'Kubernetes +7', '관련 공고 증가'], ['마감 임박', 'D-4', '오늘 먼저 볼 공고']].map(([a,b,c]) => <div key={a} style={{ background: 'rgba(255,255,255,0.36)', border: '1px solid rgba(255,255,255,0.46)', borderRadius: 15, padding: '10px 12px' }}><div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(20,21,26,0.56)' }}>{a}</div><div style={{ fontSize: 15, fontWeight: 850, marginTop: 3 }}>{b}</div><div style={{ fontSize: 11.5, color: 'rgba(20,21,26,0.58)', marginTop: 2 }}>{c}</div></div>)}</div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 'auto' }}><button onClick={() => go('jobs')} style={{ font: 'inherit', cursor: 'pointer', border: 'none', background: ink, color: '#fff', borderRadius: 24, padding: '12px 18px', fontWeight: 900 }}>추천 공고 보러가기</button><button onClick={() => go('projects')} style={{ font: 'inherit', cursor: 'pointer', border: '1px solid rgba(20,21,26,0.18)', background: '#fff', color: ink, borderRadius: 24, padding: '12px 18px', fontWeight: 900 }}>스택 추출하기</button></div>
             </> : <>
@@ -120,7 +123,7 @@ export function JobFlowHome({ t, go }) {
             <div style={{ background: ink, color: '#fff', borderRadius: 28, padding: v3 ? 24 : 28, display: 'flex', flexDirection: 'column', boxShadow: v3 ? '0 10px 28px rgba(20,21,26,0.14)' : '0 18px 44px rgba(20,21,26,0.2)', flex: 1, minHeight: v3 ? 220 : 254, boxSizing: 'border-box' }}>
             <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>REPOSITORY MATCHING</span>
             {login ? <>
-            <div style={{ marginTop: v3 ? 18 : 24, display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(255,255,255,0.12)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><GithubMark /></div><div><b>commerce-api</b><div style={{ color: 'rgba(255,255,255,0.58)', fontSize: 13 }}>최근 분석 · 2시간 전 · 매칭 후보 18개</div></div></div>
+            <div style={{ marginTop: v3 ? 18 : 24, display: 'flex', alignItems: 'center', gap: 12 }}><div style={{ width: 44, height: 44, borderRadius: 14, background: 'rgba(255,255,255,0.12)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><GithubMark /></div><div><b>{primaryProjectName}</b><div style={{ color: 'rgba(255,255,255,0.58)', fontSize: 13 }}>{primaryProjectSummary} · 매칭 후보 {JF.matches.length}개</div></div></div>
             <div style={{ marginTop: v3 ? 18 : 26, display: 'grid', gridTemplateColumns: v3 && !narrow ? '1fr 1fr' : '1fr', gap: v3 ? 14 : 18 }}>
               <div><div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 900, letterSpacing: 0.6, marginBottom: 9 }}>추출 스킬</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>{JF.skills.slice(0, 7).map((skill) => <Chip key={skill.name} dark>{skill.name}</Chip>)}</div></div>
               <div><div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11, fontWeight: 900, letterSpacing: 0.6, marginBottom: 9 }}>경험 태그</div><div style={{ display: 'grid', gap: 7, alignItems: 'start' }}>{JF.expTags.slice(0, 4).map((tag, idx) => <div key={tag.code} style={{ lineHeight: 1.1 }}><Tag muted={idx > 2} dark>{tag.label}</Tag></div>)}</div></div>

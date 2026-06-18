@@ -137,6 +137,17 @@ export default function App() {
         }));
         return mapped;
       },
+      status() {
+        return {
+          authenticated: Boolean(authStore.getToken()),
+          apiStatus: jf.__apiStatus || {},
+          userProjectId: jf.__userProjectId,
+          listingCount: jf.listings?.length || 0,
+          matchCount: jf.matches?.length || 0,
+          skillCount: jf.skills?.length || 0,
+          experienceTagCount: jf.expTags?.length || 0,
+        };
+      },
       logout() {
         authStore.clear();
         setAuthenticated(false);

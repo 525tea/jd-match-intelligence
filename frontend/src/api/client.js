@@ -3,6 +3,7 @@ import React from 'react';
 const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
 
 export const API_BASE_URL = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || '/api');
+const API_BASE_URL_IS_ABSOLUTE = /^https?:\/\//i.test(API_BASE_URL);
 const TOKEN_KEY = 'jobflow.accessToken';
 const PROJECT_ID_KEY = 'jobflow.userProjectId';
 
@@ -33,7 +34,17 @@ const buildUrl = (path, params) => {
     if (Array.isArray(value)) value.forEach((v) => url.searchParams.append(key, v));
     else url.searchParams.set(key, value);
   });
+  if (API_BASE_URL_IS_ABSOLUTE) return url.toString();
   return url.pathname + url.search;
+};
+
+const parseResponsePayload = (text) => {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    return { message: text };
+  }
 };
 
 export const unwrapList = (value) => {
@@ -52,7 +63,7 @@ async function request(path, options = {}) {
 
   const response = await fetch(buildUrl(path, options.params), { ...options, headers });
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  const payload = parseResponsePayload(text);
   if (!response.ok) {
     const message = payload?.error?.message || payload?.message || payload?.error || `API 요청 실패 (${response.status})`;
     throw new ApiError(message, response.status, payload);
