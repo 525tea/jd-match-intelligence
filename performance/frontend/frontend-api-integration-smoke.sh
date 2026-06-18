@@ -76,6 +76,18 @@ assert_data_array_not_empty() {
   fi
 }
 
+assert_json_array_path_not_empty() {
+  local file="$1"
+  local jq_path="$2"
+  local message="$3"
+
+  if ! jq -e "(${jq_path} | type == \"array\") and (${jq_path} | length > 0)" "${file}" >/dev/null; then
+    echo "Assertion failed: ${message}" >&2
+    cat "${file}" >&2
+    exit 1
+  fi
+}
+
 request_status() {
   local method="$1"
   local url="$2"
@@ -184,6 +196,10 @@ project_skills_with_token_status="skipped"
 project_job_matches_with_token_status="skipped"
 gap_analysis_with_token_status="skipped"
 recommendations_with_token_status="skipped"
+project_skill_count="skipped"
+project_job_match_count="skipped"
+gap_job_match_count="skipped"
+recommendation_count="skipped"
 saved_jobs_with_token_status="skipped"
 applications_with_token_status="skipped"
 
@@ -245,6 +261,8 @@ if [[ -n "${ACCESS_TOKEN}" ]]; then
     assert_equals "${project_skills_with_token_status}" "200" "Frontend proxy GET /api/projects/{id}/skills should return 200 with token"
     assert_json_success "${project_skills_with_token_response}" "Frontend proxy GET /api/projects/{id}/skills should return success=true with token"
     assert_data_array_not_empty "${project_skills_with_token_response}" "Frontend proxy GET /api/projects/{id}/skills should return at least one skill"
+    project_skill_count="$(jq -r '.data | length' "${project_skills_with_token_response}")"
+    echo "project_skill_count=${project_skill_count}"
 
     project_job_matches_with_token_response="${tmp_dir}/project-job-matches-with-token.json"
     project_job_matches_with_token_status="$(
@@ -263,6 +281,9 @@ if [[ -n "${ACCESS_TOKEN}" ]]; then
     echo "project_job_matches_with_token_status=${project_job_matches_with_token_status}"
     assert_equals "${project_job_matches_with_token_status}" "200" "Frontend proxy GET /api/projects/{id}/job-matches should return 200 with token"
     assert_json_success "${project_job_matches_with_token_response}" "Frontend proxy GET /api/projects/{id}/job-matches should return success=true with token"
+    assert_data_array_not_empty "${project_job_matches_with_token_response}" "Frontend proxy GET /api/projects/{id}/job-matches should return at least one match"
+    project_job_match_count="$(jq -r '.data | length' "${project_job_matches_with_token_response}")"
+    echo "project_job_match_count=${project_job_match_count}"
 
     gap_analysis_with_token_response="${tmp_dir}/gap-analysis-with-token.json"
     gap_analysis_with_token_status="$(
@@ -279,6 +300,9 @@ if [[ -n "${ACCESS_TOKEN}" ]]; then
     echo "gap_analysis_with_token_status=${gap_analysis_with_token_status}"
     assert_equals "${gap_analysis_with_token_status}" "200" "Frontend proxy GET /api/gap-analysis/projects/{id} should return 200 with token"
     assert_json_success "${gap_analysis_with_token_response}" "Frontend proxy GET /api/gap-analysis/projects/{id} should return success=true with token"
+    assert_json_array_path_not_empty "${gap_analysis_with_token_response}" ".data.jobMatches" "Frontend proxy GET /api/gap-analysis/projects/{id} should return at least one gap match"
+    gap_job_match_count="$(jq -r '.data.jobMatches | length' "${gap_analysis_with_token_response}")"
+    echo "gap_job_match_count=${gap_job_match_count}"
 
     recommendations_with_token_response="${tmp_dir}/recommendations-with-token.json"
     recommendations_with_token_status="$(
@@ -297,6 +321,9 @@ if [[ -n "${ACCESS_TOKEN}" ]]; then
     echo "recommendations_with_token_status=${recommendations_with_token_status}"
     assert_equals "${recommendations_with_token_status}" "200" "Frontend proxy GET /api/recommendations/jobs should return 200 with token"
     assert_json_success "${recommendations_with_token_response}" "Frontend proxy GET /api/recommendations/jobs should return success=true with token"
+    assert_data_array_not_empty "${recommendations_with_token_response}" "Frontend proxy GET /api/recommendations/jobs should return at least one recommendation"
+    recommendation_count="$(jq -r '.data | length' "${recommendations_with_token_response}")"
+    echo "recommendation_count=${recommendation_count}"
   else
     echo "USER_PROJECT_ID is not provided. Project analytics protected checks are skipped."
   fi
@@ -317,6 +344,10 @@ echo "project_skills_with_token_status=${project_skills_with_token_status}"
 echo "project_job_matches_with_token_status=${project_job_matches_with_token_status}"
 echo "gap_analysis_with_token_status=${gap_analysis_with_token_status}"
 echo "recommendations_with_token_status=${recommendations_with_token_status}"
+echo "project_skill_count=${project_skill_count}"
+echo "project_job_match_count=${project_job_match_count}"
+echo "gap_job_match_count=${gap_job_match_count}"
+echo "recommendation_count=${recommendation_count}"
 
 echo
 echo "Frontend API integration smoke completed."

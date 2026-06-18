@@ -61,7 +61,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       return `${prefix}${canonical}\n`;
     })
     .replace(/\s+(?=(?:[-•]\s+|\d+\.\s+))/g, '\n')
-    .replace(/\s*(?:ㆍ|·)\s*/g, '\n• ')
+    .replace(/(^|\n)\s*[ㆍ·]\s*/g, '\n• ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   const formatOriginalDescription = (value) => {
@@ -185,6 +185,11 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const primaryProject = JF.projectList?.[0] || {};
   const currentProjectName = primaryProject.name || '내 프로젝트';
   const currentProjectSkillSummary = (primaryProject.previewSkills || userSkillRows.map((skill) => skill.name) || []).slice(0, 4).join(', ') || '프로젝트 분석 스킬';
+  const hasProjectContext = Boolean(JF.__userProjectId && (JF.projectList?.length || userSkillRows.length));
+  const matchReportLabel = hasProjectContext ? `${currentProjectName} 기준 매칭률` : '프로젝트 연결 전 매칭률';
+  const matchReason = hasProjectContext
+    ? `${currentProjectName}에서 ${currentProjectSkillSummary} 근거를 확인했고, 부족 스킬은 갭 분석에서 우선순위로 볼 수 있어요.`
+    : '프로젝트 분석 결과를 연결하면 보유 스킬과 부족 스킬 기준으로 매칭률을 다시 계산합니다.';
   const userSkills = new Set(userSkillRows.map((s) => s.name));
   const m = targetById || matches.find((x) => x.companyKo === targetCompany);
   const l = !m && (listings.find((x) => x.companyKo === targetCompany) || popular.find((x) => x.companyKo === targetCompany) || closing.find((x) => x.companyKo === targetCompany));
@@ -272,30 +277,10 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     }
     window.open(job.originalUrl, '_blank', 'noopener,noreferrer');
   };
-  const SectionCard = ({ title, eyebrow, children, span }) => <section className="jf-detail-section" style={{ background: card, border: '1px solid ' + line, borderRadius: 20, padding: narrow ? 16 : 18, boxShadow: shadow, gridColumn: span ? '1 / -1' : 'auto', minWidth: 0, overflow: 'hidden' }}>
-    {eyebrow && <div style={{ fontSize: 10.5, fontWeight: 950, letterSpacing: 0.8, color: faint, textTransform: 'uppercase', marginBottom: 6 }}>{eyebrow}</div>}
-    <h2 style={{ margin: 0, fontSize: 17.5, letterSpacing: -0.25, lineHeight: 1.25 }}>{title}</h2>
-    <div style={{ marginTop: 12 }}>{children}</div>
-  </section>;
   const cleanItemText = (value) => String(value || '')
     .replace(/^\d+\.\s*/u, '')
     .replace(/\s+/g, ' ')
     .trim();
-  const compactList = (items, limit = 6) => items.map(cleanItemText).filter(Boolean).slice(0, limit);
-  const WorkCard = ({ item, index }) => <div className="jf-work-card" style={{ display: 'grid', gridTemplateColumns: '30px 1fr', gap: 12, padding: narrow ? 12 : 14, border: '1px solid ' + line, borderRadius: 16, background: '#fbfcfd', minWidth: 0 }}>
-    <span style={{ width: 30, height: 30, borderRadius: 11, background: ink, color: green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 950, fontSize: 11.5, ...num }}>{String(index + 1).padStart(2, '0')}</span>
-    <p style={{ margin: 0, color: '#30343c', fontSize: 14, lineHeight: 1.58, letterSpacing: -0.05, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{item}</p>
-  </div>;
-  const SkillPanel = ({ title, items, empty, tone = 'default' }) => <div style={{ border: '1px solid ' + line, borderRadius: 16, padding: 14, background: tone === 'preferred' ? '#fbf8ff' : '#fbfcfd', minWidth: 0 }}>
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
-      <b style={{ fontSize: 13.5 }}>{title}</b>
-      <span style={{ fontSize: 12, color: faint, fontWeight: 850, ...num }}>{items.length}개</span>
-    </div>
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-      {items.length ? items.map((s) => <Pill key={s} owned={has(s)} miss={!has(s)}>{s}</Pill>) : <span style={{ color: muted, fontSize: 13.5 }}>{empty}</span>}
-    </div>
-  </div>;
-  const MiniBar = ({ label, value, tone }) => <div style={{ marginTop: 11 }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 12.5, fontWeight: 800, color: muted, marginBottom: 6 }}><span>{label}</span><span style={{ color: tone === 'coral' ? coralDeep : ink, ...num }}>{value}%</span></div><div style={{ height: 8, background: soft, borderRadius: 5, overflow: 'hidden' }}><div style={{ width: value + '%', height: '100%', background: tone === 'coral' ? '#f06b50' : green, borderRadius: 5 }} /></div></div>;
   const TextSection = ({ title, children }) => <section style={{ paddingTop: 24, marginTop: 24, borderTop: '1px solid ' + line }}>
     <h2 style={{ margin: 0, color: muted, fontSize: 16, fontWeight: 900, letterSpacing: -0.2 }}>{title}</h2>
     <div style={{ marginTop: 11 }}>{children}</div>
@@ -307,16 +292,33 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
         .replace(/\n{3,}/g, '\n\n')
         .trim()
       : '';
-    const lines = normalized.split('\n').map(l => l.trim()).filter(Boolean);
+    const rawLines = normalized.split('\n').map(l => l.trim()).filter(Boolean);
+    const lines = rawLines.reduce((acc, line) => {
+      const clean = line.replace(/^[-•]\s*/, '').trim();
+      if (acc.length && /^운영\s+/.test(clean) && /설계·구현$/.test(acc[acc.length - 1])) {
+        acc[acc.length - 1] = `${acc[acc.length - 1]}·${clean}`;
+      } else if (acc.length && clean.length <= 4 && /^[가-힣A-Za-z/+.-]+$/.test(clean)) {
+        acc[acc.length - 1] = `${acc[acc.length - 1]}·${clean}`;
+      } else {
+        acc.push(line);
+      }
+      return acc;
+    }, []);
     const bulletLines = lines.filter(l => /^[-•]\s+/.test(l));
     const orderedLines = lines.filter(l => /^\d+\.\s+/.test(l));
-    const isBulletSection = bulletLines.length >= 2 || orderedLines.length >= 2;
+    const listLikeTitle = /주요|업무|자격|요건|우대|복지|혜택|채용|절차|팀 소개|기업\/서비스 소개/.test(title);
+    const isBulletSection = bulletLines.length >= 2 || orderedLines.length >= 2 || (listLikeTitle && lines.length >= 2);
+    const isSkillSection = /기술스택|기술 스택|스킬/.test(title);
+    const skillItems = isSkillSection ? [...new Set(normalized.split(/\s+/).map((x) => x.trim()).filter(Boolean))].slice(0, 24) : [];
+    const showTitle = !(index === 0 && title === '공고 원문');
     return (
-      <section style={{ paddingTop: index ? 28 : 0, marginTop: index ? 28 : 0, borderTop: index ? '1px solid ' + line : 'none' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: body ? 12 : 0 }}>
-          <h3 style={{ margin: 0, color: '#555d6b', fontSize: narrow ? 18 : 20, lineHeight: 1.22, fontWeight: 950, letterSpacing: -0.35 }}>{title}</h3>
-        </div>
-        {body && (isBulletSection
+      <section style={{ paddingTop: index ? 30 : 0, marginTop: index ? 30 : 0, borderTop: index ? '1px solid ' + line : 'none' }}>
+        {showTitle && <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: body ? 12 : 0 }}>
+          <h3 style={{ margin: 0, color: '#3d4451', fontSize: narrow ? 18 : 22, lineHeight: 1.22, fontWeight: 950, letterSpacing: -0.35 }}>{title}</h3>
+        </div>}
+        {body && (isSkillSection
+          ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{skillItems.map((skill) => <Pill key={skill} owned={has(skill)} miss={!has(skill)}>{skill}</Pill>)}</div>
+          : isBulletSection
           ? <ul style={{ margin: 0, paddingLeft: 20, color: '#30343c', fontSize: narrow ? 15 : 16, lineHeight: 1.78, letterSpacing: -0.12, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
               {lines.map((l, i) => <li key={i} style={{ margin: '3px 0' }}>{l.replace(/^[-•]\s*/, '').replace(/^\d+\.\s*/, '')}</li>)}
             </ul>
@@ -325,17 +327,15 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       </section>
     );
   };
-  const BulletList = ({ items }) => <ul style={{ margin: 0, paddingLeft: 22, color: '#30343c', fontSize: narrow ? 15.5 : 17, lineHeight: 1.9, letterSpacing: -0.2 }}>
-    {items.map((item, index) => <li key={item + index} style={{ margin: '2px 0', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{cleanItemText(item)}</li>)}
-  </ul>;
-  const ApplicantSpecCard = () => <div style={{ background: card, border: '1px solid ' + line, borderRadius: 18, padding: 22, boxShadow: shadow }}>
-    <div style={{ fontSize: 11, fontWeight: 900, color: greenInk, letterSpacing: 1 }}>APPLICANT SIGNAL</div>
-    <div style={{ fontSize: 16, fontWeight: 800, margin: '8px 0 6px' }}>이 공고 지원자들 스펙</div>
-    <div style={{ color: muted, fontSize: 12.5, lineHeight: 1.55 }}>지원자 통계 API가 연결되면 실제 저장·지원 신호를 표시합니다. 현재는 가짜 통계 없이 비워둡니다.</div>
-  </div>;
+  const SimilarJobsCard = ({ showScore }) => {
+    const similarJobs = matches.filter((x) => x.companyKo !== job.companyKo).slice(0, 5);
+    return <div style={{ background: card, border: '1px solid ' + line, borderRadius: 18, padding: 22, boxShadow: shadow }}>
+      <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 10 }}>비슷한 추천 공고</div>
+      {similarJobs.length ? similarJobs.map((r) => <div key={(r.jobId || r.id || '') + r.companyKo} onClick={() => go('detail', { jobId: r.jobId || r.id, company: r.companyKo })} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 0', borderTop: '1px solid ' + line, cursor: 'pointer' }}><div style={{ width: 36, height: 36, borderRadius: 11, background: ink, color: green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, flexShrink: 0 }}>{r.logo}</div><div style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 650 }}>{r.companyKo}</span><div style={{ color: muted, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title} · {r.level}</div></div>{showScore && <b style={{ color: greenInk, ...num }}>{r.score}%</b>}</div>) : <div style={{ color: muted, fontSize: 13, lineHeight: 1.55, borderTop: '1px solid ' + line, paddingTop: 12 }}>현재 프로젝트 기준으로 표시할 추가 추천 공고가 없습니다.</div>}
+    </div>;
+  };
   const parsedDescription = parseDescriptionSections(job.desc);
   const bullets = {
-    work: parsedDescription.work.length ? parsedDescription.work : parsedDescription.overview,
     required: reqList.length ? reqList : parsedDescription.required,
     preferred: prefList.length ? prefList : parsedDescription.preferred,
     process: cleanProcessItems(parsedDescription.process),
@@ -348,9 +348,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       }))
       .filter((section) => section.body)
     : parseOriginalDescriptionSections(job.desc);
-  const workItems = compactList(bullets.work, 6);
-  const processItems = bullets.process.length ? bullets.process : ['지원', '서류 검토', '인터뷰', '최종 협의'];
-  const allStack = [...new Set([...reqList, ...prefList])].slice(0, 14);
+  const processItems = bullets.process;
 
   return (
     <div style={{ minHeight: '100vh', background: '#f7f8fa', fontFamily: font, color: ink }}>
@@ -386,19 +384,15 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
             </div>
             </div>
 
-            <article style={{ background: card, border: '1px solid ' + line, borderRadius: 24, padding: narrow ? '24px 20px' : '34px 38px', boxShadow: shadow, marginTop: 18, overflow: 'hidden' }}>
+            <article style={{ background: card, border: '1px solid ' + line, borderRadius: 24, padding: narrow ? '24px 20px' : '36px 42px', boxShadow: shadow, marginTop: 18, overflow: 'hidden' }}>
               <div>
-                <h2 style={{ margin: 0, color: faint, fontSize: 12, fontWeight: 950, letterSpacing: 0.9, textTransform: 'uppercase' }}>ORIGINAL JD</h2>
+                <h2 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 22 : 26, fontWeight: 950, letterSpacing: -0.55 }}>공고 원문</h2>
                 <div style={{ marginTop: 18 }}>
                   {originalSections.length
                     ? originalSections.map((section, index) => <OriginalSection key={section.title + index} title={section.title} body={section.body} index={index} />)
                     : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.25, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{formatOriginalDescription(job.desc)}</p>}
                 </div>
               </div>
-
-              {!!workItems.length && <TextSection title="주요 업무"><BulletList items={workItems} /></TextSection>}
-              {!!parsedDescription.required.length && <TextSection title="자격 요건"><BulletList items={parsedDescription.required.slice(0, 8)} /></TextSection>}
-              {!!parsedDescription.preferred.length && <TextSection title="우대 사항"><BulletList items={parsedDescription.preferred.slice(0, 8)} /></TextSection>}
 
               <TextSection title="필수 스킬">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{reqList.length ? reqList.map((s) => <Pill key={s} owned={has(s)} miss={!has(s)}>{s}</Pill>) : <span style={{ color: muted, fontSize: 14 }}>필수 스킬 정보가 없습니다.</span>}</div>
@@ -412,9 +406,9 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{tags.length ? tags.map((c, i) => <TagPill key={c} muted={i > 0}>{tagLabels[c] || c}</TagPill>) : <span style={{ color: muted, fontSize: 14 }}>경험 태그 정보가 없습니다.</span>}</div>
               </TextSection>
 
-              <TextSection title="채용 절차">
+              {!!processItems.length && <TextSection title="채용 절차">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{processItems.slice(0, 8).map((x, i) => <span key={x + i} style={{ background: soft, border: '1px solid ' + line, borderRadius: 999, padding: '8px 12px', fontSize: 13, fontWeight: 850, whiteSpace: 'normal', maxWidth: '100%', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{i + 1}. {cleanItemText(x)}</span>)}</div>
-              </TextSection>
+              </TextSection>}
             </article>
           </div>
 
@@ -422,12 +416,12 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
             <aside style={{ display: 'grid', gap: 14, position: narrow ? 'static' : 'sticky', top: 86 }}>
               <div style={{ background: ink, color: '#fff', borderRadius: 22, padding: 24, boxShadow: '0 14px 30px rgba(20,21,26,0.16)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>MATCH REPORT</span><select style={{ font: 'inherit', border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', borderRadius: 10, padding: '7px 9px', fontSize: 12, fontWeight: 800 }}><option>{currentProjectName} 기준</option></select></div>
-                <div style={{ marginTop: 16, color: 'rgba(255,255,255,0.72)', fontSize: 13 }}>{currentProjectName} 프로젝트 기준 매칭률</div>
+                <div style={{ marginTop: 16, color: 'rgba(255,255,255,0.72)', fontSize: 13 }}>{matchReportLabel}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, margin: '2px 0 16px' }}><span style={{ fontSize: 62, fontWeight: 900, letterSpacing: -3, color: green, lineHeight: 1, ...num }}>{score}</span><span style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.72)' }}>%</span></div>
                 <Bar label={`필수 스킬 충족 · ${reqMatched.length}/${reqList.length}`} value={requiredRate} />
                 <Bar label={`우대 스킬 충족 · ${prefMatched.length}/${prefList.length}`} value={preferredRate} />
                 <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11.5, fontWeight: 700, marginTop: 2 }}>필수 70% + 우대 30% 가중치 기준</div>
-                {v3 && <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 14, paddingTop: 14, color: 'rgba(255,255,255,0.76)', fontSize: 12.5, lineHeight: 1.6 }}><b style={{ color: green }}>왜 {score}%인가요?</b><br />{currentProjectName}에서 {currentProjectSkillSummary} 근거를 확인했고, 부족 스킬은 갭 분석에서 우선순위로 볼 수 있어요.</div>}
+                {v3 && <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 14, paddingTop: 14, color: 'rgba(255,255,255,0.76)', fontSize: 12.5, lineHeight: 1.6 }}><b style={{ color: green }}>왜 {score}%인가요?</b><br />{matchReason}</div>}
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', marginTop: 16, paddingTop: 15, display: 'grid', gap: 12 }}>
                   <div><div style={{ fontSize: 11.5, fontWeight: 800, color: green, marginBottom: 7 }}>이미 충족한 스킬</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{ownedSkills.length ? ownedSkills.map((s) => <span key={s} style={{ fontSize: 12, fontWeight: 800, padding: '4px 9px', borderRadius: 8, background: 'rgba(185,236,42,0.14)', color: green, border: '1px solid rgba(185,236,42,0.28)', whiteSpace: 'nowrap' }}>✓ {s}</span>) : <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12.5 }}>없음</span>}</div></div>
                   <div><div style={{ fontSize: 11.5, fontWeight: 800, color: 'rgba(255,255,255,0.62)', marginBottom: 7 }}>보강하면 좋은 스킬</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{missingSkills.length ? missingSkills.map((s) => <span key={s} style={{ fontSize: 12, fontWeight: 800, padding: '4px 9px', borderRadius: 8, background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.62)', border: '1px solid rgba(255,255,255,0.14)', whiteSpace: 'nowrap' }}>+ {s}</span>) : <span style={{ color: green, fontSize: 12.5, fontWeight: 700 }}>모두 충족했어요</span>}</div></div>
@@ -435,12 +429,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
                 <button onClick={() => go('gap')} style={{ font: 'inherit', cursor: 'pointer', width: '100%', marginTop: 16, border: 'none', background: green, color: ink, borderRadius: 12, padding: 12, fontWeight: 900 }}>부족 스킬 갭 분석 보기 →</button>
               </div>
 
-              <ApplicantSpecCard />
-
-              <div style={{ background: card, border: '1px solid ' + line, borderRadius: 18, padding: 22, boxShadow: shadow }}>
-                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 10 }}>비슷한 추천 공고</div>
-                {matches.filter((x) => x.companyKo !== job.companyKo).map((r) => <div key={r.companyKo} onClick={() => go('detail', { company: r.companyKo })} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 0', borderTop: '1px solid ' + line, cursor: 'pointer' }}><div style={{ width: 36, height: 36, borderRadius: 11, background: ink, color: green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, flexShrink: 0 }}>{r.logo}</div><div style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 650 }}>{r.companyKo}</span><div style={{ color: muted, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title} · {r.level}</div></div><b style={{ color: greenInk, ...num }}>{r.score}%</b></div>)}
-              </div>
+              <SimilarJobsCard showScore />
             </aside>
           ) : (
             <aside style={{ display: 'grid', gap: 14, position: narrow ? 'static' : 'sticky', top: 86 }}>
@@ -451,12 +440,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
                 <button onClick={() => go('login')} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: 'none', background: green, color: ink, borderRadius: 12, padding: 12, fontWeight: 900 }}>GitHub 연결하고 매칭 보기</button>
               </div>
 
-              <ApplicantSpecCard />
-
-              <div style={{ background: card, border: '1px solid ' + line, borderRadius: 18, padding: 22, boxShadow: shadow }}>
-                <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 10 }}>비슷한 추천 공고</div>
-                {matches.filter((x) => x.companyKo !== job.companyKo).map((r) => <div key={r.companyKo} onClick={() => go('detail', { company: r.companyKo })} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 0', borderTop: '1px solid ' + line, cursor: 'pointer' }}><div style={{ width: 36, height: 36, borderRadius: 11, background: ink, color: green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, flexShrink: 0 }}>{r.logo}</div><div style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 650 }}>{r.companyKo}</span><div style={{ color: muted, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title} · {r.level}</div></div></div>)}
-              </div>
+              <SimilarJobsCard />
             </aside>
           )}
         </section>

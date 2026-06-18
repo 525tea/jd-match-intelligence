@@ -9,7 +9,7 @@ export function JobFlowHome({ t, go }) {
   const [popularPage, setPopularPage] = React.useState(0);
   const [closingPage, setClosingPage] = React.useState(0);
   const fire = (label) => { setToast(label); clearTimeout(window.__jfT); window.__jfT = setTimeout(() => setToast(null), 1900); };
-  const openJob = (company) => go('detail', { company });
+  const openJob = (job) => go('detail', { jobId: job.jobId || job.id, company: job.companyKo });
 
   const ink = '#14151a', muted = '#5b616e', faint = '#9aa1ad';
   const page = '#ffffff', card = '#ffffff', line = '#e7eaf0', soft = '#f1f3f7';
@@ -69,7 +69,7 @@ export function JobFlowHome({ t, go }) {
     const visibleTags = tags.length > maxTags ? tags.slice(0, maxTags - 1) : tags.slice(0, maxTags);
     const hiddenTags = Math.max(0, tags.length - visibleTags.length);
     return (
-      <div className="jf-jobcard" onClick={() => openJob(job.companyKo)} style={{ cursor: 'pointer', background: v2 && featured ? green : darkCard ? '#171a20' : card, color: darkCard ? '#fff' : ink, border: '1px solid ' + (featured ? (v3 ? greenTintBd : green) : urgent ? coralTintBd : darkCard ? 'rgba(255,255,255,0.1)' : '#edf0f3'), borderRadius: 18, padding: v3 ? 18 : 20, display: 'flex', flexDirection: 'column', minHeight: 252, boxShadow: urgent ? '0 3px 16px rgba(240,96,63,0.13)' : featured && !v2 ? (v3 ? '0 8px 22px rgba(20,21,26,0.055)' : '0 0 0 2px rgba(185,236,42,0.16), 0 8px 24px rgba(20,21,26,0.06)') : shadow }}>
+      <div className="jf-jobcard" onClick={() => openJob(job)} style={{ cursor: 'pointer', background: v2 && featured ? green : darkCard ? '#171a20' : card, color: darkCard ? '#fff' : ink, border: '1px solid ' + (featured ? (v3 ? greenTintBd : green) : urgent ? coralTintBd : darkCard ? 'rgba(255,255,255,0.1)' : '#edf0f3'), borderRadius: 18, padding: v3 ? 18 : 20, display: 'flex', flexDirection: 'column', minHeight: 252, boxShadow: urgent ? '0 3px 16px rgba(240,96,63,0.13)' : featured && !v2 ? (v3 ? '0 8px 22px rgba(20,21,26,0.055)' : '0 0 0 2px rgba(185,236,42,0.16), 0 8px 24px rgba(20,21,26,0.06)') : shadow }}>
         <div style={{ display: 'flex', gap: 13, alignItems: 'flex-start' }}>
           <Logo text={job.logo || job.companyKo.slice(0, 2)} />
           <div style={{ minWidth: 0, flex: 1 }}>
