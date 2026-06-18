@@ -348,17 +348,17 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     const skillItems = isSkillSection ? [...new Set(normalized.split(/\s+/).map((x) => x.trim()).filter(Boolean))].slice(0, 24) : [];
     const showTitle = !(index === 0 && title === '공고 원문');
     return (
-      <section style={{ paddingTop: index ? 30 : 0, marginTop: index ? 30 : 0, borderTop: index ? '1px solid ' + line : 'none' }}>
+      <section style={{ paddingTop: index ? 30 : 0, marginTop: index ? 30 : 0, borderTop: index ? '1px solid ' + line : 'none', minWidth: 0 }}>
         {showTitle && <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: body ? 12 : 0 }}>
           <h3 style={{ margin: 0, color: '#3d4451', fontSize: narrow ? 18 : 22, lineHeight: 1.22, fontWeight: 950, letterSpacing: -0.35 }}>{title}</h3>
         </div>}
         {body && (isSkillSection
           ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{skillItems.map((skill) => <Pill key={skill} owned={has(skill)} miss={!has(skill)}>{skill}</Pill>)}</div>
           : isBulletSection
-          ? <ul style={{ margin: 0, paddingLeft: 20, color: '#30343c', fontSize: narrow ? 15 : 16, lineHeight: 1.82, letterSpacing: -0.12, wordBreak: 'keep-all', overflowWrap: 'break-word' }}>
-              {lines.map((line, i) => <li key={line + i} style={{ margin: '5px 0', paddingLeft: 2 }}>{line}</li>)}
+          ? <ul style={{ margin: 0, paddingLeft: 20, color: '#30343c', fontSize: narrow ? 15 : 16, lineHeight: 1.82, letterSpacing: -0.12, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
+              {lines.map((line, i) => <li key={line + i} style={{ margin: '5px 0', paddingLeft: 2, maxWidth: '100%' }}>{line}</li>)}
             </ul>
-          : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15 : 16, lineHeight: 1.78, letterSpacing: -0.12, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'break-word' }}>{lines.join('\n')}</p>
+          : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15 : 16, lineHeight: 1.78, letterSpacing: -0.12, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{lines.join('\n')}</p>
         )}
       </section>
     );
@@ -403,7 +403,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
               <Logo />
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}><span style={{ fontSize: 18, fontWeight: 650 }}>{job.companyKo}</span><span style={{ color: muted, fontSize: 13.5 }}>{job.companyIntro}</span></div>
-                <h1 style={{ fontSize: narrow ? 27 : (v3 ? 34 : 40), lineHeight: 1.1, margin: '10px 0 8px', letterSpacing: -1.2, fontWeight: 820, maxWidth: '100%' }}>{job.fullTitle}</h1>
+                <h1 style={{ fontSize: narrow ? 27 : (v3 ? 34 : 40), lineHeight: 1.1, margin: '10px 0 8px', letterSpacing: -1.2, fontWeight: 820, maxWidth: '100%', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{job.fullTitle}</h1>
                 <div style={{ color: muted, fontSize: 14.5 }}>{job.role} · {job.level} · {job.location}</div>
               </div>
             </div>
@@ -444,7 +444,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
               </TextSection>
 
               {!!processItems.length && <TextSection title="채용 절차">
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{processItems.slice(0, 8).map((x, i) => <span key={x + i} style={{ background: soft, border: '1px solid ' + line, borderRadius: 999, padding: '8px 12px', fontSize: 13, fontWeight: 850, whiteSpace: 'normal', maxWidth: '100%', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{i + 1}. {cleanItemText(x)}</span>)}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 8 }}>{processItems.slice(0, 8).map((x, i) => <div key={x + i} style={{ background: soft, border: '1px solid ' + line, borderRadius: 14, padding: '10px 12px', fontSize: 13, fontWeight: 850, lineHeight: 1.45, wordBreak: 'keep-all', overflowWrap: 'anywhere', minWidth: 0 }}><span style={{ color: faint, marginRight: 6, ...num }}>{i + 1}.</span>{cleanItemText(x)}</div>)}</div>
               </TextSection>}
             </article>
           </div>
@@ -452,7 +452,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
           {login ? (
             <aside style={{ display: 'grid', gap: 14, position: narrow ? 'static' : 'sticky', top: 86 }}>
               <div style={{ background: ink, color: '#fff', borderRadius: 22, padding: 24, boxShadow: '0 14px 30px rgba(20,21,26,0.16)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>MATCH REPORT</span><select style={{ font: 'inherit', border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', borderRadius: 10, padding: '7px 9px', fontSize: 12, fontWeight: 800 }}><option>{currentProjectName} 기준</option></select></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}><span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>매칭 리포트</span><select style={{ font: 'inherit', border: '1px solid rgba(255,255,255,0.18)', background: 'rgba(255,255,255,0.08)', color: '#fff', borderRadius: 10, padding: '7px 9px', fontSize: 12, fontWeight: 800 }}><option>{currentProjectName} 기준</option></select></div>
                 <div style={{ marginTop: 16, color: 'rgba(255,255,255,0.72)', fontSize: 13 }}>{matchReportLabel}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, margin: '2px 0 16px' }}><span style={{ fontSize: 62, fontWeight: 900, letterSpacing: -3, color: green, lineHeight: 1, ...num }}>{score}</span><span style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.72)' }}>%</span></div>
                 <Bar label={`필수 스킬 충족 · ${reqMatched.length}/${reqList.length}`} value={requiredRate} />
@@ -471,7 +471,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
           ) : (
             <aside style={{ display: 'grid', gap: 14, position: narrow ? 'static' : 'sticky', top: 86 }}>
               <div style={{ background: ink, color: '#fff', borderRadius: 22, padding: 24, boxShadow: '0 14px 30px rgba(20,21,26,0.16)' }}>
-                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>MATCH REPORT</span>
+                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>매칭 리포트</span>
                 <div style={{ fontSize: 19, fontWeight: 900, margin: '12px 0 8px', lineHeight: 1.3 }}>내 스킬과 이 공고의<br />매칭률이 궁금하다면</div>
                 <p style={{ color: 'rgba(255,255,255,0.62)', fontSize: 13.5, lineHeight: 1.6, margin: '0 0 16px' }}>GitHub 레포를 연결하거나 스킬을 입력하면 필수·우대 스킬 충족률이 여기에 채워져요.</p>
                 <button onClick={() => go('login')} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: 'none', background: green, color: ink, borderRadius: 12, padding: 12, fontWeight: 900 }}>GitHub 연결하고 매칭 보기</button>
