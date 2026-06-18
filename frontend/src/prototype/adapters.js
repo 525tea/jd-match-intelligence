@@ -323,6 +323,7 @@ function attachLookup(next) {
   const everyJob = [
     ...(next.listings || []),
     ...(next.matches || []),
+    ...(next.recommendations || []),
     ...(next.popular || []),
     ...(next.closing || []),
     ...(next.userJobs?.saved || []),
@@ -358,6 +359,7 @@ export function mergePrototypeJobIntoState(state, job) {
     ...state,
     listings: upsert(state.listings || [], true),
     matches: upsert(state.matches || []),
+    recommendations: upsert(state.recommendations || []),
     popular: upsert(state.popular || []),
     closing: upsert(state.closing || []),
     userJobs: {
@@ -484,6 +486,9 @@ export async function loadJobFlowData(baseJF) {
   const recommendationRows = asList(recommendations?.data);
   const displayableMatches = dedupeJobs(matchRows.filter(isUserFacingJob));
   const displayableRecommendations = dedupeJobs(recommendationRows.filter(isUserFacingJob));
+  if (recommendations?.ok) {
+    next.recommendations = displayableRecommendations.map(toPrototypeJob).slice(0, 12);
+  }
   const matchSource = matches?.ok && displayableMatches.length ? displayableMatches : recommendations?.ok && displayableRecommendations.length ? displayableRecommendations : null;
   if (matchSource) {
     next.matches = matchSource.map(toPrototypeJob).slice(0, 8);

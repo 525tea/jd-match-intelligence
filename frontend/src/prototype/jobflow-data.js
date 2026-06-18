@@ -30,6 +30,7 @@ export const JF = {
   projects: { analyzed: 0, pending: 0, skillsTotal: 0, tagsTotal: 0 },
   projectList: [],
   matches: [],
+  recommendations: [],
   skills: [],
   expTags: [],
   applications: [],
