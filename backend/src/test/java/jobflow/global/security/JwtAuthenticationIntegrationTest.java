@@ -2,6 +2,9 @@ package jobflow.global.security;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import jobflow.domain.job.dto.JobCanonicalGroupItemResponse;
+import jobflow.domain.job.dto.JobCanonicalGroupResponse;
+import jobflow.domain.job.JobStatus;
 import jobflow.domain.job.JobService;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
@@ -68,6 +71,47 @@ class JwtAuthenticationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    @DisplayName("인증 토큰 없이 canonical group API를 호출할 수 있다")
+    void getCanonicalGroupWithoutToken() throws Exception {
+        given(jobService.getCanonicalGroup(1L))
+                .willReturn(new JobCanonicalGroupResponse(
+                        "example-company|backend-engineer|seoul",
+                        2L,
+                        "https://company.example.com/jobs/backend",
+                        1,
+                        List.of(
+                                new JobCanonicalGroupItemResponse(
+                                        1L,
+                                        "WANTED",
+                                        "1001",
+                                        "Backend Engineer",
+                                        "Example Company",
+                                        "https://www.wanted.co.kr/wd/1001",
+                                        JobStatus.OPEN,
+                                        null,
+                                        false
+                                ),
+                                new JobCanonicalGroupItemResponse(
+                                        2L,
+                                        "JUMPIT",
+                                        "2001",
+                                        "Backend Engineer",
+                                        "Example Company",
+                                        "https://company.example.com/jobs/backend",
+                                        JobStatus.OPEN,
+                                        null,
+                                        true
+                                )
+                        )
+                ));
+
+        mockMvc.perform(get("/jobs/{jobId}/canonical-group", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.representativeApplyUrl").value("https://company.example.com/jobs/backend"));
     }
 
     @Test
