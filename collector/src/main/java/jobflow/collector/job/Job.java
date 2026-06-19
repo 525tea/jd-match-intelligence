@@ -231,6 +231,10 @@ public class Job extends BaseTimeEntity {
         this.role = role;
     }
 
+    public void updateDescription(String description) {
+        this.description = description;
+    }
+
     public void close() {
         validateOpenStatus();
         this.status = JobStatus.CLOSED;
