@@ -363,9 +363,11 @@ class JobControllerTest {
                 1L,
                 "SARAMIN",
                 "external-1",
+                "jobflow|backend developer|seoul",
                 "백엔드 개발자",
                 "JobFlow",
                 "[자격 요건]\nSpring Boot 기반 백엔드 개발자 채용",
+                "https://example.com/jobs/1",
                 "https://example.com/jobs/1",
                 "https://example.com/jobs/1",
                 List.of(new JobDescriptionSectionResponse(
@@ -413,8 +415,12 @@ class JobControllerTest {
     private JobSummaryResponse jobSummaryResponse() {
         return new JobSummaryResponse(
                 1L,
+                "WANTED",
+                "external-1",
+                "jobflow|backend developer|seoul",
                 "백엔드 개발자",
                 "JobFlow",
+                "https://www.wanted.co.kr/wd/external-1",
                 JobRole.BACKEND,
                 CareerLevel.JUNIOR,
                 EmploymentType.FULL_TIME,
@@ -430,8 +436,11 @@ class JobControllerTest {
         return new JobSearchResponse(
                 1L,
                 "WANTED",
+                "external-1",
+                "jobflow|backend developer|seoul",
                 "백엔드 개발자",
                 "JobFlow",
+                "https://www.wanted.co.kr/wd/external-1",
                 JobRole.BACKEND,
                 CareerLevel.JUNIOR,
                 EmploymentType.FULL_TIME,

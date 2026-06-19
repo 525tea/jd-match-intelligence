@@ -71,6 +71,8 @@ public interface JobRepository extends JpaRepository<Job, Long> {
                 SELECT
                     id AS id,
                     source AS source,
+                    external_id AS externalId,
+                    canonical_fingerprint AS canonicalFingerprint,
                     title AS title,
                     company_name AS companyName,
                     role AS role,

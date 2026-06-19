@@ -39,6 +39,7 @@ public class JobService {
     private final JobSkillNormalizationService jobSkillNormalizationService;
     private final JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
     private final JdJobRoleClassificationService jdJobRoleClassificationService;
+    private final JobApplyUrlResolver jobApplyUrlResolver;
 
     @Transactional
     public JobResponse createJob(JobCreateRequest request) {
@@ -90,7 +91,7 @@ public class JobService {
                 OutboxEvent.TOPIC_JOB_EVENTS
         );
 
-        return JobResponse.of(savedJob, jobSkills, jobExperienceTags);
+        return JobResponse.of(savedJob, jobSkills, jobExperienceTags, jobApplyUrlResolver.resolve(savedJob));
     }
 
     public JobResponse getJob(Long jobId) {
@@ -98,20 +99,25 @@ public class JobService {
         List<JobSkill> jobSkills = jobSkillRepository.findByJobId(jobId);
         List<JobExperienceTag> jobExperienceTags = jobExperienceTagRepository.findByJobId(jobId);
 
-        return JobResponse.of(job, jobSkills, jobExperienceTags);
+        return JobResponse.of(job, jobSkills, jobExperienceTags, jobApplyUrlResolver.resolve(job));
     }
 
     public List<JobSummaryResponse> getJobs() {
         return jobRepository.findAllByOrderByCreatedAtDesc()
                 .stream()
-                .map(JobSummaryResponse::from)
+                .map(job -> JobSummaryResponse.from(job, jobApplyUrlResolver.resolve(job)))
                 .toList();
     }
 
     public List<JobSearchResponse> searchJobs(String keyword, int limit) {
         return jobSearchService.search(keyword, limit)
                 .stream()
-                .map(searchResult -> searchResult.toResponse())
+                .map(searchResult -> searchResult.toResponse(jobApplyUrlResolver.resolve(
+                        searchResult.source(),
+                        searchResult.externalId(),
+                        null,
+                        null
+                )))
                 .toList();
     }
 
@@ -163,7 +169,7 @@ public class JobService {
         List<JobSkill> jobSkills = jobSkillRepository.findByJobId(jobId);
         List<JobExperienceTag> jobExperienceTags = jobExperienceTagRepository.findByJobId(jobId);
 
-        return JobResponse.of(job, jobSkills, jobExperienceTags);
+        return JobResponse.of(job, jobSkills, jobExperienceTags, jobApplyUrlResolver.resolve(job));
     }
 
     @Transactional
@@ -182,7 +188,7 @@ public class JobService {
         List<JobSkill> jobSkills = jobSkillRepository.findByJobId(jobId);
         List<JobExperienceTag> jobExperienceTags = jobExperienceTagRepository.findByJobId(jobId);
 
-        return JobResponse.of(job, jobSkills, jobExperienceTags);
+        return JobResponse.of(job, jobSkills, jobExperienceTags, jobApplyUrlResolver.resolve(job));
     }
 
     @Transactional
@@ -201,7 +207,7 @@ public class JobService {
         List<JobSkill> jobSkills = jobSkillRepository.findByJobId(jobId);
         List<JobExperienceTag> jobExperienceTags = jobExperienceTagRepository.findByJobId(jobId);
 
-        return JobResponse.of(job, jobSkills, jobExperienceTags);
+        return JobResponse.of(job, jobSkills, jobExperienceTags, jobApplyUrlResolver.resolve(job));
     }
 
     private Job findJob(Long jobId) {

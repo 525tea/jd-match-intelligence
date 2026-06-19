@@ -8,6 +8,10 @@ public interface JobSearchProjection {
 
     String getSource();
 
+    String getExternalId();
+
+    String getCanonicalFingerprint();
+
     String getTitle();
 
     String getCompanyName();

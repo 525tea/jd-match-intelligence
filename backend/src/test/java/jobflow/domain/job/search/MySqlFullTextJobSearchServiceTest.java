@@ -135,6 +135,16 @@ class MySqlFullTextJobSearchServiceTest {
             public String getSource() {
                 return "WANTED";
             }
+
+            @Override
+            public String getExternalId() {
+                return "367438";
+            }
+
+            @Override
+            public String getCanonicalFingerprint() {
+                return "jobflow|backend developer|seoul";
+            }
         };
     }
 }

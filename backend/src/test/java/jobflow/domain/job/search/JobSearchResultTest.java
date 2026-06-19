@@ -43,6 +43,8 @@ class JobSearchResultTest {
 
         assertThat(result.id()).isEqualTo(1L);
         assertThat(result.source()).isEqualTo("JUMPIT");
+        assertThat(result.externalId()).isEqualTo("job-1");
+        assertThat(result.canonicalFingerprint()).isEqualTo("jobflow|backend developer|seoul");
         assertThat(result.title()).isEqualTo("백엔드 개발자");
         assertThat(result.companyName()).isEqualTo("JobFlow");
         assertThat(result.role()).isEqualTo(JobRole.BACKEND);
@@ -61,6 +63,8 @@ class JobSearchResultTest {
         JobSearchResult result = new JobSearchResult(
                 1L,
                 "WANTED",
+                "367438",
+                "jobflow|backend developer|seoul",
                 "백엔드 개발자",
                 "JobFlow",
                 JobRole.BACKEND,
@@ -74,12 +78,15 @@ class JobSearchResultTest {
                 3.5
         );
 
-        JobSearchResponse response = result.toResponse();
+        JobSearchResponse response = result.toResponse("https://www.wanted.co.kr/wd/367438");
 
         assertThat(response.id()).isEqualTo(1L);
         assertThat(response.source()).isEqualTo("WANTED");
+        assertThat(response.externalId()).isEqualTo("367438");
+        assertThat(response.canonicalFingerprint()).isEqualTo("jobflow|backend developer|seoul");
         assertThat(response.title()).isEqualTo("백엔드 개발자");
         assertThat(response.companyName()).isEqualTo("JobFlow");
+        assertThat(response.applyUrl()).isEqualTo("https://www.wanted.co.kr/wd/367438");
         assertThat(response.score()).isEqualTo(3.5);
     }
 }

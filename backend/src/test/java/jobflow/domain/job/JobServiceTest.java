@@ -75,6 +75,9 @@ class JobServiceTest {
     @Mock
     private JdJobRoleClassificationService jdJobRoleClassificationService;
 
+    @Mock
+    private JobApplyUrlResolver jobApplyUrlResolver;
+
     @Test
     @DisplayName("공고를 생성하고 스킬과 경험 태그를 함께 저장한다")
     void createJob() {
@@ -91,6 +94,7 @@ class JobServiceTest {
         );
 
         givenRoleResolution(request, JobRole.BACKEND);
+        given(jobApplyUrlResolver.resolve(savedJob)).willReturn("https://example.com/jobs/1");
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
         given(experienceTagCodeRepository.findById("HIGH_TRAFFIC")).willReturn(Optional.of(tagCode));
@@ -103,6 +107,7 @@ class JobServiceTest {
         assertThat(response.title()).isEqualTo("백엔드 개발자");
         assertThat(response.companyName()).isEqualTo("JobFlow");
         assertThat(response.status()).isEqualTo(JobStatus.OPEN);
+        assertThat(response.applyUrl()).isEqualTo("https://example.com/jobs/1");
         assertThat(response.skills()).hasSize(1);
         assertThat(response.skills().getFirst().name()).isEqualTo("Spring Boot");
         assertThat(response.skills().getFirst().requirementType()).isEqualTo(RequirementType.REQUIRED);
@@ -139,6 +144,7 @@ class JobServiceTest {
         );
 
         givenRoleResolution(request, JobRole.BACKEND);
+        given(jobApplyUrlResolver.resolve(savedJob)).willReturn("https://example.com/jobs/1");
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
         given(experienceTagCodeRepository.findById("HIGH_TRAFFIC")).willReturn(Optional.of(tagCode));
@@ -165,6 +171,7 @@ class JobServiceTest {
         );
 
         givenRoleResolution(request, JobRole.BACKEND);
+        given(jobApplyUrlResolver.resolve(savedJob)).willReturn("https://example.com/jobs/1");
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
         given(jobSkillRepository.saveAll(any())).willReturn(List.of(jobSkill));
@@ -235,6 +242,7 @@ class JobServiceTest {
         JobSkill jobSkill = JobSkill.create(savedJob, springBoot, RequirementType.REQUIRED);
 
         givenRoleResolution(request, JobRole.BACKEND);
+        given(jobApplyUrlResolver.resolve(savedJob)).willReturn("https://example.com/jobs/1");
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(jobSkillNormalizationService.saveNormalizedSkills(
                 savedJob,
@@ -274,6 +282,7 @@ class JobServiceTest {
         );
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of(jobSkill));
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of(jobExperienceTag));
 
@@ -281,6 +290,7 @@ class JobServiceTest {
 
         assertThat(response.id()).isEqualTo(jobId);
         assertThat(response.title()).isEqualTo("백엔드 개발자");
+        assertThat(response.applyUrl()).isEqualTo("https://example.com/jobs/1");
         assertThat(response.skills()).hasSize(1);
         assertThat(response.experienceTags()).hasSize(1);
     }
@@ -304,6 +314,7 @@ class JobServiceTest {
         Job job = createJobEntity(1L);
 
         given(jobRepository.findAllByOrderByCreatedAtDesc()).willReturn(List.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
 
         List<JobSummaryResponse> responses = jobService.getJobs();
 
@@ -311,6 +322,7 @@ class JobServiceTest {
         assertThat(responses.getFirst().id()).isEqualTo(1L);
         assertThat(responses.getFirst().title()).isEqualTo("백엔드 개발자");
         assertThat(responses.getFirst().status()).isEqualTo(JobStatus.OPEN);
+        assertThat(responses.getFirst().applyUrl()).isEqualTo("https://example.com/jobs/1");
     }
 
     @Test
@@ -320,6 +332,8 @@ class JobServiceTest {
 
         given(jobSearchService.search(" 백엔드 ", 20))
                 .willReturn(List.of(result));
+        given(jobApplyUrlResolver.resolve("WANTED", "367438", null, null))
+                .willReturn("https://www.wanted.co.kr/wd/367438");
 
         List<JobSearchResponse> responses = jobService.searchJobs(" 백엔드 ", 20);
 
@@ -327,6 +341,7 @@ class JobServiceTest {
         assertThat(responses.getFirst().id()).isEqualTo(1L);
         assertThat(responses.getFirst().title()).isEqualTo("백엔드 개발자");
         assertThat(responses.getFirst().score()).isEqualTo(0.42);
+        assertThat(responses.getFirst().applyUrl()).isEqualTo("https://www.wanted.co.kr/wd/367438");
 
         verify(jobSearchService).search(" 백엔드 ", 20);
     }
@@ -351,6 +366,8 @@ class JobServiceTest {
 
         given(jobSearchService.search("백엔드", 999))
                 .willReturn(List.of(result));
+        given(jobApplyUrlResolver.resolve("WANTED", "367438", null, null))
+                .willReturn("https://www.wanted.co.kr/wd/367438");
 
         List<JobSearchResponse> responses = jobService.searchJobs("백엔드", 999);
 
@@ -368,6 +385,7 @@ class JobServiceTest {
         JobUpdateRequest request = updateRequest();
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         givenRoleResolution(request, JobRole.BACKEND);
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
@@ -396,6 +414,7 @@ class JobServiceTest {
         JobUpdateRequest request = updateRequestWithEtcRole();
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         givenRoleResolution(request, JobRole.BACKEND);
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
@@ -412,6 +431,7 @@ class JobServiceTest {
         Job job = createJobEntity(jobId);
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
 
@@ -435,6 +455,7 @@ class JobServiceTest {
         Job job = createJobEntity(jobId);
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
 
@@ -727,6 +748,8 @@ class JobServiceTest {
         return new JobSearchResult(
                 1L,
                 "WANTED",
+                "367438",
+                "jobflow|backend developer|seoul",
                 "백엔드 개발자",
                 "JobFlow",
                 JobRole.BACKEND,
