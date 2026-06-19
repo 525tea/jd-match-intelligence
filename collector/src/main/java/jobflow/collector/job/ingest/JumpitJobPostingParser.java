@@ -10,6 +10,7 @@ import jobflow.collector.job.EmploymentType;
 import jobflow.collector.job.RemoteType;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -79,7 +80,7 @@ public class JumpitJobPostingParser implements JobPostingParser {
                 ),
                 inferCompanyName(pageText, title)
         );
-        String description = firstValidText(
+        String description = firstValidMultilineText(
                 document,
                 "[data-testid=position-description]",
                 "[data-testid=job-description]",
@@ -144,6 +145,18 @@ public class JumpitJobPostingParser implements JobPostingParser {
         return "";
     }
 
+    private String firstValidMultilineText(Document document, String... selectors) {
+        for (String selector : selectors) {
+            String value = multilineText(document, selector);
+
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+
+        return "";
+    }
+
     private String firstValidCompanyText(Document document, String... selectors) {
         for (String selector : selectors) {
             String value = cleanCompanyName(text(document, selector));
@@ -164,6 +177,47 @@ public class JumpitJobPostingParser implements JobPostingParser {
         return normalize(document.select(selector).first() == null
                 ? ""
                 : document.select(selector).first().text());
+    }
+
+    private String multilineText(Document document, String selector) {
+        Element element = document.select(selector).first();
+
+        if (element == null) {
+            return "";
+        }
+
+        String value = element.text();
+
+        if (value == null || value.isBlank()) {
+            value = element.wholeText();
+        }
+
+        return normalizeDescription(value);
+    }
+
+    private String normalizeDescription(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        String normalized = value.replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .replace('\u00A0', ' ')
+                .replaceAll("[ \\t]+", " ")
+                .replaceAll("\\n[ \\t]+", "\n")
+                .replaceAll("[ \\t]+\\n", "\n")
+                .replaceAll("\\n{3,}", "\n\n")
+                .trim();
+
+        normalized = normalized.replaceAll(
+                "\\s*(포지션 상세 정보|기술스택|주요업무|자격요건|우대사항|복지 및 혜택|채용절차 및 기타 지원 유의사항|포지션 경력/학력/마감일/근무지역 정보|기업/서비스 소개|팀 소개)\\s*",
+                "\n\n$1\n"
+        );
+        normalized = normalized.replaceAll("\\s+([•ㆍ])\\s*", "\n$1 ");
+        normalized = normalized.replaceAll("\\s+(\\[[^\\]\\n]{2,40}])\\s*", "\n$1\n");
+        normalized = normalized.replaceAll("\\n{3,}", "\n\n");
+
+        return normalized.trim();
     }
 
     private void validateRequired(

@@ -108,6 +108,53 @@ class JumpitJobPostingParserTest {
     }
 
     @Test
+    @DisplayName("점핏 description 섹션과 bullet 줄바꿈을 보존한다")
+    void preserveDescriptionSectionLineBreaks() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.JUMPIT,
+                "jumpit-100",
+                "https://jumpit.saramin.co.kr/position/jumpit-100",
+                "https://jumpit.saramin.co.kr/position/jumpit-100",
+                """
+                        <html>
+                          <body>
+                            <main>
+                              <h1>Backend Engineer</h1>
+                              <a href="/company/example-labs">Example Labs</a>
+                              <section data-testid="position-description">
+                                포지션 상세 정보 기술스택 Java Spring Boot Docker 주요업무
+                                • Java 기반 API 개발
+                                • Redis 캐시 운영
+                                [백엔드 팀이 사용하는 기술]
+                                Java, Spring Boot, Redis
+                                자격요건
+                                • 백엔드 개발 경험 3년 이상
+                                우대사항
+                                • 대용량 트래픽 경험
+                                채용절차 및 기타 지원 유의사항
+                                • 서류 전형 - 기술 면접 - 최종 합격
+                                마감일 2026-07-31
+                              </section>
+                            </main>
+                          </body>
+                        </html>
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.description())
+                .contains("기술스택\nJava Spring Boot Docker")
+                .doesNotContain("JavaSpring")
+                .contains("주요업무\n")
+                .contains("\n• Java 기반 API 개발")
+                .contains("\n[백엔드 팀이 사용하는 기술]\nJava, Spring Boot, Redis")
+                .contains("자격요건\n")
+                .contains("우대사항\n")
+                .contains("채용절차 및 기타 지원 유의사항\n");
+    }
+
+    @Test
     @DisplayName("직무 탐색 페이지 제목은 공고로 파싱하지 않는다")
     void rejectExplorePageTitle() {
         FetchedJobPosting fetched = new FetchedJobPosting(
