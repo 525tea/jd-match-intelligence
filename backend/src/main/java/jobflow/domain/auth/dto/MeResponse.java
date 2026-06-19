@@ -4,6 +4,7 @@ public record MeResponse(
         Long id,
         String email,
         String name,
-        String role
+        String role,
+        Long userProjectId
 ) {
 }

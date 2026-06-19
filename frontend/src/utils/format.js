@@ -14,11 +14,11 @@ export const careerLabel = (career, min, max) => {
 export const statusLabel = (status) => ({ APPLIED: '지원', DOCUMENT_PASSED: '서류', CODING_TEST: '코테', INTERVIEW: '면접', OFFER: '오퍼', REJECTED: '불합격', WITHDRAWN: '취소' }[status] || status);
 
 export const dday = (deadlineAt) => {
-  if (!deadlineAt) return '상시';
+  if (!deadlineAt) return '마감 정보 없음';
   const today = new Date();
   const due = new Date(deadlineAt);
   const diff = Math.ceil((due.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0)) / 86400000);
-  if (Number.isNaN(diff)) return '상시';
+  if (Number.isNaN(diff)) return '마감 정보 없음';
   if (diff < 0) return '마감';
   if (diff === 0) return 'D-DAY';
   return `D-${diff}`;

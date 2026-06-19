@@ -131,8 +131,30 @@ public class WantedJobPostingParser implements JobPostingParser {
         appendIfPresent(parts, "자격 요건", detail.path("requirements").asText(""));
         appendIfPresent(parts, "우대 사항", detail.path("preferred_points").asText(""));
         appendIfPresent(parts, "혜택 및 복지", detail.path("benefits").asText(""));
+        appendIfPresent(parts, "채용절차 및 기타 지원 유의사항", firstText(
+                detail,
+                "hiring_process",
+                "recruitment_process",
+                "selection_process",
+                "interview_process",
+                "process",
+                "caution",
+                "notice"
+        ));
 
         return String.join("\n\n", parts);
+    }
+
+    private String firstText(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            String value = normalize(node.path(fieldName).asText(""));
+
+            if (!value.isBlank()) {
+                return value;
+            }
+        }
+
+        return "";
     }
 
     private void appendIfPresent(List<String> parts, String label, String value) {

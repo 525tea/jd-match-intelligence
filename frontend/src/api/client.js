@@ -1,12 +1,30 @@
-import React from 'react';
+const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
-const TOKEN_KEY = 'jobflow.accessToken';
+export const API_BASE_URL = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || '/api');
+const API_BASE_URL_IS_ABSOLUTE = /^https?:\/\//i.test(API_BASE_URL);
+const AUTH_HINT_KEY = 'jobflow.authenticated';
+const PROJECT_ID_KEY = 'jobflow.userProjectId';
+let memoryAccessToken = '';
 
 export const authStore = {
-  getToken: () => localStorage.getItem(TOKEN_KEY),
-  setToken: (token) => token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+  getToken: () => memoryAccessToken || (localStorage.getItem(AUTH_HINT_KEY) === 'true' ? 'cookie' : ''),
+  hasMemoryToken: () => Boolean(memoryAccessToken),
+  setToken: (token) => {
+    if (token) {
+      memoryAccessToken = token;
+    }
+    localStorage.setItem(AUTH_HINT_KEY, 'true');
+  },
+  clear: () => {
+    memoryAccessToken = '';
+    localStorage.removeItem(AUTH_HINT_KEY);
+  },
+};
+
+export const projectStore = {
+  getProjectId: () => localStorage.getItem(PROJECT_ID_KEY) || import.meta.env.VITE_DEFAULT_USER_PROJECT_ID || '',
+  setProjectId: (projectId) => projectId ? localStorage.setItem(PROJECT_ID_KEY, String(projectId)) : localStorage.removeItem(PROJECT_ID_KEY),
+  clear: () => localStorage.removeItem(PROJECT_ID_KEY),
 };
 
 export class ApiError extends Error {
@@ -24,7 +42,17 @@ const buildUrl = (path, params) => {
     if (Array.isArray(value)) value.forEach((v) => url.searchParams.append(key, v));
     else url.searchParams.set(key, value);
   });
+  if (API_BASE_URL_IS_ABSOLUTE) return url.toString();
   return url.pathname + url.search;
+};
+
+const parseResponsePayload = (text) => {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    return { message: text };
+  }
 };
 
 export const unwrapList = (value) => {
@@ -36,16 +64,15 @@ export const unwrapList = (value) => {
 };
 
 async function request(path, options = {}) {
-  const token = authStore.getToken();
   const headers = new Headers(options.headers || {});
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (memoryAccessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${memoryAccessToken}`);
 
-  const response = await fetch(buildUrl(path, options.params), { ...options, headers });
+  const response = await fetch(buildUrl(path, options.params), { ...options, headers, credentials: 'include' });
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
+  const payload = parseResponsePayload(text);
   if (!response.ok) {
-    const message = payload?.message || payload?.error || `API 요청 실패 (${response.status})`;
+    const message = payload?.error?.message || payload?.message || payload?.error || `요청 실패 (${response.status})`;
     throw new ApiError(message, response.status, payload);
   }
   if (payload && Object.prototype.hasOwnProperty.call(payload, 'data')) return payload.data;
@@ -54,11 +81,13 @@ async function request(path, options = {}) {
 
 export const api = {
   login: (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  demoLogin: () => request('/auth/demo-login', { method: 'POST' }),
   signup: (body) => request('/auth/signup', { method: 'POST', body: JSON.stringify(body) }),
   oauthToken: (body) => request('/auth/oauth2/token', { method: 'POST', body: JSON.stringify(body) }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/auth/me'),
 
-  jobs: () => request('/jobs'),
+  jobs: (params = {}) => request('/jobs', { params: { limit: 50, ...params } }),
   searchJobs: (keyword, limit = 30) => request('/jobs/search', { params: { keyword, limit } }),
   job: (jobId) => request(`/jobs/${jobId}`),
 
@@ -84,16 +113,3 @@ export const api = {
   cooccurrences: (skillId, params = {}) => request(`/trends/skills/${skillId}/cooccurrences`, { params }),
   skillExperienceTags: (skillId, params = {}) => request(`/trends/skills/${skillId}/experience-tags`, { params }),
 };
-
-export function useApiResource(loader, fallback, deps = []) {
-  const [state, setState] = React.useState({ data: fallback, loading: true, error: null, fromMock: false });
-  React.useEffect(() => {
-    let alive = true;
-    setState((prev) => ({ ...prev, loading: true, error: null }));
-    loader()
-      .then((data) => alive && setState({ data: data ?? fallback, loading: false, error: null, fromMock: false }))
-      .catch((error) => alive && setState({ data: fallback, loading: false, error, fromMock: true }));
-    return () => { alive = false; };
-  }, deps);
-  return state;
-}

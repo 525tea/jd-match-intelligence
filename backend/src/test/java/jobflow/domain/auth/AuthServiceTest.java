@@ -4,13 +4,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import jobflow.domain.auth.dto.DemoLoginResponse;
 import jobflow.domain.auth.dto.LoginRequest;
 import jobflow.domain.auth.dto.LoginResponse;
+import jobflow.domain.auth.dto.OAuth2TokenRequest;
 import jobflow.domain.auth.dto.SignupRequest;
 import jobflow.domain.auth.dto.SignupResponse;
+import jobflow.domain.auth.oauth.code.OAuth2AuthorizationCode;
+import jobflow.domain.auth.oauth.code.OAuth2AuthorizationCodeStore;
+import jobflow.domain.project.UserProject;
+import jobflow.domain.project.UserProjectAnalysis;
+import jobflow.domain.project.UserProjectAnalysisRepository;
+import jobflow.domain.project.UserProjectRepository;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
 import jobflow.global.error.ErrorCode;
@@ -25,10 +36,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
-import jobflow.domain.auth.dto.OAuth2TokenRequest;
-import jobflow.domain.auth.oauth.code.OAuth2AuthorizationCode;
-import jobflow.domain.auth.oauth.code.OAuth2AuthorizationCodeStore;
-import java.time.Instant;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -44,6 +51,12 @@ class AuthServiceTest {
 
     @Mock
     private OAuth2AuthorizationCodeStore authorizationCodeStore;
+
+    @Mock
+    private UserProjectAnalysisRepository userProjectAnalysisRepository;
+
+    @Mock
+    private UserProjectRepository userProjectRepository;
 
     @InjectMocks
     private AuthService authService;
@@ -115,12 +128,19 @@ class AuthServiceTest {
         given(passwordEncoder.matches(request.password(), user.getPasswordHash())).willReturn(true);
         given(jwtTokenProvider.createAccessToken(user)).willReturn("access-token");
         given(jwtTokenProvider.getAccessTokenExpirationMillis()).willReturn(3600000L);
+        given(userProjectAnalysisRepository.findWithProjectSkillsByUserIdOrderByAnalyzedAtDescIdDesc(any(), any()))
+                .willReturn(List.of());
+        UserProject userProject = mock(UserProject.class);
+        given(userProjectRepository.findFirstByUserIdOrderByUpdatedAtDescIdDesc(user.getId()))
+                .willReturn(Optional.of(userProject));
+        given(userProject.getId()).willReturn(2L);
 
         LoginResponse response = authService.login(request);
 
         assertThat(response.tokenType()).isEqualTo("Bearer");
         assertThat(response.accessToken()).isEqualTo("access-token");
         assertThat(response.expiresIn()).isEqualTo(3600000L);
+        assertThat(response.userProjectId()).isEqualTo(2L);
 
         verify(userRepository).findByEmail(request.email());
         verify(passwordEncoder).matches(request.password(), user.getPasswordHash());
@@ -190,12 +210,19 @@ class AuthServiceTest {
         given(userRepository.findById(authorizationCode.userId())).willReturn(Optional.of(user));
         given(jwtTokenProvider.createAccessToken(user)).willReturn("oauth-access-token");
         given(jwtTokenProvider.getAccessTokenExpirationMillis()).willReturn(3600000L);
+        given(userProjectAnalysisRepository.findWithProjectSkillsByUserIdOrderByAnalyzedAtDescIdDesc(any(), any()))
+                .willReturn(List.of());
+        UserProject userProject = mock(UserProject.class);
+        given(userProjectRepository.findFirstByUserIdOrderByUpdatedAtDescIdDesc(user.getId()))
+                .willReturn(Optional.of(userProject));
+        given(userProject.getId()).willReturn(2L);
 
         LoginResponse response = authService.exchangeOAuth2Code(request);
 
         assertThat(response.tokenType()).isEqualTo("Bearer");
         assertThat(response.accessToken()).isEqualTo("oauth-access-token");
         assertThat(response.expiresIn()).isEqualTo(3600000L);
+        assertThat(response.userProjectId()).isEqualTo(2L);
 
         verify(authorizationCodeStore).consume(request.code());
         verify(userRepository).findById(authorizationCode.userId());
@@ -234,5 +261,74 @@ class AuthServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.AUTH_OAUTH2_CODE_INVALID);
+    }
+
+    @Test
+    @DisplayName("데모 로그인이 활성화되어 있으면 스킬 스냅샷이 있는 최신 분석 프로젝트 사용자로 JWT를 발급한다")
+    void demoLogin() {
+        User user = User.signup("demo@example.com", "encoded-password", "Demo User");
+        ReflectionTestUtils.setField(user, "id", 1L);
+
+        UserProject userProject = mock(UserProject.class);
+        UserProjectAnalysis analysis = mock(UserProjectAnalysis.class);
+
+        ReflectionTestUtils.setField(authService, "demoLoginEnabled", true);
+        given(userProjectAnalysisRepository.findWithProjectSkillsOrderByAnalyzedAtDescIdDesc(any()))
+                .willReturn(List.of(analysis));
+        given(analysis.getUserProject()).willReturn(userProject);
+        given(userProject.getUser()).willReturn(user);
+        given(userProject.getId()).willReturn(2L);
+        given(jwtTokenProvider.createAccessToken(user)).willReturn("demo-access-token");
+        given(jwtTokenProvider.getAccessTokenExpirationMillis()).willReturn(3600000L);
+
+        DemoLoginResponse response = authService.demoLogin();
+
+        assertThat(response.tokenType()).isEqualTo("Bearer");
+        assertThat(response.accessToken()).isEqualTo("demo-access-token");
+        assertThat(response.expiresIn()).isEqualTo(3600000L);
+        assertThat(response.userProjectId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("사용자의 최신 분석 프로젝트 id를 스킬 스냅샷 기준으로 우선 반환한다")
+    void findLatestProjectIdPrefersAnalyzedProjectWithSkills() {
+        UserProject userProject = mock(UserProject.class);
+        UserProjectAnalysis analysis = mock(UserProjectAnalysis.class);
+
+        given(userProjectAnalysisRepository.findWithProjectSkillsByUserIdOrderByAnalyzedAtDescIdDesc(any(), any()))
+                .willReturn(List.of(analysis));
+        given(analysis.getUserProject()).willReturn(userProject);
+        given(userProject.getId()).willReturn(7L);
+
+        Long userProjectId = authService.findLatestProjectId(4L);
+
+        assertThat(userProjectId).isEqualTo(7L);
+    }
+
+    @Test
+    @DisplayName("스킬 스냅샷이 없으면 사용자의 최신 프로젝트 id를 반환한다")
+    void findLatestProjectIdFallsBackToLatestProject() {
+        UserProject userProject = mock(UserProject.class);
+
+        given(userProjectAnalysisRepository.findWithProjectSkillsByUserIdOrderByAnalyzedAtDescIdDesc(any(), any()))
+                .willReturn(List.of());
+        given(userProjectRepository.findFirstByUserIdOrderByUpdatedAtDescIdDesc(4L))
+                .willReturn(Optional.of(userProject));
+        given(userProject.getId()).willReturn(2L);
+
+        Long userProjectId = authService.findLatestProjectId(4L);
+
+        assertThat(userProjectId).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("데모 로그인이 비활성화되어 있으면 403 예외가 발생한다")
+    void demoLoginDisabled() {
+        ReflectionTestUtils.setField(authService, "demoLoginEnabled", false);
+
+        assertThatThrownBy(() -> authService.demoLogin())
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.COMMON_FORBIDDEN);
     }
 }

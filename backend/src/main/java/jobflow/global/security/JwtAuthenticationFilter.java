@@ -21,13 +21,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final UserRepository userRepository;
+    private final JwtCookieService jwtCookieService;
 
     public JwtAuthenticationFilter(
             JwtTokenProvider jwtTokenProvider,
-            UserRepository userRepository
+            UserRepository userRepository,
+            JwtCookieService jwtCookieService
     ) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.userRepository = userRepository;
+        this.jwtCookieService = jwtCookieService;
     }
 
     @Override
@@ -74,10 +77,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private String resolveToken(HttpServletRequest request) {
         String authorization = request.getHeader(AUTHORIZATION_HEADER);
 
-        if (!StringUtils.hasText(authorization) || !authorization.startsWith(BEARER_PREFIX)) {
-            return null;
+        if (StringUtils.hasText(authorization) && authorization.startsWith(BEARER_PREFIX)) {
+            return authorization.substring(BEARER_PREFIX.length());
         }
 
-        return authorization.substring(BEARER_PREFIX.length());
+        return jwtCookieService.resolveAccessToken(request)
+                .orElse(null);
     }
 }
