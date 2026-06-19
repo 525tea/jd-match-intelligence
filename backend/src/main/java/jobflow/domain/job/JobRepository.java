@@ -20,6 +20,8 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
     List<Job> findByIdIn(Collection<Long> ids);
 
+    List<Job> findByCanonicalFingerprintOrderByCreatedAtDescIdDesc(String canonicalFingerprint);
+
     List<Job> findByStatusAndDeadlineAtBefore(JobStatus status, LocalDateTime deadlineAt);
 
     List<Job> findByStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDescIdDesc(

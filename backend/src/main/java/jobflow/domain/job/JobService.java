@@ -1,6 +1,8 @@
 package jobflow.domain.job;
 
 import jobflow.domain.job.dto.JobCreateRequest;
+import jobflow.domain.job.dto.JobCanonicalGroupItemResponse;
+import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobExperienceTagRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
@@ -22,6 +24,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -121,6 +126,29 @@ public class JobService {
                 .toList();
     }
 
+    public JobCanonicalGroupResponse getCanonicalGroup(Long jobId) {
+        Job job = findJob(jobId);
+        List<Job> candidates = canonicalCandidates(job);
+        Job representative = selectRepresentative(candidates);
+        String representativeApplyUrl = jobApplyUrlResolver.resolve(representative);
+
+        List<JobCanonicalGroupItemResponse> items = candidates.stream()
+                .map(candidate -> JobCanonicalGroupItemResponse.of(
+                        candidate,
+                        jobApplyUrlResolver.resolve(candidate),
+                        candidate.getId().equals(representative.getId())
+                ))
+                .toList();
+
+        return new JobCanonicalGroupResponse(
+                job.getCanonicalFingerprint(),
+                representative.getId(),
+                representativeApplyUrl,
+                Math.max(0, candidates.size() - 1),
+                items
+        );
+    }
+
     @Transactional
     public JobResponse updateJob(Long jobId, JobUpdateRequest request) {
         Job job = findJob(jobId);
@@ -213,6 +241,71 @@ public class JobService {
     private Job findJob(Long jobId) {
         return jobRepository.findById(jobId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorCode.JOB_NOT_FOUND));
+    }
+
+    private List<Job> canonicalCandidates(Job job) {
+        String canonicalFingerprint = job.getCanonicalFingerprint();
+        if (canonicalFingerprint == null || canonicalFingerprint.isBlank()) {
+            return List.of(job);
+        }
+
+        List<Job> candidates = jobRepository.findByCanonicalFingerprintOrderByCreatedAtDescIdDesc(canonicalFingerprint);
+        if (candidates.isEmpty()) {
+            return List.of(job);
+        }
+
+        return candidates;
+    }
+
+    private Job selectRepresentative(List<Job> candidates) {
+        return candidates.stream()
+                .min(Comparator
+                        .comparingInt(this::representativeUrlRank)
+                        .thenComparingInt(this::representativeSourceRank)
+                        .thenComparing(Job::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(Job::getId, Comparator.nullsLast(Comparator.reverseOrder())))
+                .orElseThrow();
+    }
+
+    private int representativeUrlRank(Job job) {
+        String applyUrl = jobApplyUrlResolver.resolve(job);
+        if (applyUrl == null || applyUrl.isBlank()) {
+            return 3;
+        }
+
+        String host = host(applyUrl);
+        if (host == null) {
+            return 3;
+        }
+
+        if (host.endsWith("wanted.co.kr") || host.endsWith("jumpit.saramin.co.kr")
+                || host.endsWith("saramin.co.kr")) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    private int representativeSourceRank(Job job) {
+        if (job.getSource() == null) {
+            return 99;
+        }
+
+        return switch (job.getSource().trim().toUpperCase()) {
+            case "WANTED" -> 0;
+            case "JUMPIT" -> 1;
+            case "SARAMIN" -> 2;
+            case "ZIGHANG" -> 3;
+            default -> 10;
+        };
+    }
+
+    private String host(String url) {
+        try {
+            return new URI(url).getHost();
+        } catch (URISyntaxException exception) {
+            return null;
+        }
     }
 
     private List<JobSkill> saveJobSkills(Job job, JobCreateRequest request) {

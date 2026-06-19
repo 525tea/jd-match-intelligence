@@ -1,6 +1,7 @@
 package jobflow.domain.job;
 
 import jobflow.domain.job.dto.JobCreateRequest;
+import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobExperienceTagRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
@@ -306,6 +307,56 @@ class JobServiceTest {
                 .isInstanceOf(EntityNotFoundException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.JOB_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("canonical fingerprint가 같은 공고 중 회사 원문 URL 공고를 대표 공고로 선택한다")
+    void getCanonicalGroup() {
+        Job wantedJob = createJobEntity(1L);
+        Job companyJob = createJobEntity(2L);
+        ReflectionTestUtils.setField(wantedJob, "source", "WANTED");
+        ReflectionTestUtils.setField(wantedJob, "externalId", "367438");
+        ReflectionTestUtils.setField(wantedJob, "canonicalFingerprint", "example-company|backend-engineer|seoul");
+        ReflectionTestUtils.setField(companyJob, "source", "JUMPIT");
+        ReflectionTestUtils.setField(companyJob, "externalId", "54118198");
+        ReflectionTestUtils.setField(companyJob, "canonicalFingerprint", "example-company|backend-engineer|seoul");
+
+        given(jobRepository.findById(1L)).willReturn(Optional.of(wantedJob));
+        given(jobRepository.findByCanonicalFingerprintOrderByCreatedAtDescIdDesc(
+                "example-company|backend-engineer|seoul"
+        )).willReturn(List.of(wantedJob, companyJob));
+        given(jobApplyUrlResolver.resolve(wantedJob)).willReturn("https://www.wanted.co.kr/wd/367438");
+        given(jobApplyUrlResolver.resolve(companyJob)).willReturn("https://company.example.com/jobs/backend");
+
+        JobCanonicalGroupResponse response = jobService.getCanonicalGroup(1L);
+
+        assertThat(response.canonicalFingerprint()).isEqualTo("example-company|backend-engineer|seoul");
+        assertThat(response.representativeJobId()).isEqualTo(2L);
+        assertThat(response.representativeApplyUrl()).isEqualTo("https://company.example.com/jobs/backend");
+        assertThat(response.duplicateCount()).isEqualTo(1);
+        assertThat(response.jobs()).hasSize(2);
+        assertThat(response.jobs())
+                .filteredOn(job -> job.id().equals(2L))
+                .singleElement()
+                .extracting("representative")
+                .isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("canonical fingerprint가 없으면 단일 공고 group으로 반환한다")
+    void getCanonicalGroupWithoutFingerprint() {
+        Job job = createJobEntity(1L);
+        given(jobRepository.findById(1L)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
+
+        JobCanonicalGroupResponse response = jobService.getCanonicalGroup(1L);
+
+        assertThat(response.canonicalFingerprint()).isNull();
+        assertThat(response.representativeJobId()).isEqualTo(1L);
+        assertThat(response.duplicateCount()).isZero();
+        assertThat(response.jobs()).hasSize(1);
+
+        verify(jobRepository, never()).findByCanonicalFingerprintOrderByCreatedAtDescIdDesc(any());
     }
 
     @Test

@@ -12,6 +12,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.LocalDateTime;
 import java.util.List;
+import jobflow.domain.job.dto.JobCanonicalGroupItemResponse;
+import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobDescriptionSectionResponse;
 import jobflow.domain.job.dto.JobExperienceTagResponse;
 import jobflow.domain.job.dto.JobResponse;
@@ -186,6 +188,23 @@ class JobControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("JOB_NOT_FOUND"))
                 .andExpect(jsonPath("$.error.message").value("공고를 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("canonical group 조회 성공 시 대표 공고와 중복 후보를 반환한다")
+    void getCanonicalGroup() throws Exception {
+        given(jobService.getCanonicalGroup(1L))
+                .willReturn(canonicalGroupResponse());
+
+        mockMvc.perform(get("/jobs/{jobId}/canonical-group", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.canonicalFingerprint").value("example-company|backend-engineer|seoul"))
+                .andExpect(jsonPath("$.data.representativeJobId").value(2))
+                .andExpect(jsonPath("$.data.representativeApplyUrl").value("https://company.example.com/jobs/backend"))
+                .andExpect(jsonPath("$.data.duplicateCount").value(1))
+                .andExpect(jsonPath("$.data.jobs", hasSize(2)))
+                .andExpect(jsonPath("$.data.jobs[1].representative").value(true));
     }
 
     @Test
@@ -450,6 +469,39 @@ class JobControllerTest {
                 LocalDateTime.of(2026, 7, 1, 23, 59),
                 JobStatus.OPEN,
                 0.42
+        );
+    }
+
+    private JobCanonicalGroupResponse canonicalGroupResponse() {
+        return new JobCanonicalGroupResponse(
+                "example-company|backend-engineer|seoul",
+                2L,
+                "https://company.example.com/jobs/backend",
+                1,
+                List.of(
+                        new JobCanonicalGroupItemResponse(
+                                1L,
+                                "WANTED",
+                                "367438",
+                                "Backend Engineer",
+                                "Example Company",
+                                "https://www.wanted.co.kr/wd/367438",
+                                JobStatus.OPEN,
+                                LocalDateTime.of(2026, 7, 1, 23, 59),
+                                false
+                        ),
+                        new JobCanonicalGroupItemResponse(
+                                2L,
+                                "JUMPIT",
+                                "54118198",
+                                "Backend Engineer",
+                                "Example Company",
+                                "https://company.example.com/jobs/backend",
+                                JobStatus.OPEN,
+                                LocalDateTime.of(2026, 7, 1, 23, 59),
+                                true
+                        )
+                )
         );
     }
 }
