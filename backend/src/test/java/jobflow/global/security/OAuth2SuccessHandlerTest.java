@@ -68,6 +68,12 @@ class OAuth2SuccessHandlerTest {
     private OAuth2UserEmailResolver userEmailResolver;
 
     @Mock
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private JwtCookieService jwtCookieService;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -83,7 +89,9 @@ class OAuth2SuccessHandlerTest {
                 oAuth2Properties,
                 authorizedClientServiceProvider,
                 providerTokenService,
-                userEmailResolver
+                userEmailResolver,
+                jwtTokenProvider,
+                jwtCookieService
         );
     }
 
@@ -115,6 +123,8 @@ class OAuth2SuccessHandlerTest {
                 ));
         given(oAuth2Properties.successRedirectUri())
                 .willReturn("http://localhost:3000/oauth2/success");
+        given(jwtTokenProvider.createAccessToken(user)).willReturn("jobflow-jwt");
+        given(jwtTokenProvider.getAccessTokenExpirationMillis()).willReturn(3600000L);
 
         successHandler.onAuthenticationSuccess(request, response, authentication);
 
@@ -134,6 +144,7 @@ class OAuth2SuccessHandlerTest {
 
         verify(userEmailResolver).resolve(any(), any());
         verify(authorizationCodeStore).save(1L);
+        verify(jwtCookieService).addAccessTokenCookie(response, "jobflow-jwt", 3600000L);
         verify(response).sendRedirect("http://localhost:3000/oauth2/success?code=oauth2-authorization-code");
     }
 
@@ -170,6 +181,8 @@ class OAuth2SuccessHandlerTest {
                 ));
         given(oAuth2Properties.successRedirectUri())
                 .willReturn("http://localhost:3000/oauth2/success");
+        given(jwtTokenProvider.createAccessToken(user)).willReturn("jobflow-jwt");
+        given(jwtTokenProvider.getAccessTokenExpirationMillis()).willReturn(3600000L);
 
         successHandler.onAuthenticationSuccess(request, response, authentication);
 
@@ -178,6 +191,7 @@ class OAuth2SuccessHandlerTest {
         verify(oAuth2AuthService).findOrCreateUser(userInfoCaptor.capture());
         assertThat(userInfoCaptor.getValue().getEmail()).isEqualTo("primary@example.com");
         verify(providerTokenService).saveOrReplace(any());
+        verify(jwtCookieService).addAccessTokenCookie(response, "jobflow-jwt", 3600000L);
         verify(response).sendRedirect("http://localhost:3000/oauth2/success?code=oauth2-authorization-code");
     }
 

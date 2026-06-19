@@ -39,6 +39,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
     private final ObjectProvider<OAuth2AuthorizedClientService> authorizedClientServiceProvider;
     private final OAuth2ProviderTokenService providerTokenService;
     private final OAuth2UserEmailResolver userEmailResolver;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final JwtCookieService jwtCookieService;
 
     @Override
     public void onAuthenticationSuccess(
@@ -58,6 +60,13 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         User user = oAuth2AuthService.findOrCreateUser(resolvedUserInfo);
         saveProviderAccessToken(user, resolvedUserInfo, authorizedClient);
+
+        String accessToken = jwtTokenProvider.createAccessToken(user);
+        jwtCookieService.addAccessTokenCookie(
+                response,
+                accessToken,
+                jwtTokenProvider.getAccessTokenExpirationMillis()
+        );
 
         OAuth2AuthorizationCode authorizationCode = authorizationCodeStore.save(user.getId());
 

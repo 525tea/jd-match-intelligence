@@ -2,13 +2,23 @@ const trimTrailingSlash = (value) => String(value || '').replace(/\/+$/, '');
 
 export const API_BASE_URL = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || '/api');
 const API_BASE_URL_IS_ABSOLUTE = /^https?:\/\//i.test(API_BASE_URL);
-const TOKEN_KEY = 'jobflow.accessToken';
+const AUTH_HINT_KEY = 'jobflow.authenticated';
 const PROJECT_ID_KEY = 'jobflow.userProjectId';
+let memoryAccessToken = '';
 
 export const authStore = {
-  getToken: () => localStorage.getItem(TOKEN_KEY),
-  setToken: (token) => token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+  getToken: () => memoryAccessToken || (localStorage.getItem(AUTH_HINT_KEY) === 'true' ? 'cookie' : ''),
+  hasMemoryToken: () => Boolean(memoryAccessToken),
+  setToken: (token) => {
+    if (token) {
+      memoryAccessToken = token;
+    }
+    localStorage.setItem(AUTH_HINT_KEY, 'true');
+  },
+  clear: () => {
+    memoryAccessToken = '';
+    localStorage.removeItem(AUTH_HINT_KEY);
+  },
 };
 
 export const projectStore = {
@@ -54,12 +64,11 @@ export const unwrapList = (value) => {
 };
 
 async function request(path, options = {}) {
-  const token = authStore.getToken();
   const headers = new Headers(options.headers || {});
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
-  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (memoryAccessToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${memoryAccessToken}`);
 
-  const response = await fetch(buildUrl(path, options.params), { ...options, headers });
+  const response = await fetch(buildUrl(path, options.params), { ...options, headers, credentials: 'include' });
   const text = await response.text();
   const payload = parseResponsePayload(text);
   if (!response.ok) {
@@ -72,11 +81,13 @@ async function request(path, options = {}) {
 
 export const api = {
   login: (body) => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  demoLogin: () => request('/auth/demo-login', { method: 'POST' }),
   signup: (body) => request('/auth/signup', { method: 'POST', body: JSON.stringify(body) }),
   oauthToken: (body) => request('/auth/oauth2/token', { method: 'POST', body: JSON.stringify(body) }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/auth/me'),
 
-  jobs: () => request('/jobs'),
+  jobs: (params = {}) => request('/jobs', { params: { limit: 50, ...params } }),
   searchJobs: (keyword, limit = 30) => request('/jobs/search', { params: { keyword, limit } }),
   job: (jobId) => request(`/jobs/${jobId}`),
 

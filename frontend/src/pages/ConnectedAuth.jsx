@@ -6,17 +6,46 @@ const muted = '#5b616e';
 const faint = '#9aa1ad';
 const line = '#e7eaf0';
 const green = '#b9ec2a';
-const greenInk = '#3f5c08';
-const greenTint = '#eef8cf';
-const greenTintBd = '#dbeca8';
 const coralDeep = '#c2391f';
 const coralTint = '#ffe8e1';
 const coralTintBd = '#f6c9bc';
 const soft = '#f1f3f7';
 const font = "'Space Grotesk', 'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif";
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isTemporaryGatewayError = (error) => {
+  const code = error?.payload?.error?.code || error?.payload?.code;
+  return error?.status === 502 || error?.status === 503 || code === 'GATEWAY_BACKEND_UNAVAILABLE';
+};
+
+const isConsumableOAuthCodeError = (error) => {
+  const code = error?.payload?.error?.code || error?.payload?.code;
+  return code === 'AUTH_OAUTH2_CODE_INVALID' || code === 'COMMON_UNAUTHORIZED';
+};
+
+async function retryTemporaryGatewayError(action, onRetry) {
+  let lastError;
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    try {
+      return await action();
+    } catch (error) {
+      lastError = error;
+      if (!isTemporaryGatewayError(error) || attempt === 4) break;
+      onRetry?.(attempt);
+      await sleep(700 * attempt);
+    }
+  }
+  throw lastError;
+}
+
 function GithubMark({ size = 16 }) {
   return <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.34c-2.23.49-2.7-1.07-2.7-1.07-.36-.93-.89-1.18-.89-1.18-.73-.5.05-.49.05-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.03 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.82 1.28.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>;
+}
+
+function leaveOAuthCallback(go, screen) {
+  window.history.replaceState({}, '', `/#${screen}`);
+  go(screen);
 }
 
 export function ConnectedLogin({ go, onAuthenticated }) {
@@ -25,11 +54,7 @@ export function ConnectedLogin({ go, onAuthenticated }) {
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const narrow = window.innerWidth < 980;
-  const demoEmail = import.meta.env.VITE_DEMO_EMAIL;
-  const demoPassword = import.meta.env.VITE_DEMO_PASSWORD;
-  const demoProjectId = import.meta.env.VITE_DEMO_PROJECT_ID;
-  const defaultProjectId = import.meta.env.VITE_DEFAULT_USER_PROJECT_ID || demoProjectId || '';
-  const demoConfigured = Boolean(demoEmail && demoPassword);
+  const defaultProjectId = import.meta.env.VITE_DEFAULT_USER_PROJECT_ID || '';
   const [projectId, setProjectId] = React.useState(projectStore.getProjectId() || defaultProjectId);
 
   const persistProjectId = () => {
@@ -45,10 +70,16 @@ export function ConnectedLogin({ go, onAuthenticated }) {
       if (mode === 'signup') {
         await api.signup({ name: form.name, email: form.email, password: form.password });
       }
-      const token = await api.login({ email: form.email, password: form.password });
-      authStore.setToken(token.accessToken);
-      persistProjectId();
-      await onAuthenticated?.();
+      const session = await api.login({ email: form.email, password: form.password });
+      authStore.setToken(session.accessToken);
+      const user = await retryTemporaryGatewayError(() => api.me());
+      if (session.userProjectId && !String(projectId || '').trim()) {
+        projectStore.setProjectId(String(session.userProjectId));
+        setProjectId(String(session.userProjectId));
+      } else {
+        persistProjectId();
+      }
+      await onAuthenticated?.({ user, userProjectId: session.userProjectId || projectStore.getProjectId(), github: false });
       go('home');
     } catch (e) {
       setError(e.message || '로그인 요청에 실패했습니다.');
@@ -57,35 +88,30 @@ export function ConnectedLogin({ go, onAuthenticated }) {
     }
   };
 
-  const startOAuth = () => {
-    persistProjectId();
-    window.location.href = `${API_BASE_URL}/oauth2/authorization/github`;
-  };
-
-  const startDemo = async () => {
-    if (!demoConfigured) {
-      setError('체험 계정 설정이 없습니다. GitHub 로그인 또는 이메일 로그인으로 계속해주세요.');
-      return;
-    }
+  const demoLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      const token = await api.login({ email: demoEmail, password: demoPassword });
-      authStore.setToken(token.accessToken);
-      if (String(projectId || '').trim()) persistProjectId();
-      else if (demoProjectId) projectStore.setProjectId(demoProjectId);
-      try {
-        await onAuthenticated?.();
-      } catch (refreshError) {
-        console.warn('Demo login succeeded, but data refresh failed.', refreshError);
+      const session = await api.demoLogin();
+      authStore.setToken(session.accessToken);
+      const user = await retryTemporaryGatewayError(() => api.me());
+      if (session.userProjectId) {
+        projectStore.setProjectId(String(session.userProjectId));
+        setProjectId(String(session.userProjectId));
       }
+      await onAuthenticated?.({ user, userProjectId: session.userProjectId, github: false });
       go('home');
     } catch (e) {
-      authStore.clear();
-      setError(e.message || '체험 계정 로그인이 실패했습니다. GitHub 로그인 또는 이메일 로그인으로 계속해주세요.');
+      setError(e.message || '데모 로그인에 실패했습니다.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const startOAuth = async () => {
+    authStore.clear();
+    await api.logout().catch(() => null);
+    window.location.href = `${API_BASE_URL}/oauth2/authorization/github`;
   };
 
   return <div style={{ minHeight: '100vh', background: '#fff', fontFamily: font, color: ink }}>
@@ -102,12 +128,12 @@ export function ConnectedLogin({ go, onAuthenticated }) {
           {mode === 'signup' && <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="이름" style={inputStyle} />}
           <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="이메일" style={inputStyle} />
           <input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="비밀번호" type="password" style={inputStyle} />
-          <input value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="분석 프로젝트 ID (예: 2)" style={inputStyle} />
+          <input value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="분석 프로젝트 ID" style={inputStyle} />
           {error && <div style={{ background: coralTint, border: '1px solid ' + coralTintBd, color: coralDeep, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 800, marginBottom: 10 }}>{error}</div>}
           <button disabled={loading} onClick={submit} style={{ font: 'inherit', cursor: loading ? 'default' : 'pointer', width: '100%', border: 'none', background: ink, color: '#fff', borderRadius: 12, padding: 14, fontWeight: 900 }}>{loading ? '처리 중...' : mode === 'signup' ? '가입하고 계속하기' : '이메일로 계속하기'}</button>
-          {demoConfigured && <button onClick={startDemo} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + greenTintBd, background: greenTint, color: greenInk, borderRadius: 12, padding: 13, fontWeight: 900, marginTop: 10 }}>체험 계정으로 둘러보기</button>}
+          <button disabled={loading} onClick={demoLogin} style={{ font: 'inherit', cursor: loading ? 'default' : 'pointer', width: '100%', border: 'none', background: green, color: ink, borderRadius: 12, padding: 14, fontWeight: 950, marginTop: 12 }}>데모로 바로 시작</button>
           <button onClick={startOAuth} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: '1px solid ' + line, background: '#fff', borderRadius: 12, padding: 13, fontWeight: 850, marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><GithubMark />GitHub로 로그인</button>
-          <div style={{ color: faint, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>로그인하면 저장 공고, 지원 현황, 프로젝트 분석, JD 매칭, 갭 분석 화면이 계정 기준으로 연결됩니다. 프로젝트 ID는 분석 결과를 불러올 때 사용합니다.</div>
+          <div style={{ color: faint, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>데모 로그인은 분석 결과가 있는 프로젝트를 자동으로 선택합니다. 직접 로그인이나 GitHub 로그인은 프로젝트 ID를 지정하면 JD 매칭과 갭 분석 화면까지 연결됩니다.</div>
         </section>
         <section style={{ background: ink, color: '#fff', borderRadius: 24, padding: 30, minHeight: 440, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: green }}>프로젝트 매칭</span>
@@ -126,24 +152,56 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
   const [message, setMessage] = React.useState('GitHub 로그인 결과를 확인하고 사용자 정보를 불러옵니다.');
 
   React.useEffect(() => {
+    let active = true;
     const code = new URLSearchParams(window.location.search).get('code');
+    authStore.clear();
+
+    const completeLogin = async (session = null) => {
+      if (session?.accessToken) {
+        authStore.setToken(session.accessToken);
+      } else {
+        authStore.setToken();
+      }
+      const user = await retryTemporaryGatewayError(
+        () => api.me(),
+        () => active && setMessage('로그인 세션을 확인하는 중입니다. 잠시만 기다려주세요.')
+      );
+      if (!user?.id) throw new Error('로그인 세션을 확인할 수 없습니다.');
+      if (session?.userProjectId) {
+        projectStore.setProjectId(String(session.userProjectId));
+      }
+      await onAuthenticated?.({ user, userProjectId: session?.userProjectId || projectStore.getProjectId(), github: true });
+      if (!active) return;
+      setStatus('success');
+      setMessage('로그인 완료! 홈으로 이동합니다.');
+      setTimeout(() => leaveOAuthCallback(go, 'home'), 500);
+    };
+
     if (!code) {
       setStatus('error');
       setMessage('로그인 결과를 확인할 수 없습니다. 다시 로그인해주세요.');
       return;
     }
-    api.oauthToken({ code })
-      .then(async (token) => {
-        authStore.setToken(token.accessToken);
-        await onAuthenticated?.();
-        setStatus('success');
-        setMessage('로그인 완료! 홈으로 이동합니다.');
-        setTimeout(() => go('home'), 500);
+
+    retryTemporaryGatewayError(
+      () => api.oauthToken({ code }),
+      () => active && setMessage('백엔드 연결이 회복되는 중입니다. 잠시 후 다시 확인합니다.')
+    )
+      .then(completeLogin)
+      .catch(async (e) => {
+        if (!isConsumableOAuthCodeError(e)) throw e;
+        setMessage('이미 생성된 로그인 세션을 확인합니다.');
+        await completeLogin();
       })
       .catch((e) => {
+        if (!active) return;
         setStatus('error');
         setMessage(e.message || 'GitHub 로그인이 완료되지 않았습니다.');
       });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#fff', fontFamily: font, color: ink, padding: 24 }}>
@@ -151,7 +209,7 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
       <div style={{ width: 54, height: 54, borderRadius: 18, background: status === 'error' ? coralTint : green, color: status === 'error' ? coralDeep : ink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 1000 }}>{status === 'error' ? '!' : status === 'success' ? '✓' : '…'}</div>
       <h1 style={{ margin: '18px 0 8px', letterSpacing: -1 }}>{status === 'error' ? '로그인이 완료되지 않았습니다' : '로그인 처리 중'}</h1>
       <p style={{ color: muted, lineHeight: 1.6 }}>{message}</p>
-      {status === 'error' && <button onClick={() => go('login')} style={{ font: 'inherit', border: 'none', background: ink, color: '#fff', borderRadius: 13, padding: '12px 16px', fontWeight: 900, cursor: 'pointer' }}>로그인으로 돌아가기</button>}
+      {status === 'error' && <button onClick={() => leaveOAuthCallback(go, 'login')} style={{ font: 'inherit', border: 'none', background: ink, color: '#fff', borderRadius: 13, padding: '12px 16px', fontWeight: 900, cursor: 'pointer' }}>로그인으로 돌아가기</button>}
     </section>
   </div>;
 }

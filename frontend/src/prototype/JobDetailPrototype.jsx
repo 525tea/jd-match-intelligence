@@ -1,14 +1,21 @@
 import React from 'react';
+import { jobflowActions } from '../api/jobflowActions.js';
+import { getJobflowState } from './jobflowState.js';
 
 // JobFlow — 공고 상세. JD + matching report.
 // Palette: lime = owned/match, charcoal = analysis, coral = urgent/missing.
 export function JobDetail({ t, go, company, jobId, loading = false }) {
-  const JF = window.JF || {};
+  const JF = getJobflowState() || {};
   const [toast, setToast] = React.useState(null);
+  const toastTimerRef = React.useRef(null);
   const [saved, setSaved] = React.useState(false);
   const [applied, setApplied] = React.useState(false);
   const [hidden, setHidden] = React.useState(false);
-  const fire = (label) => { setToast(label); clearTimeout(window.__jdT); window.__jdT = setTimeout(() => setToast(null), 1900); };
+  const fire = (label) => {
+    setToast(label);
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 1900);
+  };
 
   const ink = '#14151a', muted = '#5b616e', faint = '#9aa1ad';
   const card = '#ffffff', line = '#e7eaf0', soft = '#f1f3f7';
@@ -49,6 +56,12 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   const sectionHeadingPattern = new RegExp(`(?:\\[\\s*(${escapedSectionAliases.join('|')})\\s*\\]|(${escapedSectionAliases.join('|')}))`, 'giu');
   const canonicalizeHeading = (value) => aliasToCanonical.get(String(value || '').replace(/^\[|\]$/g, '').trim().toLowerCase()) || String(value || '').trim();
+  const originalSectionOrder = new Map(canonicalHeadings.map((heading, index) => [heading, index]));
+  const sortOriginalSections = (sections) => [...sections].sort((a, b) => {
+    const aOrder = originalSectionOrder.has(a.title) ? originalSectionOrder.get(a.title) : 999;
+    const bOrder = originalSectionOrder.has(b.title) ? originalSectionOrder.get(b.title) : 999;
+    return aOrder - bOrder;
+  });
   const normalizeDescription = (value) => String(value || '')
     .replace(/\\n/g, '\n')
     .replace(/\r\n?/g, '\n')
@@ -163,6 +176,19 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, 8);
+  const processItemsFromOriginalSections = (sections) => sections
+    .filter((section) => /채용|전형|절차|프로세스|지원 유의사항/.test(section.title))
+    .flatMap((section) => normalizeOriginalItems(
+      String(section.body || '')
+        .split('\n')
+        .flatMap((line) => cleanOriginalDisplayText(line, section.title).split('\n'))
+        .map((line) => line.trim())
+        .filter(Boolean),
+      section.title,
+    ))
+    .map(cleanItemText)
+    .filter(Boolean)
+    .slice(0, 8);
 
   const matches = JF.matches || [];
   const listings = JF.listings || [];
@@ -196,8 +222,8 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const trackingJobId = (targetById && (targetById.jobId || targetById.id)) || (m && (m.jobId || m.id)) || (l && (l.jobId || l.id)) || jobId;
   const trackingCompany = targetCompany || (m && m.companyKo) || (l && l.companyKo);
   React.useEffect(() => {
-    if (trackingJobId) window.__jobflowApi?.viewJobById?.(trackingJobId);
-    else if (trackingCompany) window.__jobflowApi?.viewJobByCompany?.(trackingCompany);
+    if (trackingJobId) jobflowActions.viewJobById?.(trackingJobId);
+    else if (trackingCompany) jobflowActions.viewJobByCompany?.(trackingCompany);
   }, [trackingCompany, trackingJobId]);
 
   if (!m && !l && loading) {
@@ -304,10 +330,18 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     if (/^(검색 시스템|서빙 API|튜닝 MySQL|운영 Docker|운영 Prometheus|운영 Redis|API 개발|스키마 문서화|파이프라인 개발자 포지션)/u.test(current) && /(추천|추론|데이터베이스 설계|설계|설계·구현|OpenAPI|Swagger|GraphQL)$/u.test(previous)) return true;
     return false;
   };
+  const shouldJoinWithMiddleDot = (left, right) => {
+    const previous = stripListMarker(left);
+    const current = stripListMarker(right);
+    if (!previous || !current) return false;
+    if (/[A-Za-z0-9)]$/u.test(previous) || /^[A-Za-z0-9]/u.test(current)) return false;
+    return /(?:설계|구현|운영|개발|배포|구축|작성|리뷰|튜닝|처리|추천|추론|검색|서빙|모니터링|로깅)$/u.test(previous)
+      && /^(?:설계|구현|운영|개발|배포|구축|작성|리뷰|튜닝|처리|추천|추론|검색|서빙|모니터링|로깅)/u.test(current);
+  };
   const joinJdFragments = (left, right) => {
     const previous = stripListMarker(left);
     const current = stripListMarker(right);
-    const separator = /[A-Za-z0-9)]$/u.test(previous) || /^[A-Za-z0-9]/u.test(current) ? ' ' : '·';
+    const separator = shouldJoinWithMiddleDot(previous, current) ? '·' : ' ';
     return `${previous}${separator}${current}`;
   };
   const compactOriginalLines = (rawLines) => {
@@ -334,8 +368,8 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const originalLineStyle = (compact = false) => ({
     margin: 0,
     color: '#2f343d',
-    fontSize: compact ? (narrow ? 14.5 : 15.5) : (narrow ? 15.5 : 17),
-    lineHeight: compact ? 1.72 : 1.82,
+    fontSize: compact ? (narrow ? 14 : 15) : (narrow ? 15 : 16),
+    lineHeight: compact ? 1.62 : 1.72,
     letterSpacing: -0.12,
     wordBreak: 'keep-all',
     overflowWrap: 'anywhere',
@@ -343,7 +377,14 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const cleanOriginalDisplayText = (value, title) => {
     let text = String(value || '')
       .replace(/\s+\*\s+/gu, '\n* ')
+      .replace(/\s+(?=\[[^\]\n]{2,70}\])/gu, '\n')
+      .replace(/([^\n])(\[[^\]\n]{2,70}\])/gu, '$1\n$2')
+      .replace(/\s+(?=\((?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\))/gu, '\n')
+      .replace(/([^\n])(\((?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\))/gu, '$1\n$2')
+      .replace(/\s+(?=(?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\s*[:：])/gu, '\n')
+      .replace(/([^\n])((?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\s*[:：])/gu, '$1\n$2')
       .replace(/\s+(?=[^:\n]{1,34}(?:홈페이지|가이드):\s*https?:\/\/)/gu, '\n')
+      .replace(/\s+(?=(?:채용 관련 문의|문의 사항|기타 안내|유의사항|참고사항)(?:은|는|\s))/gu, '\n')
       .replace(/[＜<]\s*$/u, '')
       .replace(/^[＞>]\s*/u, '')
       .replace(/지도보기[·\s]*주소복사/gu, '지도보기')
@@ -353,6 +394,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     if (/기업\/서비스 소개|기업 소개|회사 소개|서비스 소개/.test(title)) {
       text = text
         .replace(/^기업상세 정보로 이동\s*\d+\s*\/\s*\d+\s*/u, '')
+        .replace(/\s+(?=(?:그루비|젠서|젤라또)\([^)]+\)\s*(?:홈페이지|가이드):)/gu, '\n')
         .trim();
     }
 
@@ -363,6 +405,77 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     }
 
     return text;
+  };
+  const protectInlineSpacing = (value) => String(value || '')
+    .replace(/\s+·\s+/gu, '·')
+    .replace(/이미지\s+영상/gu, '이미지·영상')
+    .replace(/모니터링\s+로깅/gu, '모니터링·로깅')
+    .replace(/위치\s+궤적/gu, '위치·궤적')
+    .replace(/설계\s+구현/gu, '설계·구현')
+    .replace(/구축\s+운영/gu, '구축·운영')
+    .replace(/설계\s+운영/gu, '설계·운영')
+    .replace(/개발\s+운영/gu, '개발·운영')
+    .replace(/배포\s+운영/gu, '배포·운영')
+    .replace(/캐시\s+메시지/gu, '캐시·메시지')
+    .replace(/작성\s+리뷰\s+테스트/gu, '작성·리뷰·테스트')
+    .replace(/추천\s+추론/gu, '추천·추론')
+    .replace(/검색\s+서빙/gu, '검색·서빙')
+    .replace(/객체지향\s+계층형/gu, '객체지향·계층형')
+    .replace(/처리\s+경험/gu, '처리 경험');
+  const listMarkerPattern = /^(?:[-•*]\s*|\d+[.)]\s+|\((?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\)|(?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\s*[:：])/u;
+  const itemBoundaryPattern = /(?=(?:[-•*]\s*|\d+[.)]\s+|\((?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\)|(?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\s*[:：]))/u;
+  const stripItemMarker = (value) => String(value || '')
+    .replace(/^[-•*]\s*/u, '')
+    .replace(/^\d+[.)]\s*/u, '')
+    .replace(/^\((?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\)\s*/u, '')
+    .replace(/^(?:우대|필수|자격|경험|혜택|복지|기타|참고|주의)\s*[:：]\s*/u, '')
+    .trim();
+  const splitOriginalListPieces = (rawLines) => rawLines.flatMap((line) => {
+    const normalized = protectInlineSpacing(line)
+      .replace(/([^\n])\s*(?:•|ㆍ)\s*/gu, '$1\n• ')
+      .replace(/^(?:•|ㆍ)\s*/gu, '• ')
+      .trim();
+    return normalized
+      .split(/\n+/)
+      .flatMap((part) => part.split(itemBoundaryPattern))
+      .map((part) => {
+        const source = part.trim();
+        return {
+          startsItem: listMarkerPattern.test(source),
+          text: stripItemMarker(source),
+        };
+      })
+      .filter((part) => part.text);
+  });
+  const normalizeOriginalItems = (rawLines, title) => {
+    if (!/자격|요건|우대|혜택|복지|주요|업무|채용|절차/.test(title)) {
+      return compactOriginalLines(rawLines).map(protectInlineSpacing);
+    }
+
+    const pieces = splitOriginalListPieces(rawLines);
+    const items = [];
+    pieces.forEach(({ startsItem, text }) => {
+      const previous = items[items.length - 1];
+      const shouldMerge = previous && (
+        shouldJoinWithNextLine(previous, text)
+        || shouldAppendToPreviousLine(previous, text)
+        || /^(구현|운영|개발|리뷰|테스트|메시지|계층형|서버|클라이언트|문서화|최적화|관리|처리|배포)(?:\s|·|$)/u.test(text)
+      );
+
+      if (!items.length || (startsItem && !shouldMerge)) {
+        items.push(text);
+        return;
+      }
+
+      if (shouldMerge) {
+        items[items.length - 1] = joinJdFragments(previous, text);
+        return;
+      }
+
+      items.push(text);
+    });
+
+    return items.map(protectInlineSpacing);
   };
   const toOriginalBlocks = (items) => items.flatMap((line) => {
     const blocks = [];
@@ -381,6 +494,16 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     const after = source.slice(cursor).trim();
     if (after) blocks.push({ type: 'text', value: after });
     return blocks.length ? blocks : [{ type: 'text', value: source }];
+  });
+  const paragraphToOriginalBlocks = (lines, compact) => lines.flatMap((line) => {
+    const source = String(line || '').trim();
+    if (!source) return [];
+    const softLines = source
+      .replace(/\s+(?=https?:\/\/)/gu, '\n')
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return toOriginalBlocks(softLines).map((block) => ({ ...block, compact }));
   });
   const OriginalSubheading = ({ children }) => (
     <div className="jf-original-subheading">
@@ -412,24 +535,28 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     const listLikeTitle = isOriginalListSection(title);
     const paragraphLikeTitle = isOriginalParagraphSection(title);
     const isSkillSection = /기술스택|기술 스택|스킬/.test(title);
-    const lines = isSkillSection ? rawLines.map(stripListMarker) : compactOriginalLines(rawLines);
+    const lines = isSkillSection ? rawLines.map(stripListMarker) : normalizeOriginalItems(rawLines, title);
     const isBulletSection = listLikeTitle && !paragraphLikeTitle && lines.length >= 2;
-    const blocks = isSkillSection ? [] : toOriginalBlocks(lines).map((block) => ({ ...block, compact: compactInfo }));
+    const blocks = isSkillSection
+      ? []
+      : paragraphLikeTitle
+      ? paragraphToOriginalBlocks(lines, compactInfo)
+      : toOriginalBlocks(lines).map((block) => ({ ...block, compact: compactInfo }));
     const skillItems = isSkillSection ? [...new Set(normalized.split(/\s+/).map((x) => x.trim()).filter(Boolean))].slice(0, 24) : [];
     const showTitle = !(index === 0 && title === '공고 원문');
     return (
-      <section className="jf-original-section" style={{ paddingTop: index ? 28 : 0, marginTop: index ? 28 : 0, borderTop: index ? '1px solid ' + line : 'none', minWidth: 0 }}>
-        {showTitle && <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: body ? 14 : 0 }}>
-          <span style={{ width: 5, height: 22, borderRadius: 999, background: green, flexShrink: 0 }} />
-          <h3 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 19 : 24, lineHeight: 1.22, fontWeight: 950, letterSpacing: -0.45 }}>{title}</h3>
+      <section className="jf-original-section" style={{ paddingTop: index ? 22 : 0, marginTop: index ? 22 : 0, borderTop: index ? '1px solid ' + line : 'none', minWidth: 0 }}>
+        {showTitle && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: body ? 10 : 0 }}>
+          <span style={{ width: 4, height: 18, borderRadius: 999, background: green, flexShrink: 0 }} />
+          <h3 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 18 : 21, lineHeight: 1.24, fontWeight: 920, letterSpacing: -0.35 }}>{title}</h3>
         </div>}
         {body && (isSkillSection
           ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{skillItems.map((skill) => <Pill key={skill} owned={has(skill)} miss={!has(skill)}>{skill}</Pill>)}</div>
           : isBulletSection
-          ? <div className="jf-original-list" style={{ color: '#2f343d', fontSize: narrow ? 15.5 : 17, lineHeight: 1.82, letterSpacing: -0.12, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
+          ? <div className="jf-original-list" style={{ color: '#2f343d', fontSize: narrow ? 15 : 16, lineHeight: 1.72, letterSpacing: -0.12, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
               {blocks.map((block, i) => <OriginalTextBlock key={block.type + block.value + i} block={block} bullet />)}
             </div>
-          : <div style={{ display: 'grid', gap: 10 }}>
+          : <div style={{ display: 'grid', gap: compactInfo ? 6 : 8 }}>
               {blocks.map((block, i) => <OriginalTextBlock key={block.type + block.value + i} block={block} />)}
             </div>
         )}
@@ -462,14 +589,20 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       ...section,
       title: canonicalizeHeading(section.title),
     }));
+  const sectionHasMeaningfulBody = (section) => String(section?.body || '').replace(/\s+/g, ' ').trim().length >= 16;
   const originalSections = apiOriginalSections.length
     ? rawOriginalSections.reduce((merged, section) => {
-      const alreadyIncluded = merged.some((item) => item.title === section.title);
-      return alreadyIncluded ? merged : merged.concat(section);
+      const existingIndex = merged.findIndex((item) => item.title === section.title);
+      if (existingIndex < 0) return merged.concat(section);
+      if (!sectionHasMeaningfulBody(merged[existingIndex]) && sectionHasMeaningfulBody(section)) {
+        return merged.map((item, index) => index === existingIndex ? section : item);
+      }
+      return merged;
     }, apiOriginalSections)
     : rawOriginalSections;
-  const mainOriginalSections = originalSections.filter((section) => !/기술스택|기술 스택|스킬/.test(section.title));
-  const processItems = bullets.process;
+  const mainOriginalSections = sortOriginalSections(originalSections)
+    .filter((section) => !/기술스택|기술 스택|스킬/.test(section.title));
+  const processItems = bullets.process.length ? bullets.process : processItemsFromOriginalSections(originalSections);
 
   return (
     <div style={{ minHeight: '100vh', background: '#f7f8fa', fontFamily: font, color: ink }}>
@@ -499,9 +632,9 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: narrow ? 'wrap' : 'nowrap' }}>
               {btn('지원하기', false, openOriginalJob, true)}
-              {login && btn(saved ? '저장됨' : '저장', saved, async () => { try { if (job.jobId) await window.__jobflowApi?.saveJobById?.(job.jobId); else await window.__jobflowApi?.saveJobByCompany?.(job.companyKo); setSaved(true); fire('저장한 공고에 추가했어요'); } catch (e) { fire(e.message || '저장에 실패했어요'); } }, false, <BookmarkIcon filled={saved} />)}
-              {login && btn(hidden ? '숨김 처리됨' : '숨김', hidden, async () => { try { if (job.jobId) await window.__jobflowApi?.ignoreJobById?.(job.jobId); setHidden(true); fire('추천에서 숨겼어요'); } catch (e) { fire(e.message || '숨김 처리에 실패했어요'); } }, false)}
-              {login && btn(applied ? '지원 기록 있음 ✓' : '지원 기록 추가', applied, async () => { try { if (job.jobId) await window.__jobflowApi?.createApplicationByJobId?.(job.jobId); else await window.__jobflowApi?.createApplicationByCompany?.(job.companyKo); setApplied(true); fire('지원 기록을 만들었어요'); } catch (e) { fire(e.message || '지원 기록 생성에 실패했어요'); } }, false)}
+              {login && btn(saved ? '저장됨' : '저장', saved, async () => { try { if (job.jobId) await jobflowActions.saveJobById?.(job.jobId); else await jobflowActions.saveJobByCompany?.(job.companyKo); setSaved(true); fire('저장한 공고에 추가했어요'); } catch (e) { fire(e.message || '저장에 실패했어요'); } }, false, <BookmarkIcon filled={saved} />)}
+              {login && btn(hidden ? '숨김 처리됨' : '숨김', hidden, async () => { try { if (job.jobId) await jobflowActions.ignoreJobById?.(job.jobId); setHidden(true); fire('추천에서 숨겼어요'); } catch (e) { fire(e.message || '숨김 처리에 실패했어요'); } }, false)}
+              {login && btn(applied ? '지원 기록 있음 ✓' : '지원 기록 추가', applied, async () => { try { if (job.jobId) await jobflowActions.createApplicationByJobId?.(job.jobId); else await jobflowActions.createApplicationByCompany?.(job.companyKo); setApplied(true); fire('지원 기록을 만들었어요'); } catch (e) { fire(e.message || '지원 기록 생성에 실패했어요'); } }, false)}
             </div>
             </div>
 

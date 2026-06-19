@@ -7,10 +7,10 @@ const asList = unwrapList;
 const initials = (text = '') => String(text).replace(/[^A-Za-z0-9가-힣]/g, ' ').trim().split(/\s+/).map((x) => x[0]).join('').slice(0, 2).toUpperCase() || 'JF';
 
 const dday = (deadlineAt) => {
-  if (!deadlineAt) return '상시';
+  if (!deadlineAt) return '마감 정보 없음';
   const now = new Date();
   const due = new Date(deadlineAt);
-  if (Number.isNaN(due.getTime())) return '상시';
+  if (Number.isNaN(due.getTime())) return '마감 정보 없음';
   const diff = Math.ceil((due.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0)) / 86400000);
   if (diff < 0) return '마감';
   if (diff === 0) return 'D-DAY';
@@ -74,6 +74,14 @@ const parseDdayNumber = (value) => {
 
 const USER_FACING_JOB_SOURCES = new Set(['WANTED', 'JUMPIT']);
 
+const canonicalApplyUrl = (source, externalId, fallback = '') => {
+  const id = String(externalId || '').trim();
+  if (!id) return fallback || '';
+  if (source === 'WANTED') return `https://www.wanted.co.kr/wd/${encodeURIComponent(id)}`;
+  if (source === 'JUMPIT') return `https://jumpit.saramin.co.kr/position/${encodeURIComponent(id)}`;
+  return fallback || '';
+};
+
 export const isUserFacingJob = (job = {}) => {
   const rawJob = job.job || job;
   const source = rawJob.source || job.source;
@@ -89,6 +97,8 @@ export function toPrototypeJob(job, index = 0) {
   const rawJob = job.job || job;
   const displayRole = roleLabel(rawJob.role || job.role, compactDetail(rawJob.roleDetail || job.roleDetail));
   const companyKo = rawJob.companyName || rawJob.companyKo || job.companyName || '회사명';
+  const source = rawJob.source || job.source;
+  const externalId = rawJob.externalId || rawJob.external_id || rawJob.sourceId || job.externalId || job.external_id || job.sourceId;
   const skills = skillNames(rawJob.skills || job.skills);
   const matched = [
     ...(job.matchedRequiredSkills || []),
@@ -103,10 +113,11 @@ export function toPrototypeJob(job, index = 0) {
   return {
     id: rawJob.id || rawJob.jobId || job.jobId || job.id,
     jobId: rawJob.jobId || rawJob.id || job.jobId || job.id,
-    source: rawJob.source || job.source,
+    source,
+    externalId,
     status: rawJob.status || job.status,
-    sourceId: rawJob.sourceId || job.sourceId,
-    originalUrl: rawJob.originalUrl || rawJob.original_url || rawJob.url || job.originalUrl || job.original_url || job.url || '',
+    sourceId: externalId,
+    originalUrl: canonicalApplyUrl(source, externalId, rawJob.originalUrl || rawJob.original_url || rawJob.url || job.originalUrl || job.original_url || job.url),
     company: rawJob.company || job.company || companyKo,
     companyKo,
     logo: rawJob.logo || job.logo || initials(companyKo),
@@ -124,7 +135,7 @@ export function toPrototypeJob(job, index = 0) {
     requiredSkills: firstNonEmpty(skillNames(rawJob.skills?.filter?.((s) => s.requirementType === 'REQUIRED')), skillNames(job.skills?.filter?.((s) => s.requirementType === 'REQUIRED')), [...new Set([...(job.matchedRequiredSkills || []), ...(job.missingRequiredSkills || [])])], visibleSkills),
     preferredSkills: firstNonEmpty(skillNames(rawJob.skills?.filter?.((s) => s.requirementType === 'PREFERRED')), skillNames(job.skills?.filter?.((s) => s.requirementType === 'PREFERRED')), [...new Set([...(job.matchedPreferredSkills || []), ...(job.missingPreferredSkills || [])])], []),
     tags: tagCodes(rawJob.experienceTags).length ? tagCodes(rawJob.experienceTags) : tagCodes(job.experienceTags).length ? tagCodes(job.experienceTags) : tagCodes(job.matchedExperienceTags).concat(tagCodes(job.missingExperienceTags)).slice(0, 3),
-    deadline: dday(rawJob.deadlineAt || job.deadlineAt) || job.deadline || '상시',
+    deadline: dday(rawJob.deadlineAt || job.deadlineAt) || job.deadline || '마감 정보 없음',
     views: job.views || 0,
     companyIntro: rawJob.companyIntro || job.companyIntro || '',
     desc: rawJob.description || job.description || '공고 원문이 제공되지 않았습니다.',
@@ -137,7 +148,7 @@ const toTrend = (trend, index = 0, ownedSkills = new Set()) => {
   const preferred = Number(trend.preferredCount || 0);
   const total = Number(trend.jobCount || trend.totalJobs || 0);
   const trendScore = Number(trend.trendScore ?? trend.score ?? 0);
-  const rate = Math.min(100, Math.round(Number(trend.rate ?? trendScore ?? (total ? (required / total) * 100 : 0))));
+  const rate = Math.min(100, Math.round(Number(trend.rate ?? (total ? (required / total) * 100 : trendScore))));
   const name = trend.skillName || trend.name;
   return {
     id: trend.skillId || trend.id || index,
@@ -164,19 +175,26 @@ const toApplication = (app) => ({
   updatedAt: app.updatedAt,
 });
 
+const userFacingEvidence = (value, fallback) => {
+  const text = String(value || '').trim();
+  if (!text) return fallback;
+  if (/smoke|fixture|mock|test data|sample data/i.test(text)) return fallback;
+  return text;
+};
+
 const toSkill = (skill) => ({
   name: skill.skillName || skill.name,
   conf: Math.round(Number(skill.confidence || skill.conf || 70)),
   level: skill.source === 'LLM' ? '분석 신뢰도' : '근거 강도',
   commits: skill.commits || 0,
   files: skill.files || 0,
-  reason: skill.evidence || skill.reason || '프로젝트 분석 결과에서 검출되었습니다.',
+  reason: userFacingEvidence(skill.evidence || skill.reason, '프로젝트 분석 결과에서 검출되었습니다.'),
 });
 
 const toExpTag = (tag) => ({
   code: tag.tagCode || tag.code,
   label: tag.tagName || tag.label || tagLabel(tag.tagCode || tag.code),
-  sentence: tag.evidence || tag.sentence || tag.description || '프로젝트 분석 결과에서 관련 경험 태그로 추출되었습니다.',
+  sentence: userFacingEvidence(tag.evidence || tag.sentence, tag.description || '프로젝트 분석 결과에서 관련 경험 태그로 추출되었습니다.'),
 });
 
 const toUserJobCard = (item, index = 0) => {
@@ -345,6 +363,39 @@ function attachLookup(next) {
   return next;
 }
 
+const resetUserFacingData = (state) => {
+  Object.assign(state, {
+    listings: [],
+    matches: [],
+    recommendations: [],
+    popular: [],
+    closing: [],
+    skills: [],
+    expTags: [],
+    gapSkills: [],
+    projectList: [],
+    applications: [],
+    pipeline: [],
+    saved: 0,
+    viewed: 0,
+    ignored: 0,
+    trends: [],
+    userJobs: {
+      saved: [],
+      viewed: [],
+      ignored: [],
+    },
+    market: {
+      ...(state.market || {}),
+      totalCount: 0,
+      openJobCount: 0,
+    },
+  });
+  return state;
+};
+
+export const createEmptyJobFlowState = (baseJF) => resetUserFacingData(clone(baseJF));
+
 export function mergePrototypeJobIntoState(state, job) {
   if (!job || !(job.jobId || job.id || job.companyKo)) return state;
 
@@ -381,10 +432,8 @@ export function mergePrototypeJobIntoState(state, job) {
 }
 
 export async function loadJobFlowData(baseJF) {
-  const next = clone(baseJF);
-  const token = authStore.getToken();
-  const userProjectId = projectStore.getProjectId();
-  const hasUserProjectId = Boolean(userProjectId);
+  const next = createEmptyJobFlowState(baseJF);
+  let userProjectId = projectStore.getProjectId();
   next.tagLabel = {
     ...(next.tagLabel || {}),
     CLOUD_INFRA: '클라우드/인프라',
@@ -427,10 +476,25 @@ export async function loadJobFlowData(baseJF) {
     next.market.openJobCount = open || undefined;
   }
 
-  if (!token) return attachLookup(next);
+  const meResult = await settle('me', () => api.me());
+  if (!meResult.ok) {
+    if (!authStore.hasMemoryToken()) {
+      authStore.clear();
+    }
+    return attachLookup(next);
+  }
+
+  authStore.setToken();
+  next.__authenticated = true;
+
+  if (!userProjectId && meResult.data?.userProjectId) {
+    userProjectId = String(meResult.data.userProjectId);
+    projectStore.setProjectId(userProjectId);
+  }
+
+  const hasUserProjectId = Boolean(userProjectId);
 
   const authLoaders = [
-    settle('me', () => api.me()),
     settle('applications', () => api.applications()),
     settle('saved', () => api.savedJobs()),
     settle('viewed', () => api.viewedJobs()),
@@ -447,7 +511,7 @@ export async function loadJobFlowData(baseJF) {
     );
   }
 
-  const authResults = await Promise.all(authLoaders);
+  const authResults = [meResult, ...(await Promise.all(authLoaders))];
   next.__apiStatus = {
     ...(next.__apiStatus || {}),
     ...Object.fromEntries(authResults.map((result) => [result.key, result.ok ? 'ok' : 'unavailable'])),

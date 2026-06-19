@@ -50,6 +50,10 @@ public class FixedWindowRateLimitFilter implements GatewayFilter {
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+        if (shouldSkipRateLimit(exchange)) {
+            return chain.filter(exchange);
+        }
+
         String key = rateLimitKey(exchange);
 
         return redisTemplate.opsForValue()
@@ -68,6 +72,23 @@ public class FixedWindowRateLimitFilter implements GatewayFilter {
 
                     return chain.filter(exchange);
                 });
+    }
+
+    private boolean shouldSkipRateLimit(ServerWebExchange exchange) {
+        String path = exchange.getRequest().getURI().getPath();
+
+        return path.startsWith("/api/auth/")
+                || path.startsWith("/api/oauth2/")
+                || path.startsWith("/api/login/oauth2/")
+                || path.startsWith("/api/actuator/")
+                || path.startsWith("/api/v3/api-docs")
+                || path.startsWith("/api/swagger-ui")
+                || path.startsWith("/auth/")
+                || path.startsWith("/oauth2/")
+                || path.startsWith("/login/oauth2/")
+                || path.startsWith("/actuator/")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/swagger-ui");
     }
 
     private String rateLimitKey(ServerWebExchange exchange) {

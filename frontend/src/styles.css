@@ -41,28 +41,29 @@ button { -webkit-tap-highlight-color: transparent; }
 }
 .jf-original-list {
   display: grid;
-  gap: 10px;
+  gap: 6px;
 }
 .jf-original-bullet {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
+  grid-template-columns: 12px minmax(0, 1fr);
   align-items: start;
 }
 .jf-original-dot {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: #5b616e;
-  margin-top: 13px;
+  margin-top: 12px;
   display: inline-block;
 }
 .jf-original-subheading {
-  margin: 18px 0 6px;
+  margin: 10px 0 2px;
   padding: 0;
-  color: #20242c;
-  font-weight: 850;
-  letter-spacing: -0.2px;
-  line-height: 1.55;
+  color: #4b5563;
+  font-weight: 820;
+  letter-spacing: -0.15px;
+  line-height: 1.45;
+  font-size: 0.96em;
 }
 .jf-original-subheading:first-child {
   margin-top: 0;

@@ -1,9 +1,10 @@
 import React from 'react';
+import { getJobflowState } from './jobflowState.js';
 
 // JobFlow — 온보딩 플로우 (스킬 직접 입력). 4스텝, 선택 즉시 자동 전환.
 // Step1 직무 → Step2 경력 → Step3 스킬(복수) → Step4 결과(매칭 공고 + GitHub 유도)
 export function Onboarding({ t, go }) {
-  const JF = window.JF;
+  const JF = getJobflowState();
   const [step, setStep] = React.useState(1);
   const [role, setRole] = React.useState(null);
   const [career, setCareer] = React.useState(null);
