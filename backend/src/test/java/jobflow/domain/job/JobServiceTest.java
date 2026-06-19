@@ -1,6 +1,7 @@
 package jobflow.domain.job;
 
 import jobflow.domain.job.dto.JobCreateRequest;
+import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobExperienceTagRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
@@ -75,6 +76,9 @@ class JobServiceTest {
     @Mock
     private JdJobRoleClassificationService jdJobRoleClassificationService;
 
+    @Mock
+    private JobApplyUrlResolver jobApplyUrlResolver;
+
     @Test
     @DisplayName("공고를 생성하고 스킬과 경험 태그를 함께 저장한다")
     void createJob() {
@@ -91,6 +95,7 @@ class JobServiceTest {
         );
 
         givenRoleResolution(request, JobRole.BACKEND);
+        given(jobApplyUrlResolver.resolve(savedJob)).willReturn("https://example.com/jobs/1");
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
         given(experienceTagCodeRepository.findById("HIGH_TRAFFIC")).willReturn(Optional.of(tagCode));
@@ -103,6 +108,7 @@ class JobServiceTest {
         assertThat(response.title()).isEqualTo("백엔드 개발자");
         assertThat(response.companyName()).isEqualTo("JobFlow");
         assertThat(response.status()).isEqualTo(JobStatus.OPEN);
+        assertThat(response.applyUrl()).isEqualTo("https://example.com/jobs/1");
         assertThat(response.skills()).hasSize(1);
         assertThat(response.skills().getFirst().name()).isEqualTo("Spring Boot");
         assertThat(response.skills().getFirst().requirementType()).isEqualTo(RequirementType.REQUIRED);
@@ -139,6 +145,7 @@ class JobServiceTest {
         );
 
         givenRoleResolution(request, JobRole.BACKEND);
+        given(jobApplyUrlResolver.resolve(savedJob)).willReturn("https://example.com/jobs/1");
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
         given(experienceTagCodeRepository.findById("HIGH_TRAFFIC")).willReturn(Optional.of(tagCode));
@@ -165,6 +172,7 @@ class JobServiceTest {
         );
 
         givenRoleResolution(request, JobRole.BACKEND);
+        given(jobApplyUrlResolver.resolve(savedJob)).willReturn("https://example.com/jobs/1");
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
         given(jobSkillRepository.saveAll(any())).willReturn(List.of(jobSkill));
@@ -235,6 +243,7 @@ class JobServiceTest {
         JobSkill jobSkill = JobSkill.create(savedJob, springBoot, RequirementType.REQUIRED);
 
         givenRoleResolution(request, JobRole.BACKEND);
+        given(jobApplyUrlResolver.resolve(savedJob)).willReturn("https://example.com/jobs/1");
         given(jobRepository.save(any(Job.class))).willReturn(savedJob);
         given(jobSkillNormalizationService.saveNormalizedSkills(
                 savedJob,
@@ -274,6 +283,7 @@ class JobServiceTest {
         );
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of(jobSkill));
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of(jobExperienceTag));
 
@@ -281,6 +291,7 @@ class JobServiceTest {
 
         assertThat(response.id()).isEqualTo(jobId);
         assertThat(response.title()).isEqualTo("백엔드 개발자");
+        assertThat(response.applyUrl()).isEqualTo("https://example.com/jobs/1");
         assertThat(response.skills()).hasSize(1);
         assertThat(response.experienceTags()).hasSize(1);
     }
@@ -299,11 +310,62 @@ class JobServiceTest {
     }
 
     @Test
+    @DisplayName("canonical fingerprint가 같은 공고 중 회사 원문 URL 공고를 대표 공고로 선택한다")
+    void getCanonicalGroup() {
+        Job wantedJob = createJobEntity(1L);
+        Job companyJob = createJobEntity(2L);
+        ReflectionTestUtils.setField(wantedJob, "source", "WANTED");
+        ReflectionTestUtils.setField(wantedJob, "externalId", "367438");
+        ReflectionTestUtils.setField(wantedJob, "canonicalFingerprint", "example-company|backend-engineer|seoul");
+        ReflectionTestUtils.setField(companyJob, "source", "JUMPIT");
+        ReflectionTestUtils.setField(companyJob, "externalId", "54118198");
+        ReflectionTestUtils.setField(companyJob, "canonicalFingerprint", "example-company|backend-engineer|seoul");
+
+        given(jobRepository.findById(1L)).willReturn(Optional.of(wantedJob));
+        given(jobRepository.findByCanonicalFingerprintOrderByCreatedAtDescIdDesc(
+                "example-company|backend-engineer|seoul"
+        )).willReturn(List.of(wantedJob, companyJob));
+        given(jobApplyUrlResolver.resolve(wantedJob)).willReturn("https://www.wanted.co.kr/wd/367438");
+        given(jobApplyUrlResolver.resolve(companyJob)).willReturn("https://company.example.com/jobs/backend");
+
+        JobCanonicalGroupResponse response = jobService.getCanonicalGroup(1L);
+
+        assertThat(response.canonicalFingerprint()).isEqualTo("example-company|backend-engineer|seoul");
+        assertThat(response.representativeJobId()).isEqualTo(2L);
+        assertThat(response.representativeApplyUrl()).isEqualTo("https://company.example.com/jobs/backend");
+        assertThat(response.duplicateCount()).isEqualTo(1);
+        assertThat(response.jobs()).hasSize(2);
+        assertThat(response.jobs())
+                .filteredOn(job -> job.id().equals(2L))
+                .singleElement()
+                .extracting("representative")
+                .isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("canonical fingerprint가 없으면 단일 공고 group으로 반환한다")
+    void getCanonicalGroupWithoutFingerprint() {
+        Job job = createJobEntity(1L);
+        given(jobRepository.findById(1L)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
+
+        JobCanonicalGroupResponse response = jobService.getCanonicalGroup(1L);
+
+        assertThat(response.canonicalFingerprint()).isNull();
+        assertThat(response.representativeJobId()).isEqualTo(1L);
+        assertThat(response.duplicateCount()).isZero();
+        assertThat(response.jobs()).hasSize(1);
+
+        verify(jobRepository, never()).findByCanonicalFingerprintOrderByCreatedAtDescIdDesc(any());
+    }
+
+    @Test
     @DisplayName("공고 목록을 조회한다")
     void getJobs() {
         Job job = createJobEntity(1L);
 
         given(jobRepository.findAllByOrderByCreatedAtDesc()).willReturn(List.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
 
         List<JobSummaryResponse> responses = jobService.getJobs();
 
@@ -311,6 +373,7 @@ class JobServiceTest {
         assertThat(responses.getFirst().id()).isEqualTo(1L);
         assertThat(responses.getFirst().title()).isEqualTo("백엔드 개발자");
         assertThat(responses.getFirst().status()).isEqualTo(JobStatus.OPEN);
+        assertThat(responses.getFirst().applyUrl()).isEqualTo("https://example.com/jobs/1");
     }
 
     @Test
@@ -320,6 +383,8 @@ class JobServiceTest {
 
         given(jobSearchService.search(" 백엔드 ", 20))
                 .willReturn(List.of(result));
+        given(jobApplyUrlResolver.resolve("WANTED", "367438", null, null))
+                .willReturn("https://www.wanted.co.kr/wd/367438");
 
         List<JobSearchResponse> responses = jobService.searchJobs(" 백엔드 ", 20);
 
@@ -327,6 +392,7 @@ class JobServiceTest {
         assertThat(responses.getFirst().id()).isEqualTo(1L);
         assertThat(responses.getFirst().title()).isEqualTo("백엔드 개발자");
         assertThat(responses.getFirst().score()).isEqualTo(0.42);
+        assertThat(responses.getFirst().applyUrl()).isEqualTo("https://www.wanted.co.kr/wd/367438");
 
         verify(jobSearchService).search(" 백엔드 ", 20);
     }
@@ -351,6 +417,8 @@ class JobServiceTest {
 
         given(jobSearchService.search("백엔드", 999))
                 .willReturn(List.of(result));
+        given(jobApplyUrlResolver.resolve("WANTED", "367438", null, null))
+                .willReturn("https://www.wanted.co.kr/wd/367438");
 
         List<JobSearchResponse> responses = jobService.searchJobs("백엔드", 999);
 
@@ -368,6 +436,7 @@ class JobServiceTest {
         JobUpdateRequest request = updateRequest();
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         givenRoleResolution(request, JobRole.BACKEND);
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
@@ -396,6 +465,7 @@ class JobServiceTest {
         JobUpdateRequest request = updateRequestWithEtcRole();
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         givenRoleResolution(request, JobRole.BACKEND);
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
@@ -412,6 +482,7 @@ class JobServiceTest {
         Job job = createJobEntity(jobId);
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
 
@@ -435,6 +506,7 @@ class JobServiceTest {
         Job job = createJobEntity(jobId);
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
+        given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
         given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
 
@@ -727,6 +799,8 @@ class JobServiceTest {
         return new JobSearchResult(
                 1L,
                 "WANTED",
+                "367438",
+                "jobflow|backend developer|seoul",
                 "백엔드 개발자",
                 "JobFlow",
                 JobRole.BACKEND,

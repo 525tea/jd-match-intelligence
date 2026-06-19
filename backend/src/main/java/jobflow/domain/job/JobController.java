@@ -1,6 +1,7 @@
 package jobflow.domain.job;
 
 import jakarta.validation.Valid;
+import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobCreateRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
@@ -61,6 +62,15 @@ public class JobController {
             @PathVariable Long jobId
     ) {
         JobResponse response = jobService.getJob(jobId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{jobId}/canonical-group")
+    public ResponseEntity<ApiResponse<JobCanonicalGroupResponse>> getCanonicalGroup(
+            @PathVariable Long jobId
+    ) {
+        JobCanonicalGroupResponse response = jobService.getCanonicalGroup(jobId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

@@ -90,6 +90,7 @@ export const api = {
   jobs: (params = {}) => request('/jobs', { params: { limit: 50, ...params } }),
   searchJobs: (keyword, limit = 30) => request('/jobs/search', { params: { keyword, limit } }),
   job: (jobId) => request(`/jobs/${jobId}`),
+  canonicalGroup: (jobId) => request(`/jobs/${jobId}/canonical-group`),
 
   saveJob: (jobId) => request(`/user/jobs/${jobId}/save`, { method: 'POST' }),
   viewJob: (jobId) => request(`/user/jobs/${jobId}/view`, { method: 'POST' }),

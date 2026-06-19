@@ -12,6 +12,8 @@ import jobflow.domain.job.dto.JobSearchResponse;
 public record JobSearchResult(
         Long id,
         String source,
+        String externalId,
+        String canonicalFingerprint,
         String title,
         String companyName,
         JobRole role,
@@ -29,6 +31,8 @@ public record JobSearchResult(
         return new JobSearchResult(
                 projection.getId(),
                 projection.getSource(),
+                projection.getExternalId(),
+                projection.getCanonicalFingerprint(),
                 projection.getTitle(),
                 projection.getCompanyName(),
                 JobRole.valueOf(projection.getRole()),
@@ -47,6 +51,8 @@ public record JobSearchResult(
         return new JobSearchResult(
                 Long.valueOf(document.id()),
                 document.source(),
+                document.externalId(),
+                document.canonicalFingerprint(),
                 document.title(),
                 document.companyName(),
                 JobRole.valueOf(document.role()),
@@ -61,12 +67,15 @@ public record JobSearchResult(
         );
     }
 
-    public JobSearchResponse toResponse() {
+    public JobSearchResponse toResponse(String applyUrl) {
         return new JobSearchResponse(
                 id,
                 source,
+                externalId,
+                canonicalFingerprint,
                 title,
                 companyName,
+                applyUrl,
                 role,
                 careerLevel,
                 employmentType,

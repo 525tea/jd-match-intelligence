@@ -16,11 +16,13 @@ public record JobResponse(
         Long id,
         String source,
         String externalId,
+        String canonicalFingerprint,
         String title,
         String companyName,
         String description,
         String url,
         String originalUrl,
+        String applyUrl,
         List<JobDescriptionSectionResponse> descriptionSections,
         JobRole role,
         String roleDetail,
@@ -50,17 +52,20 @@ public record JobResponse(
     public static JobResponse of(
             Job job,
             List<JobSkill> jobSkills,
-            List<JobExperienceTag> jobExperienceTags
+            List<JobExperienceTag> jobExperienceTags,
+            String applyUrl
     ) {
         return new JobResponse(
                 job.getId(),
                 job.getSource(),
                 job.getExternalId(),
+                job.getCanonicalFingerprint(),
                 job.getTitle(),
                 job.getCompanyName(),
                 job.getDescription(),
                 job.getUrl(),
                 job.getOriginalUrl(),
+                applyUrl,
                 new JobDescriptionSectionParser().parse(job.getDescription()),
                 job.getRole(),
                 job.getRoleDetail(),

@@ -89,6 +89,8 @@ class JobSearchServiceTest {
         return new JobSearchResult(
                 1L,
                 "WANTED",
+                "367438",
+                "jobflow|backend developer|seoul",
                 "백엔드 개발자",
                 "JobFlow",
                 JobRole.BACKEND,

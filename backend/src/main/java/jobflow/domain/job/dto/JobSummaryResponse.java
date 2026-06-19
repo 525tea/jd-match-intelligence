@@ -10,8 +10,12 @@ import jobflow.domain.job.RemoteType;
 
 public record JobSummaryResponse(
         Long id,
+        String source,
+        String externalId,
+        String canonicalFingerprint,
         String title,
         String companyName,
+        String applyUrl,
         JobRole role,
         CareerLevel careerLevel,
         EmploymentType employmentType,
@@ -22,11 +26,15 @@ public record JobSummaryResponse(
         JobStatus status
 ) {
 
-    public static JobSummaryResponse from(Job job) {
+    public static JobSummaryResponse from(Job job, String applyUrl) {
         return new JobSummaryResponse(
                 job.getId(),
+                job.getSource(),
+                job.getExternalId(),
+                job.getCanonicalFingerprint(),
                 job.getTitle(),
                 job.getCompanyName(),
+                applyUrl,
                 job.getRole(),
                 job.getCareerLevel(),
                 job.getEmploymentType(),

@@ -11,8 +11,11 @@ import jobflow.domain.job.RemoteType;
 public record JobSearchResponse(
         Long id,
         String source,
+        String externalId,
+        String canonicalFingerprint,
         String title,
         String companyName,
+        String applyUrl,
         JobRole role,
         CareerLevel careerLevel,
         EmploymentType employmentType,
@@ -23,22 +26,4 @@ public record JobSearchResponse(
         JobStatus status,
         Double score
 ) {
-
-    public static JobSearchResponse from(JobSearchProjection projection) {
-        return new JobSearchResponse(
-                projection.getId(),
-                projection.getSource(),
-                projection.getTitle(),
-                projection.getCompanyName(),
-                JobRole.valueOf(projection.getRole()),
-                CareerLevel.valueOf(projection.getCareerLevel()),
-                EmploymentType.valueOf(projection.getEmploymentType()),
-                projection.getLocationRegion(),
-                projection.getLocationCity(),
-                RemoteType.valueOf(projection.getRemoteType()),
-                projection.getDeadlineAt(),
-                JobStatus.valueOf(projection.getStatus()),
-                projection.getScore()
-        );
-    }
 }

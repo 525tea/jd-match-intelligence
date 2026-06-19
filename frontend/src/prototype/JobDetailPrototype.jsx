@@ -1,4 +1,5 @@
 import React from 'react';
+import { api } from '../api/client.js';
 import { jobflowActions } from '../api/jobflowActions.js';
 import { getJobflowState } from './jobflowState.js';
 
@@ -11,6 +12,8 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const [saved, setSaved] = React.useState(false);
   const [applied, setApplied] = React.useState(false);
   const [hidden, setHidden] = React.useState(false);
+  const [canonicalGroup, setCanonicalGroup] = React.useState(null);
+  const [canonicalGroupStatus, setCanonicalGroupStatus] = React.useState('idle');
   const fire = (label) => {
     setToast(label);
     clearTimeout(toastTimerRef.current);
@@ -226,6 +229,27 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     else if (trackingCompany) jobflowActions.viewJobByCompany?.(trackingCompany);
   }, [trackingCompany, trackingJobId]);
 
+  React.useEffect(() => {
+    setCanonicalGroup(null);
+    setCanonicalGroupStatus('idle');
+    if (!trackingJobId) return undefined;
+
+    let alive = true;
+    setCanonicalGroupStatus('loading');
+    api.canonicalGroup(trackingJobId)
+      .then((group) => {
+        if (!alive) return;
+        setCanonicalGroup(group || null);
+        setCanonicalGroupStatus(group ? 'ok' : 'empty');
+      })
+      .catch(() => {
+        if (!alive) return;
+        setCanonicalGroupStatus('error');
+      });
+
+    return () => { alive = false; };
+  }, [trackingJobId]);
+
   if (!m && !l && loading) {
     return (
       <div style={{ minHeight: '100vh', background: '#ffffff', fontFamily: font, color: ink }}>
@@ -275,6 +299,8 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     views: (m && m.views) || (l && l.views) || 0,
     applicants: (m && m.applicants) || (l && l.applicants) || 0,
     companyIntro: (m && m.companyIntro) || '',
+    canonicalFingerprint: (m && m.canonicalFingerprint) || (l && l.canonicalFingerprint) || '',
+    applyUrl: (m && m.applyUrl) || (l && l.applyUrl) || '',
     originalUrl: (m && m.originalUrl) || (l && l.originalUrl) || '',
     desc: (m && m.desc) || (l && l.desc) || '공고 상세 설명이 제공되지 않았습니다.',
     descriptionSections: (m && m.descriptionSections) || (l && l.descriptionSections) || [],
@@ -296,12 +322,23 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const Stat = ({ label, value, tone }) => <div style={{ background: tone === 'green' ? greenTint : tone === 'coral' ? coralTint : soft, border: '1px solid ' + (tone === 'green' ? greenTintBd : tone === 'coral' ? coralTintBd : line), borderRadius: 14, padding: '13px 14px' }}><b style={{ fontSize: 23, color: tone === 'coral' ? coralDeep : ink, ...num }}>{value}</b><div style={{ color: tone === 'green' ? greenInk : muted, fontSize: 11.5, fontWeight: 800, marginTop: 2 }}>{label}</div></div>;
   const Bar = ({ label, value }) => <div style={{ marginBottom: 12 }}><div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 700, color: 'rgba(255,255,255,0.65)', marginBottom: 5 }}><span>{label}</span><span style={{ color: '#fff', ...num }}>{value}%</span></div><div style={{ height: 9, background: 'rgba(255,255,255,0.12)', borderRadius: 5, overflow: 'hidden' }}><div style={{ width: value + '%', height: '100%', background: green, borderRadius: 5 }} /></div></div>;
   const btn = (label, active, onClick, primary, icon) => <button className="jf-cta" onClick={onClick} disabled={active} style={{ font: 'inherit', flex: narrow ? '1 1 calc(50% - 6px)' : 1, minWidth: narrow ? 'calc(50% - 6px)' : 0, cursor: active ? 'default' : 'pointer', borderRadius: 12, padding: '13px 12px', fontSize: 14.5, fontWeight: 760, lineHeight: 1.15, border: primary ? 'none' : '1px solid ' + line, background: active ? soft : primary ? green : card, color: active ? muted : ink, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, whiteSpace: 'nowrap' }}>{icon}{label}</button>;
+  const duplicateJobs = canonicalGroup?.jobs || [];
+  const representativeApplyUrl = canonicalGroup?.representativeApplyUrl || job.applyUrl || job.originalUrl;
+  const representativeJobId = canonicalGroup?.representativeJobId;
+  const canonicalDuplicateCount = Number(canonicalGroup?.duplicateCount || 0);
+  const sourceLabel = (source) => ({
+    WANTED: '원티드',
+    JUMPIT: '점핏',
+    SARAMIN: '사람인',
+    ZIGHANG: '직행',
+    CANONICAL_SMOKE: '스모크',
+  }[source] || source || '출처');
   const openOriginalJob = () => {
-    if (!job.originalUrl) {
+    if (!representativeApplyUrl) {
       fire('원본 공고 URL이 없습니다.');
       return;
     }
-    window.open(job.originalUrl, '_blank', 'noopener,noreferrer');
+    window.open(representativeApplyUrl, '_blank', 'noopener,noreferrer');
   };
   const cleanItemText = (value) => String(value || '')
     .replace(/^\d+\.\s*/u, '')
@@ -570,6 +607,51 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       {similarJobs.length ? similarJobs.map((r) => <div key={(r.jobId || r.id || '') + r.companyKo} onClick={() => go('detail', { jobId: r.jobId || r.id, company: r.companyKo })} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '11px 0', borderTop: '1px solid ' + line, cursor: 'pointer' }}><div style={{ width: 36, height: 36, borderRadius: 11, background: ink, color: green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 13, flexShrink: 0 }}>{r.logo}</div><div style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 14, fontWeight: 650 }}>{r.companyKo}</span><div style={{ color: muted, fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title} · {r.level}</div></div>{showScore && <b style={{ color: greenInk, ...num }}>{r.score}%</b>}</div>) : <div style={{ color: muted, fontSize: 13, lineHeight: 1.55, borderTop: '1px solid ' + line, paddingTop: 12 }}>현재 프로젝트 기준으로 표시할 추가 추천 공고가 없습니다.</div>}
     </div>;
   };
+  const CanonicalGroupCard = () => {
+    const hasGroup = canonicalGroupStatus === 'ok' && canonicalGroup;
+    const representativeItem = hasGroup
+      ? duplicateJobs.find((item) => item.representative) || duplicateJobs.find((item) => String(item.id) === String(representativeJobId))
+      : null;
+    const visibleJobs = hasGroup ? duplicateJobs.slice(0, 4) : [];
+
+    return (
+      <div style={{ background: card, border: '1px solid ' + line, borderRadius: 18, padding: 20, boxShadow: shadow }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: 1, color: faint, textTransform: 'uppercase' }}>Apply Route</div>
+            <div style={{ fontSize: 16, fontWeight: 900, marginTop: 5 }}>지원 경로</div>
+          </div>
+          {canonicalDuplicateCount > 0 && <span style={{ background: greenTint, color: greenInk, border: '1px solid ' + greenTintBd, borderRadius: 999, padding: '5px 9px', fontSize: 11.5, fontWeight: 900, whiteSpace: 'nowrap' }}>중복 {canonicalDuplicateCount}건</span>}
+        </div>
+        <p style={{ margin: '10px 0 0', color: muted, fontSize: 13, lineHeight: 1.58 }}>
+          {hasGroup
+            ? '같은 공고 후보를 묶고, 회사 원문 링크가 있으면 대표 지원 경로로 우선 사용해요.'
+            : canonicalGroupStatus === 'loading'
+            ? '지원 경로를 확인하는 중입니다.'
+            : '현재 공고의 지원 링크를 바로 열 수 있어요.'}
+        </p>
+        <button onClick={openOriginalJob} style={{ font: 'inherit', cursor: 'pointer', width: '100%', marginTop: 14, border: 'none', background: ink, color: '#fff', borderRadius: 13, padding: '12px 14px', fontWeight: 900 }}>
+          대표 지원 링크 열기 →
+        </button>
+        {representativeItem && <div style={{ marginTop: 10, color: muted, fontSize: 12.5, lineHeight: 1.55, wordBreak: 'keep-all' }}>
+          대표 출처: <b style={{ color: ink }}>{sourceLabel(representativeItem.source)}</b>
+        </div>}
+        {visibleJobs.length > 1 && <div style={{ marginTop: 14, borderTop: '1px solid ' + line, paddingTop: 12, display: 'grid', gap: 8 }}>
+          {visibleJobs.map((item) => (
+            <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center', minWidth: 0 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 850, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sourceLabel(item.source)} · {item.companyName}</div>
+                <div style={{ color: faint, fontSize: 11.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 900, color: item.representative ? greenInk : muted, background: item.representative ? greenTint : soft, border: '1px solid ' + (item.representative ? greenTintBd : line), borderRadius: 999, padding: '4px 8px', whiteSpace: 'nowrap' }}>
+                {item.representative ? '대표' : '후보'}
+              </span>
+            </div>
+          ))}
+        </div>}
+      </div>
+    );
+  };
   const parsedDescription = parseDescriptionSections(job.desc);
   const bullets = {
     required: reqList.length ? reqList : parsedDescription.required,
@@ -685,6 +767,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
                 <button onClick={() => go('gap')} style={{ font: 'inherit', cursor: 'pointer', width: '100%', marginTop: 16, border: 'none', background: green, color: ink, borderRadius: 12, padding: 12, fontWeight: 900 }}>부족 스킬 갭 분석 보기 →</button>
               </div>
 
+              <CanonicalGroupCard />
               <SimilarJobsCard showScore />
             </aside>
           ) : (
@@ -696,6 +779,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
                 <button onClick={() => go('login')} style={{ font: 'inherit', cursor: 'pointer', width: '100%', border: 'none', background: green, color: ink, borderRadius: 12, padding: 12, fontWeight: 900 }}>GitHub 연결하고 매칭 보기</button>
               </div>
 
+              <CanonicalGroupCard />
               <SimilarJobsCard />
             </aside>
           )}
