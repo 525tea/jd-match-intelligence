@@ -155,6 +155,47 @@ class JumpitJobPostingParserTest {
     }
 
     @Test
+    @DisplayName("점핏 description에서 공고 본문이 아닌 CTA footer 노이즈를 제거한다")
+    void removeFooterNoise() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.JUMPIT,
+                "jumpit-101",
+                "https://jumpit.saramin.co.kr/position/jumpit-101",
+                "https://jumpit.saramin.co.kr/position/jumpit-101",
+                """
+                        <html>
+                          <body>
+                            <main>
+                              <h1>Backend Engineer</h1>
+                              <a href="/company/example-labs">Example Labs</a>
+                              <section data-testid="position-description">
+                                주요업무
+                                • Java 기반 API 개발
+                                자격요건
+                                • 백엔드 개발 경험 3년 이상
+                                기업/서비스 소개
+                                기업상세 정보로 이동 1 / 6
+                                Example Labs는 채용 데이터를 분석하는 회사입니다.
+                                최종 합격하면 취업축하금 50만원 Example Labs 기업정보 보기 업력 3년차 홈페이지 바로가기 지원하기 지원하기 스크랩 공유 면접 예상 질문을 받아보세요! AI 면접 코치
+                              </section>
+                            </main>
+                          </body>
+                        </html>
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.description())
+                .contains("기업/서비스 소개")
+                .contains("Example Labs는 채용 데이터를 분석하는 회사입니다.")
+                .doesNotContain("기업상세 정보로 이동")
+                .doesNotContain("최종 합격하면 취업축하금")
+                .doesNotContain("지원하기 지원하기")
+                .doesNotContain("AI 면접 코치");
+    }
+
+    @Test
     @DisplayName("직무 탐색 페이지 제목은 공고로 파싱하지 않는다")
     void rejectExplorePageTitle() {
         FetchedJobPosting fetched = new FetchedJobPosting(

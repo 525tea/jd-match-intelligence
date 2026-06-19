@@ -215,9 +215,22 @@ public class JumpitJobPostingParser implements JobPostingParser {
         );
         normalized = normalized.replaceAll("\\s+([•ㆍ])\\s*", "\n$1 ");
         normalized = normalized.replaceAll("\\s+(\\[[^\\]\\n]{2,40}])\\s*", "\n$1\n");
+        normalized = removeJumpitFooterNoise(normalized);
         normalized = normalized.replaceAll("\\n{3,}", "\n\n");
 
         return normalized.trim();
+    }
+
+    private String removeJumpitFooterNoise(String value) {
+        String cleaned = value;
+
+        cleaned = cleaned.replaceAll("기업상세 정보로 이동\\s*\\d+\\s*/\\s*\\d+\\s*", "");
+        cleaned = cleaned.replaceAll("지도보기\\s*·?\\s*주소복사", "");
+        cleaned = cleaned.replaceAll("홈페이지 바로가기\\s*", "");
+        cleaned = cleaned.replaceAll("지원하기\\s+지원하기\\s+스크랩\\s+공유.*$", "");
+        cleaned = cleaned.replaceAll("최종 합격하면 취업축하금\\s*50만원.*$", "");
+
+        return cleaned.trim();
     }
 
     private void validateRequired(
