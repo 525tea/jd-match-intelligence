@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	id 'jacoco'
 	id 'org.springframework.boot' version '4.0.6'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -11,6 +12,10 @@ java {
 	toolchain {
 		languageVersion = JavaLanguageVersion.of(21)
 	}
+}
+
+jacoco {
+	toolVersion = '0.8.13'
 }
 
 repositories {
@@ -54,6 +59,68 @@ dependencies {
 	testAnnotationProcessor 'org.projectlombok:lombok'
 }
 
+def jacocoExcludes = [
+		'jobflow/BackendApplication.class',
+		'jobflow/**/dto/**',
+		'jobflow/**/config/**',
+		'jobflow/global/config/**',
+		'jobflow/global/response/**',
+		'jobflow/global/error/**',
+		'jobflow/**/**Request.class',
+		'jobflow/**/**Response.class',
+		'jobflow/**/**Dto.class',
+		'jobflow/**/**Properties.class',
+		'jobflow/**/**Exception.class',
+		'jobflow/**/**Status.class',
+		'jobflow/**/**Type.class',
+		'jobflow/**/**Role.class',
+		'jobflow/**/**Level.class',
+		'jobflow/**/**Source.class',
+		'jobflow/**/**Event.class',
+		'jobflow/**/**Payload.class'
+]
+
+def jacocoClassDirectories = {
+	files(sourceSets.main.output.classesDirs.collect {
+		fileTree(dir: it, exclude: jacocoExcludes)
+	})
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
+	finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+
+	reports {
+		xml.required = true
+		html.required = true
+		csv.required = false
+	}
+
+	classDirectories.setFrom(jacocoClassDirectories())
+}
+
+tasks.named('jacocoTestCoverageVerification') {
+	dependsOn tasks.named('test')
+
+	classDirectories.setFrom(jacocoClassDirectories())
+
+	violationRules {
+		rule {
+			element = 'BUNDLE'
+
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.80
+			}
+		}
+	}
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('jacocoTestCoverageVerification')
 }
