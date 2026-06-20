@@ -36,6 +36,8 @@ class ElasticsearchJobSearchServiceTest {
     @Mock
     private JobSearchQueryExpansionService jobSearchQueryExpansionService;
 
+    private final JobSearchIntentParser jobSearchIntentParser = new JobSearchIntentParser();
+
     @Mock
     private SearchHits<JobSearchDocument> searchHits;
 
@@ -56,11 +58,12 @@ class ElasticsearchJobSearchServiceTest {
         ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
                 elasticsearchOperations,
                 jobSearchProperties,
-                jobSearchQueryExpansionService
+                jobSearchQueryExpansionService,
+                jobSearchIntentParser
         );
         JobSearchDocument document = document();
 
-        given(jobSearchQueryExpansionService.expand("백엔드"))
+        given(jobSearchQueryExpansionService.expand("QueryDSL"))
                 .willReturn(List.of());
         given(elasticsearchOperations.search(
                 any(NativeQuery.class),
@@ -71,7 +74,7 @@ class ElasticsearchJobSearchServiceTest {
         given(searchHit.getContent()).willReturn(document);
         given(searchHit.getScore()).willReturn(3.5f);
 
-        List<JobSearchResult> results = service.search(" 백엔드 ", 10);
+        List<JobSearchResult> results = service.search(" QueryDSL ", 10);
 
         assertThat(results).hasSize(1);
         assertThat(results.getFirst().id()).isEqualTo(1L);
@@ -85,13 +88,13 @@ class ElasticsearchJobSearchServiceTest {
                 eq(JobSearchDocument.class),
                 eq(IndexCoordinates.of("jobflow-jobs"))
         );
-        verify(jobSearchQueryExpansionService).expand("백엔드");
+        verify(jobSearchQueryExpansionService).expand("QueryDSL");
 
         Query capturedQuery = queryCaptor.getValue().getQuery();
 
         assertThat(capturedQuery.isFunctionScore()).isTrue();
         assertThat(capturedQuery.functionScore().query().isMultiMatch()).isTrue();
-        assertThat(capturedQuery.functionScore().query().multiMatch().query()).isEqualTo("백엔드");
+        assertThat(capturedQuery.functionScore().query().multiMatch().query()).isEqualTo("QueryDSL");
         assertThat(capturedQuery.functionScore().query().multiMatch().operator()).isNull();
         assertThat(capturedQuery.functionScore().functions()).hasSize(2);
         assertThat(capturedQuery.functionScore().functions().getFirst().filter().exists().field())
@@ -107,7 +110,8 @@ class ElasticsearchJobSearchServiceTest {
         ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
                 elasticsearchOperations,
                 jobSearchProperties,
-                jobSearchQueryExpansionService
+                jobSearchQueryExpansionService,
+                jobSearchIntentParser
         );
         JobSearchDocument document = document();
 
@@ -158,7 +162,8 @@ class ElasticsearchJobSearchServiceTest {
         ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
                 elasticsearchOperations,
                 jobSearchProperties,
-                jobSearchQueryExpansionService
+                jobSearchQueryExpansionService,
+                jobSearchIntentParser
         );
         JobSearchDocument document = document();
 
@@ -206,7 +211,8 @@ class ElasticsearchJobSearchServiceTest {
         ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
                 elasticsearchOperations,
                 disabledExpansionProperties,
-                jobSearchQueryExpansionService
+                jobSearchQueryExpansionService,
+                jobSearchIntentParser
         );
         JobSearchDocument document = document();
 
@@ -244,7 +250,8 @@ class ElasticsearchJobSearchServiceTest {
         ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
                 elasticsearchOperations,
                 jobSearchProperties,
-                jobSearchQueryExpansionService
+                jobSearchQueryExpansionService,
+                jobSearchIntentParser
         );
 
         List<JobSearchResult> results = service.search(" ", 10);
@@ -257,6 +264,58 @@ class ElasticsearchJobSearchServiceTest {
                 eq(JobSearchDocument.class),
                 any(IndexCoordinates.class)
         );
+    }
+
+    @Test
+    @DisplayName("검색어에서 감지한 role, career, location 의도를 낮은 should boost로 추가한다")
+    void searchWithParsedIntentBoosts() {
+        ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
+                elasticsearchOperations,
+                jobSearchProperties,
+                jobSearchQueryExpansionService,
+                jobSearchIntentParser
+        );
+        JobSearchDocument document = document();
+
+        given(jobSearchQueryExpansionService.expand("backend junior seoul"))
+                .willReturn(List.of());
+        given(elasticsearchOperations.search(
+                any(NativeQuery.class),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        )).willReturn(searchHits);
+        given(searchHits.stream()).willReturn(Stream.of(searchHit));
+        given(searchHit.getContent()).willReturn(document);
+        given(searchHit.getScore()).willReturn(4.5f);
+
+        List<JobSearchResult> results = service.search(" backend junior seoul ", 10);
+
+        assertThat(results).hasSize(1);
+
+        ArgumentCaptor<NativeQuery> queryCaptor = ArgumentCaptor.forClass(NativeQuery.class);
+        verify(elasticsearchOperations).search(
+                queryCaptor.capture(),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        );
+
+        Query searchQuery = queryCaptor.getValue().getQuery().functionScore().query();
+
+        assertThat(searchQuery.isBool()).isTrue();
+        assertThat(searchQuery.bool().must()).hasSize(1);
+        assertThat(searchQuery.bool().must().getFirst().multiMatch().query())
+                .isEqualTo("backend junior seoul");
+        assertThat(searchQuery.bool().should()).hasSize(3);
+        assertThat(searchQuery.bool().should().get(0).term().field()).isEqualTo("role");
+        assertThat(searchQuery.bool().should().get(0).term().value().stringValue()).isEqualTo("BACKEND");
+        assertThat(searchQuery.bool().should().get(0).term().boost()).isEqualTo(2.8f);
+        assertThat(searchQuery.bool().should().get(1).term().field()).isEqualTo("careerLevel");
+        assertThat(searchQuery.bool().should().get(1).term().value().stringValue()).isEqualTo("JUNIOR");
+        assertThat(searchQuery.bool().should().get(1).term().boost()).isEqualTo(1.8f);
+        assertThat(searchQuery.bool().should().get(2).match().field()).isEqualTo("locationRegion");
+        assertThat(searchQuery.bool().should().get(2).match().query().stringValue()).isEqualTo("Seoul");
+        assertThat(searchQuery.bool().should().get(2).match().boost()).isEqualTo(1.4f);
+        assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
     }
 
     private JobSearchDocument document() {
