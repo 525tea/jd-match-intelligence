@@ -21,12 +21,16 @@ public class ElasticsearchJobSearchService {
     private static final int DEFAULT_LIMIT = 20;
     private static final int MAX_LIMIT = 100;
     private static final float EXPANSION_BOOST = 0.05f;
+    private static final float ROLE_INTENT_BOOST = 2.8f;
+    private static final float CAREER_INTENT_BOOST = 1.8f;
+    private static final float LOCATION_INTENT_BOOST = 1.4f;
     private static final String DEADLINE_AT_FIELD = "deadlineAt";
     private static final String CREATED_AT_FIELD = "createdAt";
 
     private final ElasticsearchOperations elasticsearchOperations;
     private final JobSearchProperties jobSearchProperties;
     private final JobSearchQueryExpansionService jobSearchQueryExpansionService;
+    private final JobSearchIntentParser jobSearchIntentParser;
 
     public List<JobSearchResult> search(String keyword, int limit) {
         String normalizedKeyword = keyword == null ? "" : keyword.trim();
@@ -35,10 +39,11 @@ public class ElasticsearchJobSearchService {
         }
 
         List<String> expandedKeywords = expandKeyword(normalizedKeyword);
+        JobSearchIntent intent = jobSearchIntentParser.parse(normalizedKeyword);
 
         NativeQuery query = NativeQuery.builder()
                 .withQuery(q -> q.functionScore(fs -> fs
-                        .query(searchQuery(normalizedKeyword, expandedKeywords))
+                        .query(searchQuery(normalizedKeyword, expandedKeywords, intent))
                         .functions(f -> f
                                 .filter(existsQuery(DEADLINE_AT_FIELD))
                                 .weight(1.4)
@@ -83,15 +88,27 @@ public class ElasticsearchJobSearchService {
                 .toList();
     }
 
-    private Query searchQuery(String keyword, List<String> expandedKeywords) {
-        if (expandedKeywords.isEmpty()) {
+    private Query searchQuery(String keyword, List<String> expandedKeywords, JobSearchIntent intent) {
+        if (expandedKeywords.isEmpty() && !intent.hasAnySignal()) {
             return primaryKeywordQuery(keyword);
         }
 
         return Query.of(q -> q.bool(b -> {
             b.must(primaryKeywordQuery(keyword));
+            intent.requiredSkillKeywords().forEach(requiredSkillKeyword ->
+                    b.must(requiredSkillKeywordQuery(requiredSkillKeyword))
+            );
             expandedKeywords.forEach(expandedKeyword ->
                     b.should(expansionKeywordQuery(expandedKeyword))
+            );
+            intent.roles().forEach(role ->
+                    b.should(keywordIntentQuery("role", role.name(), ROLE_INTENT_BOOST))
+            );
+            intent.careerLevels().forEach(careerLevel ->
+                    b.should(keywordIntentQuery("careerLevel", careerLevel.name(), CAREER_INTENT_BOOST))
+            );
+            intent.locationRegions().forEach(locationRegion ->
+                    b.should(textIntentQuery("locationRegion", locationRegion, LOCATION_INTENT_BOOST))
             );
             return b.minimumShouldMatch("0");
         }));
@@ -130,6 +147,35 @@ public class ElasticsearchJobSearchService {
                         "roleDetail^1.5",
                         "industry"
                 )
+        ));
+    }
+
+    private Query requiredSkillKeywordQuery(String keyword) {
+        return Query.of(q -> q.multiMatch(m -> m
+                .query(keyword)
+                .operator(Operator.And)
+                .fields(
+                        "title^3",
+                        "description",
+                        "roleDetail^2",
+                        "industry"
+                )
+        ));
+    }
+
+    private Query keywordIntentQuery(String field, String value, float boost) {
+        return Query.of(q -> q.term(t -> t
+                .field(field)
+                .value(value)
+                .boost(boost)
+        ));
+    }
+
+    private Query textIntentQuery(String field, String value, float boost) {
+        return Query.of(q -> q.match(m -> m
+                .field(field)
+                .query(value)
+                .boost(boost)
         ));
     }
 
