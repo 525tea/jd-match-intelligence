@@ -95,6 +95,9 @@ public class ElasticsearchJobSearchService {
 
         return Query.of(q -> q.bool(b -> {
             b.must(primaryKeywordQuery(keyword));
+            intent.requiredSkillKeywords().forEach(requiredSkillKeyword ->
+                    b.must(requiredSkillKeywordQuery(requiredSkillKeyword))
+            );
             expandedKeywords.forEach(expandedKeyword ->
                     b.should(expansionKeywordQuery(expandedKeyword))
             );
@@ -142,6 +145,19 @@ public class ElasticsearchJobSearchService {
                 .fields(
                         "description",
                         "roleDetail^1.5",
+                        "industry"
+                )
+        ));
+    }
+
+    private Query requiredSkillKeywordQuery(String keyword) {
+        return Query.of(q -> q.multiMatch(m -> m
+                .query(keyword)
+                .operator(Operator.And)
+                .fields(
+                        "title^3",
+                        "description",
+                        "roleDetail^2",
                         "industry"
                 )
         ));

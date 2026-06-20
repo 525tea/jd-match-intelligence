@@ -51,16 +51,29 @@ public class JobSearchIntentParser {
             Map.entry("Jeju", List.of("jeju", "제주"))
     );
 
+    private static final Map<String, List<String>> REQUIRED_SKILL_KEYWORDS = Map.ofEntries(
+            Map.entry("C++", List.of("c++", "cplusplus")),
+            Map.entry("C#", List.of("c#", "csharp")),
+            Map.entry("Node.js", List.of("node.js", "nodejs")),
+            Map.entry(".NET", List.of(".net", "dotnet")),
+            Map.entry("ASP.NET", List.of("asp.net", "aspnet")),
+            Map.entry("Objective-C", List.of("objective-c", "objectivec")),
+            Map.entry("Kubernetes", List.of("kubernetes", "k8s", "쿠버네티스")),
+            Map.entry("React", List.of("react")),
+            Map.entry("Spring Boot", List.of("spring boot", "스프링 부트"))
+    );
+
     public JobSearchIntent parse(String keyword) {
         String normalizedKeyword = normalize(keyword);
         if (normalizedKeyword.isBlank()) {
-            return new JobSearchIntent(List.of(), List.of(), List.of());
+            return new JobSearchIntent(List.of(), List.of(), List.of(), List.of());
         }
 
         return new JobSearchIntent(
                 findMatchingRoles(normalizedKeyword),
                 findMatchingCareerLevels(normalizedKeyword),
-                findMatchingLocationRegions(normalizedKeyword)
+                findMatchingLocationRegions(normalizedKeyword),
+                findMatchingRequiredSkillKeywords(normalizedKeyword)
         );
     }
 
@@ -92,6 +105,16 @@ public class JobSearchIntentParser {
             }
         });
         return List.copyOf(locationRegions);
+    }
+
+    private List<String> findMatchingRequiredSkillKeywords(String normalizedKeyword) {
+        List<String> requiredSkillKeywords = new ArrayList<>();
+        REQUIRED_SKILL_KEYWORDS.forEach((skillKeyword, keywords) -> {
+            if (containsAny(normalizedKeyword, keywords)) {
+                requiredSkillKeywords.add(skillKeyword);
+            }
+        });
+        return List.copyOf(requiredSkillKeywords);
     }
 
     private boolean containsAny(String normalizedKeyword, List<String> keywords) {

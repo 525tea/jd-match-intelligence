@@ -318,6 +318,53 @@ class ElasticsearchJobSearchServiceTest {
         assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
     }
 
+    @Test
+    @DisplayName("명시 기술 토큰은 선택적 must 검색어로 추가한다")
+    void searchWithRequiredSkillKeyword() {
+        ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
+                elasticsearchOperations,
+                jobSearchProperties,
+                jobSearchQueryExpansionService,
+                jobSearchIntentParser
+        );
+        JobSearchDocument document = document();
+
+        given(jobSearchQueryExpansionService.expand("C++ 개발자"))
+                .willReturn(List.of());
+        given(elasticsearchOperations.search(
+                any(NativeQuery.class),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        )).willReturn(searchHits);
+        given(searchHits.stream()).willReturn(Stream.of(searchHit));
+        given(searchHit.getContent()).willReturn(document);
+        given(searchHit.getScore()).willReturn(4.5f);
+
+        List<JobSearchResult> results = service.search(" C++ 개발자 ", 10);
+
+        assertThat(results).hasSize(1);
+
+        ArgumentCaptor<NativeQuery> queryCaptor = ArgumentCaptor.forClass(NativeQuery.class);
+        verify(elasticsearchOperations).search(
+                queryCaptor.capture(),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        );
+
+        Query searchQuery = queryCaptor.getValue().getQuery().functionScore().query();
+
+        assertThat(searchQuery.isBool()).isTrue();
+        assertThat(searchQuery.bool().must()).hasSize(2);
+        assertThat(searchQuery.bool().must().getFirst().multiMatch().query())
+                .isEqualTo("C++ 개발자");
+        assertThat(searchQuery.bool().must().get(1).multiMatch().query())
+                .isEqualTo("C++");
+        assertThat(searchQuery.bool().must().get(1).multiMatch().operator())
+                .isEqualTo(Operator.And);
+        assertThat(searchQuery.bool().should()).isEmpty();
+        assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
+    }
+
     private JobSearchDocument document() {
         return new JobSearchDocument(
                 "1",

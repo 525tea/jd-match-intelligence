@@ -19,6 +19,7 @@ class JobSearchIntentParserTest {
         assertThat(intent.roles()).containsExactly(JobRole.BACKEND);
         assertThat(intent.careerLevels()).containsExactly(CareerLevel.JUNIOR);
         assertThat(intent.locationRegions()).containsExactly("Seoul");
+        assertThat(intent.requiredSkillKeywords()).isEmpty();
         assertThat(intent.hasAnySignal()).isTrue();
     }
 
@@ -30,6 +31,7 @@ class JobSearchIntentParserTest {
         assertThat(intent.roles()).containsExactly(JobRole.BACKEND);
         assertThat(intent.careerLevels()).containsExactly(CareerLevel.JUNIOR);
         assertThat(intent.locationRegions()).containsExactly("Seoul");
+        assertThat(intent.requiredSkillKeywords()).isEmpty();
     }
 
     @Test
@@ -40,6 +42,28 @@ class JobSearchIntentParserTest {
         assertThat(intent.roles()).isEmpty();
         assertThat(intent.careerLevels()).isEmpty();
         assertThat(intent.locationRegions()).isEmpty();
+        assertThat(intent.requiredSkillKeywords()).isEmpty();
         assertThat(intent.hasAnySignal()).isFalse();
+    }
+
+    @Test
+    @DisplayName("명시 기술 토큰은 선택적 must 검색어로 추출한다")
+    void parseRequiredSkillKeyword() {
+        JobSearchIntent intent = parser.parse("C++ 개발자");
+
+        assertThat(intent.roles()).isEmpty();
+        assertThat(intent.careerLevels()).isEmpty();
+        assertThat(intent.locationRegions()).isEmpty();
+        assertThat(intent.requiredSkillKeywords()).containsExactly("C++");
+        assertThat(intent.hasAnySignal()).isTrue();
+    }
+
+    @Test
+    @DisplayName("정규화되는 기술 토큰도 선택적 must 검색어로 추출한다")
+    void parseNormalizedRequiredSkillKeyword() {
+        JobSearchIntent intent = parser.parse("Node.js 백엔드");
+
+        assertThat(intent.roles()).containsExactly(JobRole.BACKEND);
+        assertThat(intent.requiredSkillKeywords()).containsExactly("Node.js");
     }
 }
