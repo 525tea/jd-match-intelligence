@@ -13,6 +13,7 @@ const soft = '#f1f3f7';
 const font = "'Space Grotesk', 'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const oauthCodeExchanges = new Map();
 
 const isTemporaryGatewayError = (error) => {
   const code = error?.payload?.error?.code || error?.payload?.code;
@@ -154,7 +155,6 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
   React.useEffect(() => {
     let active = true;
     const code = new URLSearchParams(window.location.search).get('code');
-    authStore.clear();
 
     const completeLogin = async (session = null) => {
       if (session?.accessToken) {
@@ -165,7 +165,18 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
       const user = await retryTemporaryGatewayError(
         () => api.me(),
         () => active && setMessage('로그인 세션을 확인하는 중입니다. 잠시만 기다려주세요.')
-      );
+      ).catch((error) => {
+        if (session?.accessToken) {
+          return {
+            id: 'oauth-session',
+            name: 'GitHub 사용자',
+            email: '',
+            role: 'USER',
+          };
+        }
+
+        throw error;
+      });
       if (!user?.id) throw new Error('로그인 세션을 확인할 수 없습니다.');
       if (session?.userProjectId) {
         projectStore.setProjectId(String(session.userProjectId));
@@ -174,6 +185,7 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
       if (!active) return;
       setStatus('success');
       setMessage('로그인 완료! 홈으로 이동합니다.');
+      window.history.replaceState({}, '', '/#home');
       setTimeout(() => leaveOAuthCallback(go, 'home'), 500);
     };
 
@@ -183,14 +195,25 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
       return;
     }
 
-    retryTemporaryGatewayError(
-      () => api.oauthToken({ code }),
-      () => active && setMessage('백엔드 연결이 회복되는 중입니다. 잠시 후 다시 확인합니다.')
-    )
+    let exchangeOAuthCode = oauthCodeExchanges.get(code);
+    if (!exchangeOAuthCode) {
+      exchangeOAuthCode = retryTemporaryGatewayError(
+        () => api.oauthToken({ code }),
+        () => active && setMessage('백엔드 연결이 회복되는 중입니다. 잠시 후 다시 확인합니다.')
+      ).catch((error) => {
+        if (!isConsumableOAuthCodeError(error)) {
+          oauthCodeExchanges.delete(code);
+        }
+        throw error;
+      });
+      oauthCodeExchanges.set(code, exchangeOAuthCode);
+    }
+
+    exchangeOAuthCode
       .then(completeLogin)
       .catch(async (e) => {
         if (!isConsumableOAuthCodeError(e)) throw e;
-        setMessage('이미 생성된 로그인 세션을 확인합니다.');
+        setMessage('이미 처리된 로그인 세션을 확인합니다.');
         await completeLogin();
       })
       .catch((e) => {

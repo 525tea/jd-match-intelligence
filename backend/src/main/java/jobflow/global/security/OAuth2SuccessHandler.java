@@ -18,6 +18,8 @@ import jobflow.domain.user.User;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -32,6 +34,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Component
 @RequiredArgsConstructor
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(OAuth2SuccessHandler.class);
 
     private final OAuth2AuthService oAuth2AuthService;
     private final OAuth2AuthorizationCodeStore authorizationCodeStore;
@@ -69,6 +73,13 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         );
 
         OAuth2AuthorizationCode authorizationCode = authorizationCodeStore.save(user.getId());
+
+        log.info(
+                "OAuth2 login succeeded. provider={}, userId={}, redirectUri={}",
+                resolvedUserInfo.getProvider(),
+                user.getId(),
+                oAuth2Properties.successRedirectUri()
+        );
 
         String redirectUri = UriComponentsBuilder
                 .fromUriString(oAuth2Properties.successRedirectUri())
