@@ -69,4 +69,23 @@ public class User extends BaseTimeEntity {
         user.providerId = providerId;
         return user;
     }
+
+    public static User admin(String email, String passwordHash, String name) {
+        User user = new User();
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.name = name;
+        user.role = UserRole.ADMIN;
+        user.authProvider = AuthProvider.LOCAL;
+        user.providerId = null;
+        return user;
+    }
+
+    public void promoteToAdmin() {
+        this.role = UserRole.ADMIN;
+    }
+
+    public void updatePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
 }

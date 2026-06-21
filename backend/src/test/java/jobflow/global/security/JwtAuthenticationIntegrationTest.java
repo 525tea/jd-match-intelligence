@@ -8,6 +8,7 @@ import jobflow.domain.job.JobStatus;
 import jobflow.domain.job.JobService;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
+import jobflow.domain.user.UserRole;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +18,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 import javax.crypto.SecretKey;
@@ -184,12 +186,76 @@ class JwtAuthenticationIntegrationTest {
                 .andExpect(jsonPath("$.error.message").value("접근 권한이 없습니다."));
     }
 
+    @Test
+    @DisplayName("ADMIN 권한이면 기준 데이터 생성 API를 호출할 수 있다")
+    void requestAdminApiWithAdminRole() throws Exception {
+        User admin = saveAdminUser("admin-api@example.com");
+        String accessToken = jwtTokenProvider.createAccessToken(admin);
+
+        String requestBody = """
+                {
+                  "name": "Admin Managed Skill",
+                  "normalizedName": "admin managed skill",
+                  "category": "FRAMEWORK"
+                }
+                """;
+
+        mockMvc.perform(post("/skills")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.name").value("Admin Managed Skill"));
+    }
+
+    @Test
+    @DisplayName("ADMIN API는 토큰이 없으면 401, USER 토큰이면 403으로 실패한다")
+    void adminApiAuthBoundary() throws Exception {
+        User user = saveLocalUser("admin-boundary-user@example.com");
+        String userToken = jwtTokenProvider.createAccessToken(user);
+
+        String requestBody = """
+                {
+                  "name": "Boundary Skill",
+                  "normalizedName": "boundary skill",
+                  "category": "FRAMEWORK"
+                }
+                """;
+
+        mockMvc.perform(post("/skills")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"));
+
+        mockMvc.perform(post("/skills")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(userToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON_FORBIDDEN"));
+    }
+
     private User saveLocalUser(String email) {
         User user = User.signup(
                 email,
                 "encoded-password",
                 "테스트"
         );
+
+        return userRepository.save(user);
+    }
+
+    private User saveAdminUser(String email) {
+        User user = User.signup(
+                email,
+                "encoded-password",
+                "관리자"
+        );
+        ReflectionTestUtils.setField(user, "role", UserRole.ADMIN);
 
         return userRepository.save(user);
     }

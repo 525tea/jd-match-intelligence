@@ -53,6 +53,11 @@ app:
   auth:
     demo:
       enabled: ${DEMO_LOGIN_ENABLED:false}
+    admin-bootstrap:
+      enabled: ${ADMIN_BOOTSTRAP_ENABLED:false}
+      email: ${ADMIN_BOOTSTRAP_EMAIL:}
+      password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+      name: ${ADMIN_BOOTSTRAP_NAME:Admin}
 
   oauth2:
     success-redirect-uri: ${OAUTH2_SUCCESS_REDIRECT_URI:http://localhost:5173/oauth2/success}

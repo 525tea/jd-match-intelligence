@@ -1,5 +1,6 @@
 package jobflow.global.security;
 
+import jobflow.domain.auth.admin.AdminBootstrapProperties;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -18,7 +19,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableConfigurationProperties({
         JwtProperties.class,
-        OAuth2Properties.class
+        OAuth2Properties.class,
+        AdminBootstrapProperties.class
 })
 public class SecurityConfig {
 

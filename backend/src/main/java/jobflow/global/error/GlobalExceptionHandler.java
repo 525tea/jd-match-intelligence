@@ -1,5 +1,6 @@
 package jobflow.global.error;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import jobflow.global.error.exception.BusinessException;
 import org.slf4j.Logger;
@@ -19,17 +20,21 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
+    public ResponseEntity<ErrorResponse> handleBusinessException(
+            BusinessException exception,
+            HttpServletRequest request
+    ) {
         ErrorCode errorCode = exception.getErrorCode();
 
         return ResponseEntity
                 .status(errorCode.getStatus())
-                .body(ErrorResponse.of(errorCode, exception.getMessage()));
+                .body(ErrorResponse.of(errorCode, exception.getMessage(), request));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(
-            MethodArgumentNotValidException exception
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request
     ) {
         List<FieldErrorResponse> fieldErrors = exception.getBindingResult()
                 .getFieldErrors()
@@ -39,11 +44,14 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(ErrorCode.COMMON_INVALID_INPUT.getStatus())
-                .body(ErrorResponse.of(ErrorCode.COMMON_INVALID_INPUT, fieldErrors));
+                .body(ErrorResponse.of(ErrorCode.COMMON_INVALID_INPUT, fieldErrors, request));
     }
 
     @ExceptionHandler(BindException.class)
-    public ResponseEntity<ErrorResponse> handleBindException(BindException exception) {
+    public ResponseEntity<ErrorResponse> handleBindException(
+            BindException exception,
+            HttpServletRequest request
+    ) {
         List<FieldErrorResponse> fieldErrors = exception.getBindingResult()
                 .getFieldErrors()
                 .stream()
@@ -52,37 +60,43 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(ErrorCode.COMMON_INVALID_INPUT.getStatus())
-                .body(ErrorResponse.of(ErrorCode.COMMON_INVALID_INPUT, fieldErrors));
+                .body(ErrorResponse.of(ErrorCode.COMMON_INVALID_INPUT, fieldErrors, request));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
-            HttpMessageNotReadableException exception
+            HttpMessageNotReadableException exception,
+            HttpServletRequest request
     ) {
         return ResponseEntity
                 .status(ErrorCode.COMMON_INVALID_REQUEST.getStatus())
-                .body(ErrorResponse.of(ErrorCode.COMMON_INVALID_REQUEST));
+                .body(ErrorResponse.of(ErrorCode.COMMON_INVALID_REQUEST, request));
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
-            MethodArgumentTypeMismatchException exception
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
     ) {
         return ResponseEntity
                 .status(ErrorCode.COMMON_INVALID_INPUT.getStatus())
                 .body(ErrorResponse.of(
                         ErrorCode.COMMON_INVALID_INPUT,
-                        "요청 파라미터 타입이 올바르지 않습니다."
+                        "요청 파라미터 타입이 올바르지 않습니다.",
+                        request
                 ));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(Exception exception) {
+    public ResponseEntity<ErrorResponse> handleException(
+            Exception exception,
+            HttpServletRequest request
+    ) {
         log.error("Unhandled exception occurred.", exception);
 
         return ResponseEntity
                 .status(ErrorCode.COMMON_INTERNAL_ERROR.getStatus())
-                .body(ErrorResponse.of(ErrorCode.COMMON_INTERNAL_ERROR));
+                .body(ErrorResponse.of(ErrorCode.COMMON_INTERNAL_ERROR, request));
     }
 
     private FieldErrorResponse toFieldErrorResponse(FieldError fieldError) {

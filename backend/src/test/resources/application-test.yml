@@ -47,6 +47,9 @@ app:
   jwt:
     secret: jobflow-test-secret-key-must-be-at-least-32-bytes-long
     access-token-expiration-millis: 3600000
+  auth:
+    admin-bootstrap:
+      enabled: false
   oauth2:
     provider-token:
       encryption-key: jobflow-test-provider-token-encryption-key
