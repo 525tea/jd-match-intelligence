@@ -4,6 +4,7 @@ import jobflow.domain.job.dto.JobCreateRequest;
 import jobflow.domain.job.dto.JobCanonicalGroupItemResponse;
 import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobExperienceTagRequest;
+import jobflow.domain.job.dto.JobListRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSkillRequest;
@@ -21,6 +22,7 @@ import jobflow.domain.skill.SkillRepository;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -107,8 +109,17 @@ public class JobService {
         return JobResponse.of(job, jobSkills, jobExperienceTags, jobApplyUrlResolver.resolve(job));
     }
 
-    public List<JobSummaryResponse> getJobs() {
-        return jobRepository.findAllByOrderByCreatedAtDesc()
+    public List<JobSummaryResponse> getJobs(JobListRequest request) {
+        PageRequest pageable = PageRequest.of(request.pageOrDefault(), request.sizeOrDefault());
+
+        return jobRepository.findSummaries(
+                        request.status(),
+                        request.role(),
+                        request.careerLevel(),
+                        request.normalizedLocationRegion(),
+                        request.remoteType(),
+                        pageable
+                )
                 .stream()
                 .map(job -> JobSummaryResponse.from(job, jobApplyUrlResolver.resolve(job)))
                 .toList();
@@ -194,8 +205,8 @@ public class JobService {
                 OutboxEvent.TOPIC_JOB_EVENTS
         );
 
-        List<JobSkill> jobSkills = jobSkillRepository.findByJobId(jobId);
-        List<JobExperienceTag> jobExperienceTags = jobExperienceTagRepository.findByJobId(jobId);
+        List<JobSkill> jobSkills = replaceJobSkills(job, request);
+        List<JobExperienceTag> jobExperienceTags = replaceJobExperienceTags(job, request);
 
         return JobResponse.of(job, jobSkills, jobExperienceTags, jobApplyUrlResolver.resolve(job));
     }
@@ -336,10 +347,73 @@ public class JobService {
         return jobSkillRepository.saveAll(jobSkills);
     }
 
+    private List<JobSkill> replaceJobSkills(Job job, JobUpdateRequest request) {
+        jobSkillRepository.deleteByJobId(job.getId());
+
+        List<JobSkillRequest> skillRequests = request.skills();
+
+        if (skillRequests == null || skillRequests.isEmpty()) {
+            return jobSkillNormalizationService.saveNormalizedSkills(
+                    job,
+                    request.title(),
+                    request.description(),
+                    request.roleDetail()
+            );
+        }
+
+        List<JobSkill> jobSkills = skillRequests.stream()
+                .map(skillRequest -> {
+                    Skill skill = skillRepository.findById(skillRequest.skillId())
+                            .orElseThrow(() -> new EntityNotFoundException(ErrorCode.SKILL_NOT_FOUND));
+
+                    return JobSkill.create(
+                            job,
+                            skill,
+                            skillRequest.requirementType()
+                    );
+                })
+                .toList();
+
+        return jobSkillRepository.saveAll(jobSkills);
+    }
+
     private List<JobExperienceTag> saveJobExperienceTags(
             Job job,
             JobCreateRequest request
     ) {
+        List<JobExperienceTagRequest> tagRequests = request.experienceTags();
+
+        if (tagRequests == null || tagRequests.isEmpty()) {
+            return jobExperienceTagNormalizationService.saveNormalizedExperienceTags(
+                    job,
+                    request.title(),
+                    request.description(),
+                    request.roleDetail()
+            );
+        }
+
+        List<JobExperienceTag> jobExperienceTags = tagRequests.stream()
+                .map(tagRequest -> {
+                    ExperienceTagCode tagCode = experienceTagCodeRepository.findById(tagRequest.tagCode())
+                            .orElseThrow(() -> new EntityNotFoundException(ErrorCode.EXPERIENCE_TAG_NOT_FOUND));
+
+                    return JobExperienceTag.create(
+                            job,
+                            tagCode,
+                            tagRequest.sourcePhrase()
+                    );
+                })
+                .toList();
+
+        return jobExperienceTagRepository.saveAll(jobExperienceTags);
+    }
+
+    private List<JobExperienceTag> replaceJobExperienceTags(
+            Job job,
+            JobUpdateRequest request
+    ) {
+        jobExperienceTagRepository.deleteByJobId(job.getId());
+
         List<JobExperienceTagRequest> tagRequests = request.experienceTags();
 
         if (tagRequests == null || tagRequests.isEmpty()) {

@@ -1,5 +1,6 @@
 package jobflow.global.config;
 
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.hasKey;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -37,6 +38,16 @@ class OpenApiDocsIntegrationTest {
                 .andExpect(jsonPath("$.paths", hasKey("/auth/oauth2/token")))
 
                 .andExpect(jsonPath("$.paths", hasKey("/jobs")))
+                .andExpect(jsonPath("$.paths['/jobs']", hasKey("get")))
+                .andExpect(jsonPath("$.paths['/jobs'].get.parameters[*].name", hasItems(
+                        "page",
+                        "size",
+                        "status",
+                        "role",
+                        "careerLevel",
+                        "locationRegion",
+                        "remoteType"
+                )))
                 .andExpect(jsonPath("$.paths", hasKey("/jobs/search")))
                 .andExpect(jsonPath("$.paths", hasKey("/jobs/{jobId}")))
                 .andExpect(jsonPath("$.paths", hasKey("/jobs/{jobId}/canonical-group")))

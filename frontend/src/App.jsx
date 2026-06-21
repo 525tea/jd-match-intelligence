@@ -165,7 +165,7 @@ export default function App() {
         const normalizedKeyword = String(keyword || '').trim();
         const rows = normalizedKeyword
           ? await api.searchJobs(normalizedKeyword, 50)
-          : await api.jobs({ limit: 50 });
+          : await api.jobs({ page: 0, size: 50 });
         const mapped = dedupeJobs(rows.filter(isUserFacingJob)).map(toPrototypeJob);
         const everyJob = mapped.filter((job) => job.companyKo && (job.jobId || job.id));
         setJf((prev) => ({

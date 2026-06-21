@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
+import java.util.List;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.EmploymentType;
 import jobflow.domain.job.JobRole;
@@ -83,6 +84,10 @@ public record JobUpdateRequest(
 
         LocalDateTime openedAt,
 
-        LocalDateTime deadlineAt
+        LocalDateTime deadlineAt,
+
+        List<JobSkillRequest> skills,
+
+        List<JobExperienceTagRequest> experienceTags
 ) {
 }

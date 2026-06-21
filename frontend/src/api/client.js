@@ -87,7 +87,7 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/auth/me'),
 
-  jobs: (params = {}) => request('/jobs', { params: { limit: 50, ...params } }),
+  jobs: (params = {}) => request('/jobs', { params: { page: 0, size: 50, ...params } }),
   searchJobs: (keyword, limit = 30) => request('/jobs/search', { params: { keyword, limit } }),
   job: (jobId) => request(`/jobs/${jobId}`),
   canonicalGroup: (jobId) => request(`/jobs/${jobId}/canonical-group`),

@@ -12,6 +12,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import jobflow.domain.common.BaseTimeEntity;
 import jobflow.global.error.ErrorCode;
+import jobflow.global.error.exception.BusinessException;
 import jobflow.global.error.exception.ConflictException;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -153,6 +154,16 @@ public class Job extends BaseTimeEntity {
             LocalDateTime openedAt,
             LocalDateTime deadlineAt
     ) {
+        validateJobValues(
+                minExperienceYears,
+                maxExperienceYears,
+                salaryMin,
+                salaryMax,
+                hiringCount,
+                openedAt,
+                deadlineAt
+        );
+
         Job job = new Job();
         job.source = source;
         job.externalId = externalId;
@@ -210,6 +221,16 @@ public class Job extends BaseTimeEntity {
             LocalDateTime openedAt,
             LocalDateTime deadlineAt
     ) {
+        validateJobValues(
+                minExperienceYears,
+                maxExperienceYears,
+                salaryMin,
+                salaryMax,
+                hiringCount,
+                openedAt,
+                deadlineAt
+        );
+
         this.title = title;
         this.companyName = companyName;
         this.description = description;
@@ -262,6 +283,63 @@ public class Job extends BaseTimeEntity {
     public void expire() {
         validateOpenStatus();
         this.status = JobStatus.EXPIRED;
+    }
+
+    private static void validateJobValues(
+            Integer minExperienceYears,
+            Integer maxExperienceYears,
+            Integer salaryMin,
+            Integer salaryMax,
+            Integer hiringCount,
+            LocalDateTime openedAt,
+            LocalDateTime deadlineAt
+    ) {
+        if (isNegative(minExperienceYears) || isNegative(maxExperienceYears)) {
+            throw new BusinessException(
+                    ErrorCode.COMMON_INVALID_INPUT,
+                    "경력 연차는 음수일 수 없습니다."
+            );
+        }
+
+        if (minExperienceYears != null && maxExperienceYears != null
+                && minExperienceYears > maxExperienceYears) {
+            throw new BusinessException(
+                    ErrorCode.COMMON_INVALID_INPUT,
+                    "최소 경력 연차는 최대 경력 연차보다 클 수 없습니다."
+            );
+        }
+
+        if (isNegative(salaryMin) || isNegative(salaryMax)) {
+            throw new BusinessException(
+                    ErrorCode.COMMON_INVALID_INPUT,
+                    "연봉은 음수일 수 없습니다."
+            );
+        }
+
+        if (salaryMin != null && salaryMax != null && salaryMin > salaryMax) {
+            throw new BusinessException(
+                    ErrorCode.COMMON_INVALID_INPUT,
+                    "최소 연봉은 최대 연봉보다 클 수 없습니다."
+            );
+        }
+
+        if (isNegative(hiringCount)) {
+            throw new BusinessException(
+                    ErrorCode.COMMON_INVALID_INPUT,
+                    "채용 인원은 음수일 수 없습니다."
+            );
+        }
+
+        if (openedAt != null && deadlineAt != null && openedAt.isAfter(deadlineAt)) {
+            throw new BusinessException(
+                    ErrorCode.COMMON_INVALID_INPUT,
+                    "공고 시작일은 마감일보다 늦을 수 없습니다."
+            );
+        }
+    }
+
+    private static boolean isNegative(Integer value) {
+        return value != null && value < 0;
     }
 
     private void validateOpenStatus() {
