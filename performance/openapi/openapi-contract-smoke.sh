@@ -47,6 +47,19 @@ assert_path_method() {
     "OpenAPI should expose ${method_label} ${path}"
 }
 
+assert_query_parameter() {
+  local path="$1"
+  local method="$2"
+  local parameter_name="$3"
+  local method_label
+
+  method_label="$(printf '%s' "${method}" | tr '[:lower:]' '[:upper:]')"
+
+  assert_json_true \
+    "([.paths[\"${path}\"].${method}.parameters[]? | select(.in == \"query\" and .name == \"${parameter_name}\")] | length) > 0" \
+    "OpenAPI should expose query parameter '${parameter_name}' for ${method_label} ${path}"
+}
+
 echo "BASE_URL=${BASE_URL}"
 echo "DOCS_PATH=${DOCS_PATH}"
 echo "SWAGGER_UI_PATH=${SWAGGER_UI_PATH}"
@@ -69,6 +82,7 @@ assert_json_true '.components.securitySchemes.bearerAuth.bearerFormat == "JWT"' 
 assert_path_method "/auth/login" "post"
 assert_path_method "/auth/signup" "post"
 assert_path_method "/auth/me" "get"
+assert_path_method "/jobs" "get"
 assert_path_method "/jobs/search" "get"
 assert_path_method "/jobs/{jobId}" "get"
 assert_path_method "/user/jobs/{jobId}/view" "post"
@@ -91,6 +105,14 @@ assert_path_method "/gap-analysis/projects/{userProjectId}" "get"
 assert_path_method "/recommendations/jobs" "get"
 assert_path_method "/trends/skills" "get"
 
+assert_query_parameter "/jobs" "get" "page"
+assert_query_parameter "/jobs" "get" "size"
+assert_query_parameter "/jobs" "get" "status"
+assert_query_parameter "/jobs" "get" "role"
+assert_query_parameter "/jobs" "get" "careerLevel"
+assert_query_parameter "/jobs" "get" "locationRegion"
+assert_query_parameter "/jobs" "get" "remoteType"
+
 echo "### OpenAPI Contract Summary"
 jq -r '
   "title=" + (.info.title // ""),
@@ -104,6 +126,14 @@ jq -r '
   ] | length | tostring),
   "has_auth_login=" + ((.paths | has("/auth/login")) | tostring),
   "has_auth_me=" + ((.paths | has("/auth/me")) | tostring),
+  "has_jobs_list=" + (((.paths["/jobs"] // {}) | has("get")) | tostring),
+  "has_jobs_list_page_param=" + (([.paths["/jobs"].get.parameters[]? | select(.in == "query" and .name == "page")] | length > 0) | tostring),
+  "has_jobs_list_size_param=" + (([.paths["/jobs"].get.parameters[]? | select(.in == "query" and .name == "size")] | length > 0) | tostring),
+  "has_jobs_list_status_param=" + (([.paths["/jobs"].get.parameters[]? | select(.in == "query" and .name == "status")] | length > 0) | tostring),
+  "has_jobs_list_role_param=" + (([.paths["/jobs"].get.parameters[]? | select(.in == "query" and .name == "role")] | length > 0) | tostring),
+  "has_jobs_list_career_level_param=" + (([.paths["/jobs"].get.parameters[]? | select(.in == "query" and .name == "careerLevel")] | length > 0) | tostring),
+  "has_jobs_list_location_region_param=" + (([.paths["/jobs"].get.parameters[]? | select(.in == "query" and .name == "locationRegion")] | length > 0) | tostring),
+  "has_jobs_list_remote_type_param=" + (([.paths["/jobs"].get.parameters[]? | select(.in == "query" and .name == "remoteType")] | length > 0) | tostring),
   "has_jobs_search=" + ((.paths | has("/jobs/search")) | tostring),
   "has_job_detail=" + ((.paths | has("/jobs/{jobId}")) | tostring),
   "has_user_job_view=" + ((.paths | has("/user/jobs/{jobId}/view")) | tostring),

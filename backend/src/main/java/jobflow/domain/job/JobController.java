@@ -12,6 +12,7 @@ import jobflow.domain.userjob.UserJobService;
 import jobflow.global.response.ApiResponse;
 import jobflow.global.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -48,7 +49,7 @@ public class JobController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<JobSummaryResponse>>> getJobs(
-            @Valid @ModelAttribute JobListRequest request
+            @Valid @ParameterObject @ModelAttribute JobListRequest request
     ) {
         List<JobSummaryResponse> response = jobService.getJobs(request);
 
