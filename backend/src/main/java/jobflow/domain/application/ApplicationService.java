@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import jobflow.domain.application.dto.ApplicationCreateRequest;
 import jobflow.domain.application.dto.ApplicationResponse;
+import jobflow.domain.application.dto.ApplicationStatusHistoryResponse;
 import jobflow.domain.application.dto.ApplicationStatusUpdateRequest;
 import jobflow.domain.application.dto.ApplicationSummaryResponse;
 import jobflow.domain.job.Job;
@@ -84,6 +85,18 @@ public class ApplicationService {
         return applicationRepository.findByUserIdOrderByCreatedAtDesc(userId)
                 .stream()
                 .map(ApplicationSummaryResponse::from)
+                .toList();
+    }
+
+    public List<ApplicationStatusHistoryResponse> getApplicationStatusHistories(
+            Long userId,
+            Long applicationId
+    ) {
+        findApplicationOfUser(applicationId, userId);
+
+        return applicationStatusHistoryRepository.findByApplicationIdOrderByChangedAtAsc(applicationId)
+                .stream()
+                .map(ApplicationStatusHistoryResponse::from)
                 .toList();
     }
 

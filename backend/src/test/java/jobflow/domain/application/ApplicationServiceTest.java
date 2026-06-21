@@ -2,6 +2,7 @@ package jobflow.domain.application;
 
 import jobflow.domain.application.dto.ApplicationCreateRequest;
 import jobflow.domain.application.dto.ApplicationResponse;
+import jobflow.domain.application.dto.ApplicationStatusHistoryResponse;
 import jobflow.domain.application.dto.ApplicationStatusUpdateRequest;
 import jobflow.domain.application.dto.ApplicationSummaryResponse;
 import jobflow.domain.job.*;
@@ -248,6 +249,64 @@ class ApplicationServiceTest {
         assertThat(responses.getFirst().id()).isEqualTo(100L);
         assertThat(responses.getFirst().jobId()).isEqualTo(10L);
         assertThat(responses.getFirst().status()).isEqualTo(ApplicationStatus.APPLIED);
+    }
+
+    @Test
+    @DisplayName("내 지원 상태 변경 이력을 조회한다")
+    void getApplicationStatusHistories() {
+        Long userId = 1L;
+        Long applicationId = 100L;
+        User user = createUser(userId);
+        Job job = createJob(10L);
+        Application application = createApplicationEntity(applicationId, user, job);
+        ApplicationStatusHistory createdHistory = ApplicationStatusHistory.record(
+                application,
+                null,
+                ApplicationStatus.APPLIED,
+                LocalDateTime.of(2026, 6, 21, 10, 0)
+        );
+        ApplicationStatusHistory interviewHistory = ApplicationStatusHistory.record(
+                application,
+                ApplicationStatus.APPLIED,
+                ApplicationStatus.INTERVIEW,
+                LocalDateTime.of(2026, 6, 21, 11, 0)
+        );
+
+        ReflectionTestUtils.setField(createdHistory, "id", 1L);
+        ReflectionTestUtils.setField(interviewHistory, "id", 2L);
+
+        given(applicationRepository.findByIdAndUserId(applicationId, userId))
+                .willReturn(Optional.of(application));
+        given(applicationStatusHistoryRepository.findByApplicationIdOrderByChangedAtAsc(applicationId))
+                .willReturn(List.of(createdHistory, interviewHistory));
+
+        List<ApplicationStatusHistoryResponse> responses =
+                applicationService.getApplicationStatusHistories(userId, applicationId);
+
+        assertThat(responses).hasSize(2);
+        assertThat(responses.getFirst().id()).isEqualTo(1L);
+        assertThat(responses.getFirst().applicationId()).isEqualTo(applicationId);
+        assertThat(responses.getFirst().previousStatus()).isNull();
+        assertThat(responses.getFirst().nextStatus()).isEqualTo(ApplicationStatus.APPLIED);
+        assertThat(responses.get(1).previousStatus()).isEqualTo(ApplicationStatus.APPLIED);
+        assertThat(responses.get(1).nextStatus()).isEqualTo(ApplicationStatus.INTERVIEW);
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 지원 상태 변경 이력은 조회할 수 없다")
+    void getApplicationStatusHistoriesOfOtherUser() {
+        Long userId = 1L;
+        Long applicationId = 100L;
+
+        given(applicationRepository.findByIdAndUserId(applicationId, userId))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> applicationService.getApplicationStatusHistories(userId, applicationId))
+                .isInstanceOf(EntityNotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.APPLICATION_NOT_FOUND);
+
+        verify(applicationStatusHistoryRepository, never()).findByApplicationIdOrderByChangedAtAsc(any());
     }
 
     @Test

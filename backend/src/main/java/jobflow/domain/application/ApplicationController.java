@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import jobflow.domain.application.dto.ApplicationCreateRequest;
 import jobflow.domain.application.dto.ApplicationResponse;
+import jobflow.domain.application.dto.ApplicationStatusHistoryResponse;
 import jobflow.domain.application.dto.ApplicationStatusUpdateRequest;
 import jobflow.domain.application.dto.ApplicationSummaryResponse;
 import jobflow.global.response.ApiResponse;
@@ -48,6 +49,19 @@ public class ApplicationController {
             @PathVariable Long applicationId
     ) {
         ApplicationResponse response = applicationService.getApplication(
+                principal.id(),
+                applicationId
+        );
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/{applicationId}/status-histories")
+    public ResponseEntity<ApiResponse<List<ApplicationStatusHistoryResponse>>> getApplicationStatusHistories(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long applicationId
+    ) {
+        List<ApplicationStatusHistoryResponse> response = applicationService.getApplicationStatusHistories(
                 principal.id(),
                 applicationId
         );
