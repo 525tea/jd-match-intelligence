@@ -109,6 +109,19 @@ public class Job extends BaseTimeEntity {
     @Column(columnDefinition = "json")
     private String rawData;
 
+    @Column(length = 500)
+    private String rawSnapshotKey;
+
+    @Column(length = 64)
+    private String rawSnapshotHash;
+
+    private Long rawSnapshotSizeBytes;
+
+    @Column(length = 30)
+    private String rawSnapshotStorageType;
+
+    private LocalDateTime rawSnapshotSavedAt;
+
     @Column(length = 50)
     private String crawlerVersion;
 
@@ -256,6 +269,20 @@ public class Job extends BaseTimeEntity {
         this.sourceUpdatedAt = sourceUpdatedAt;
         this.rawData = rawData;
         this.crawlerVersion = crawlerVersion;
+    }
+
+    public void updateRawSnapshotMetadata(
+            String rawSnapshotKey,
+            String rawSnapshotHash,
+            Long rawSnapshotSizeBytes,
+            String rawSnapshotStorageType,
+            LocalDateTime rawSnapshotSavedAt
+    ) {
+        this.rawSnapshotKey = rawSnapshotKey;
+        this.rawSnapshotHash = rawSnapshotHash;
+        this.rawSnapshotSizeBytes = rawSnapshotSizeBytes;
+        this.rawSnapshotStorageType = rawSnapshotStorageType;
+        this.rawSnapshotSavedAt = rawSnapshotSavedAt;
     }
 
     public void expire() {
