@@ -71,7 +71,14 @@ assert_path_method "/auth/signup" "post"
 assert_path_method "/auth/me" "get"
 assert_path_method "/jobs/search" "get"
 assert_path_method "/jobs/{jobId}" "get"
+assert_path_method "/user/jobs/{jobId}/view" "post"
 assert_path_method "/user/jobs/{jobId}/save" "post"
+assert_path_method "/user/jobs/{jobId}/save" "delete"
+assert_path_method "/user/jobs/{jobId}/ignore" "post"
+assert_path_method "/user/jobs/{jobId}/ignore" "delete"
+assert_path_method "/user/jobs/saved" "get"
+assert_path_method "/user/jobs/ignored" "get"
+assert_path_method "/user/jobs/viewed" "get"
 assert_path_method "/applications" "get"
 assert_path_method "/applications" "post"
 assert_path_method "/projects/{userProjectId}/skills" "get"
@@ -96,7 +103,11 @@ jq -r '
   "has_auth_me=" + ((.paths | has("/auth/me")) | tostring),
   "has_jobs_search=" + ((.paths | has("/jobs/search")) | tostring),
   "has_job_detail=" + ((.paths | has("/jobs/{jobId}")) | tostring),
+  "has_user_job_view=" + ((.paths | has("/user/jobs/{jobId}/view")) | tostring),
   "has_user_job_save=" + ((.paths | has("/user/jobs/{jobId}/save")) | tostring),
+  "has_user_job_unsave=" + (((.paths["/user/jobs/{jobId}/save"] // {}) | has("delete")) | tostring),
+  "has_user_job_ignore=" + ((.paths | has("/user/jobs/{jobId}/ignore")) | tostring),
+  "has_user_job_unignore=" + (((.paths["/user/jobs/{jobId}/ignore"] // {}) | has("delete")) | tostring),
   "has_applications=" + ((.paths | has("/applications")) | tostring),
   "has_project_skills=" + ((.paths | has("/projects/{userProjectId}/skills")) | tostring),
   "has_project_experience_tags=" + ((.paths | has("/projects/{userProjectId}/experience-tags")) | tostring),

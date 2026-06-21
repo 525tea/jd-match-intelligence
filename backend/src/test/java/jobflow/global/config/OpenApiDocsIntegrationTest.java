@@ -43,7 +43,11 @@ class OpenApiDocsIntegrationTest {
 
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/{jobId}/view")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/{jobId}/save")))
+                .andExpect(jsonPath("$.paths['/user/jobs/{jobId}/save']", hasKey("post")))
+                .andExpect(jsonPath("$.paths['/user/jobs/{jobId}/save']", hasKey("delete")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/{jobId}/ignore")))
+                .andExpect(jsonPath("$.paths['/user/jobs/{jobId}/ignore']", hasKey("post")))
+                .andExpect(jsonPath("$.paths['/user/jobs/{jobId}/ignore']", hasKey("delete")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/saved")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/viewed")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/ignored")))
