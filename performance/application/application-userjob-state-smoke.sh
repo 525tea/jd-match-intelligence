@@ -230,6 +230,33 @@ assert_eq "${application_interview_status}" "200" "PATCH /applications/{id}/stat
 assert_json_success "${application_interview_response}" "PATCH /applications/{id}/status should return success=true"
 assert_eq "$(jq -r '.data.status' "${application_interview_response}")" "INTERVIEW" "application status should be INTERVIEW"
 
+application_histories_response="${tmp_dir}/application-status-histories.json"
+application_histories_status="$(
+  request_status "GET" "/applications/${application_id}/status-histories" "${application_histories_response}"
+)"
+
+echo "application_status_histories_status=${application_histories_status}"
+assert_eq "${application_histories_status}" "200" "GET /applications/{id}/status-histories should return 200"
+assert_json_success "${application_histories_response}" "GET /applications/{id}/status-histories should return success=true"
+
+if ! jq -e '(.data | type == "array") and (.data | length >= 2)' "${application_histories_response}" >/dev/null; then
+  echo "Assertion failed: application status histories should include create and status update records" >&2
+  cat "${application_histories_response}" >&2
+  exit 1
+fi
+
+if ! jq -e '.data | any(.previousStatus == null and .nextStatus == "APPLIED")' "${application_histories_response}" >/dev/null; then
+  echo "Assertion failed: application status histories should include initial APPLIED record" >&2
+  cat "${application_histories_response}" >&2
+  exit 1
+fi
+
+if ! jq -e '.data | any(.previousStatus == "APPLIED" and .nextStatus == "INTERVIEW")' "${application_histories_response}" >/dev/null; then
+  echo "Assertion failed: application status histories should include APPLIED -> INTERVIEW record" >&2
+  cat "${application_histories_response}" >&2
+  exit 1
+fi
+
 application_invalid_response="${tmp_dir}/application-invalid.json"
 application_invalid_status="$(
   request_status "PATCH" "/applications/${application_id}/status" "${application_invalid_response}" \
@@ -258,6 +285,7 @@ echo "user_job_ignore_status=${ignore_status}"
 echo "user_job_unignore_status=${unignore_status}"
 echo "application_id=${application_id}"
 echo "application_interview_status=${application_interview_status}"
+echo "application_status_histories_status=${application_histories_status}"
 echo "application_invalid_transition_status=${application_invalid_status}"
 
 echo
