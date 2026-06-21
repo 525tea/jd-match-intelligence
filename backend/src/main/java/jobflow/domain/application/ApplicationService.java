@@ -1,5 +1,6 @@
 package jobflow.domain.application;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import jobflow.domain.application.dto.ApplicationCreateRequest;
 import jobflow.domain.application.dto.ApplicationResponse;
@@ -32,6 +33,7 @@ public class ApplicationService {
     private final UserRepository userRepository;
     private final JobRepository jobRepository;
     private final OutboxEventService outboxEventService;
+    private final ApplicationStatusHistoryRepository applicationStatusHistoryRepository;
 
     @Transactional
     public ApplicationResponse createApplication(
@@ -48,6 +50,12 @@ public class ApplicationService {
 
         try {
             Application savedApplication = applicationRepository.saveAndFlush(application);
+            applicationStatusHistoryRepository.save(ApplicationStatusHistory.record(
+                    savedApplication,
+                    null,
+                    savedApplication.getStatus(),
+                    savedApplication.getAppliedAt()
+            ));
 
             outboxEventService.save(
                     "APPLICATION",
@@ -88,7 +96,15 @@ public class ApplicationService {
         Application application = findApplicationOfUser(applicationId, userId);
 
         try {
-            application.changeStatus(request.status());
+            ApplicationStatus previousStatus = application.changeStatus(request.status());
+            if (previousStatus != application.getStatus()) {
+                applicationStatusHistoryRepository.save(ApplicationStatusHistory.record(
+                        application,
+                        previousStatus,
+                        application.getStatus(),
+                        LocalDateTime.now()
+                ));
+            }
             applicationRepository.flush();
 
             outboxEventService.save(

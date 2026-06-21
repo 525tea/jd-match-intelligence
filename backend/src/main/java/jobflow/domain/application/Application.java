@@ -59,16 +59,13 @@ public class Application extends BaseTimeEntity {
         return application;
     }
 
-    public void changeStatus(ApplicationStatus nextStatus) {
-        if (isTerminalStatus() && status != nextStatus) {
+    public ApplicationStatus changeStatus(ApplicationStatus nextStatus) {
+        if (!status.canTransitionTo(nextStatus)) {
             throw new ConflictException(ErrorCode.APPLICATION_STATUS_CONFLICT);
         }
 
+        ApplicationStatus previousStatus = this.status;
         this.status = nextStatus;
-    }
-
-    private boolean isTerminalStatus() {
-        return status == ApplicationStatus.REJECTED
-                || status == ApplicationStatus.WITHDRAWN;
+        return previousStatus;
     }
 }

@@ -28,6 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -48,6 +49,9 @@ class ApplicationServiceTest {
 
     @Mock
     private OutboxEventService outboxEventService;
+
+    @Mock
+    private ApplicationStatusHistoryRepository applicationStatusHistoryRepository;
 
     @InjectMocks
     private ApplicationService applicationService;
@@ -78,6 +82,12 @@ class ApplicationServiceTest {
         assertThat(response.status()).isEqualTo(ApplicationStatus.APPLIED);
 
         verify(applicationRepository).saveAndFlush(any(Application.class));
+        verify(applicationStatusHistoryRepository).save(argThat(history ->
+                history.getApplication() == savedApplication
+                        && history.getPreviousStatus() == null
+                        && history.getNextStatus() == ApplicationStatus.APPLIED
+                        && history.getChangedAt() == savedApplication.getAppliedAt()
+        ));
         verify(outboxEventService).save(
                 eq("APPLICATION"),
                 eq(100L),
@@ -261,6 +271,11 @@ class ApplicationServiceTest {
         assertThat(response.status()).isEqualTo(ApplicationStatus.INTERVIEW);
 
         verify(applicationRepository).flush();
+        verify(applicationStatusHistoryRepository).save(argThat(history ->
+                history.getApplication() == application
+                        && history.getPreviousStatus() == ApplicationStatus.APPLIED
+                        && history.getNextStatus() == ApplicationStatus.INTERVIEW
+        ));
         verify(outboxEventService).save(
                 eq("APPLICATION"),
                 eq(applicationId),
@@ -268,6 +283,32 @@ class ApplicationServiceTest {
                 any(),
                 eq("application.events")
         );
+    }
+
+    @Test
+    @DisplayName("허용되지 않은 지원 상태 전이는 거부한다")
+    void rejectInvalidApplicationStatusTransition() {
+        Long userId = 1L;
+        Long applicationId = 100L;
+        User user = createUser(userId);
+        Job job = createJob(10L);
+        Application application = createApplicationEntity(applicationId, user, job);
+
+        given(applicationRepository.findByIdAndUserId(applicationId, userId))
+                .willReturn(Optional.of(application));
+
+        assertThatThrownBy(() -> applicationService.updateApplicationStatus(
+                userId,
+                applicationId,
+                new ApplicationStatusUpdateRequest(ApplicationStatus.OFFER)
+        ))
+                .isInstanceOf(ConflictException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.APPLICATION_STATUS_CONFLICT);
+
+        verify(applicationStatusHistoryRepository, never()).save(any());
+        verify(applicationRepository, never()).flush();
+        verify(outboxEventService, never()).save(any(), any(), any(), any(), any());
     }
 
     @Test
