@@ -19,6 +19,12 @@ public interface UserJobRepository extends JpaRepository<UserJob, Long> {
 
     List<UserJob> findByUserIdAndStatusOrderByUpdatedAtDesc(Long userId, UserJobStatus status);
 
+    List<UserJob> findByUserIdAndStatusOrderByUpdatedAtDesc(
+            Long userId,
+            UserJobStatus status,
+            Pageable pageable
+    );
+
     List<UserJob> findByUserIdAndJobIdIn(Long userId, Collection<Long> jobIds);
 
     boolean existsByUserIdAndJobId(Long userId, Long jobId);

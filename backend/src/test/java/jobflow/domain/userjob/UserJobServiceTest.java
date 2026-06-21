@@ -13,6 +13,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -129,6 +131,58 @@ class UserJobServiceTest {
 
         verify(userJobRepository, never()).save(any(UserJob.class));
         verify(eventPublisher).publishEvent(new UserJobChangedEvent(userId, jobId, UserJobStatus.IGNORED));
+    }
+
+    @Test
+    @DisplayName("저장한 공고를 VIEWED 상태로 되돌린다")
+    void unsaveJob() {
+        Long userId = 1L;
+        Long jobId = 10L;
+        UserJob userJob = createUserJob(100L, userId, jobId);
+        userJob.save(LocalDateTime.of(2026, 6, 4, 11, 0));
+
+        given(userJobRepository.findByUserIdAndJobId(userId, jobId)).willReturn(Optional.of(userJob));
+
+        UserJobResponse response = userJobService.unsaveJob(userId, jobId);
+
+        assertThat(response.status()).isEqualTo(UserJobStatus.VIEWED);
+        assertThat(response.savedAt()).isNull();
+        assertThat(response.viewedAt()).isNotNull();
+
+        verify(eventPublisher).publishEvent(new UserJobChangedEvent(userId, jobId, UserJobStatus.VIEWED));
+    }
+
+    @Test
+    @DisplayName("무시한 공고를 VIEWED 상태로 되돌린다")
+    void unignoreJob() {
+        Long userId = 1L;
+        Long jobId = 10L;
+        UserJob userJob = createUserJob(100L, userId, jobId);
+        userJob.ignore(LocalDateTime.of(2026, 6, 4, 11, 0));
+
+        given(userJobRepository.findByUserIdAndJobId(userId, jobId)).willReturn(Optional.of(userJob));
+
+        UserJobResponse response = userJobService.unignoreJob(userId, jobId);
+
+        assertThat(response.status()).isEqualTo(UserJobStatus.VIEWED);
+        assertThat(response.ignoredAt()).isNull();
+        assertThat(response.viewedAt()).isNotNull();
+
+        verify(eventPublisher).publishEvent(new UserJobChangedEvent(userId, jobId, UserJobStatus.VIEWED));
+    }
+
+    @Test
+    @DisplayName("저장 취소 대상 UserJob이 없으면 예외가 발생한다")
+    void failWhenUnsaveTargetNotFound() {
+        Long userId = 1L;
+        Long jobId = 999L;
+
+        given(userJobRepository.findByUserIdAndJobId(userId, jobId)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userJobService.unsaveJob(userId, jobId))
+                .isInstanceOf(EntityNotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.USER_JOB_NOT_FOUND);
     }
 
     @Test
@@ -248,7 +302,11 @@ class UserJobServiceTest {
         UserJob userJob = createUserJob(100L, userId, 10L);
         userJob.save(LocalDateTime.of(2026, 6, 4, 11, 0));
 
-        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(userId, UserJobStatus.SAVED))
+        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(
+                eq(userId),
+                eq(UserJobStatus.SAVED),
+                eq(PageRequest.of(0, 20))
+        ))
                 .willReturn(List.of(userJob));
 
         List<UserJobResponse> responses = userJobService.getMySavedJobs(userId);
@@ -265,7 +323,11 @@ class UserJobServiceTest {
         UserJob userJob = createUserJob(100L, userId, 10L);
         userJob.ignore(LocalDateTime.of(2026, 6, 4, 11, 0));
 
-        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(userId, UserJobStatus.IGNORED))
+        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(
+                eq(userId),
+                eq(UserJobStatus.IGNORED),
+                eq(PageRequest.of(0, 20))
+        ))
                 .willReturn(List.of(userJob));
 
         List<UserJobResponse> responses = userJobService.getMyIgnoredJobs(userId);
@@ -280,13 +342,37 @@ class UserJobServiceTest {
         Long userId = 1L;
         UserJob userJob = createUserJob(100L, userId, 10L);
 
-        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(userId, UserJobStatus.VIEWED))
+        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(
+                eq(userId),
+                eq(UserJobStatus.VIEWED),
+                eq(PageRequest.of(0, 20))
+        ))
                 .willReturn(List.of(userJob));
 
         List<UserJobResponse> responses = userJobService.getMyViewedJobs(userId);
 
         assertThat(responses).hasSize(1);
         assertThat(responses.getFirst().status()).isEqualTo(UserJobStatus.VIEWED);
+    }
+
+    @Test
+    @DisplayName("목록 조회 page/size를 보정해서 조회한다")
+    void getMySavedJobsWithNormalizedPageable() {
+        Long userId = 1L;
+        UserJob userJob = createUserJob(100L, userId, 10L);
+        userJob.save(LocalDateTime.of(2026, 6, 4, 11, 0));
+
+        given(userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(
+                eq(userId),
+                eq(UserJobStatus.SAVED),
+                eq(PageRequest.of(0, 100))
+        ))
+                .willReturn(List.of(userJob));
+
+        List<UserJobResponse> responses = userJobService.getMySavedJobs(userId, -1, 500);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.getFirst().status()).isEqualTo(UserJobStatus.SAVED);
     }
 
     @Test

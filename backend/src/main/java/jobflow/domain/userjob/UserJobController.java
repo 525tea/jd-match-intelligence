@@ -19,27 +19,33 @@ public class UserJobController {
 
     @GetMapping("/viewed")
     public ResponseEntity<ApiResponse<List<UserJobResponse>>> getMyViewedJobs(
-            @AuthenticationPrincipal UserPrincipal principal
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        List<UserJobResponse> response = userJobService.getMyViewedJobs(principal.id());
+        List<UserJobResponse> response = userJobService.getMyViewedJobs(principal.id(), page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/saved")
     public ResponseEntity<ApiResponse<List<UserJobResponse>>> getMySavedJobs(
-            @AuthenticationPrincipal UserPrincipal principal
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        List<UserJobResponse> response = userJobService.getMySavedJobs(principal.id());
+        List<UserJobResponse> response = userJobService.getMySavedJobs(principal.id(), page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @GetMapping("/ignored")
     public ResponseEntity<ApiResponse<List<UserJobResponse>>> getMyIgnoredJobs(
-            @AuthenticationPrincipal UserPrincipal principal
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
     ) {
-        List<UserJobResponse> response = userJobService.getMyIgnoredJobs(principal.id());
+        List<UserJobResponse> response = userJobService.getMyIgnoredJobs(principal.id(), page, size);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
@@ -74,12 +80,32 @@ public class UserJobController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @DeleteMapping("/{jobId}/save")
+    public ResponseEntity<ApiResponse<UserJobResponse>> unsaveJob(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long jobId
+    ) {
+        UserJobResponse response = userJobService.unsaveJob(principal.id(), jobId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @PostMapping("/{jobId}/ignore")
     public ResponseEntity<ApiResponse<UserJobResponse>> ignoreJob(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long jobId
     ) {
         UserJobResponse response = userJobService.ignoreJob(principal.id(), jobId);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @DeleteMapping("/{jobId}/ignore")
+    public ResponseEntity<ApiResponse<UserJobResponse>> unignoreJob(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long jobId
+    ) {
+        UserJobResponse response = userJobService.unignoreJob(principal.id(), jobId);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

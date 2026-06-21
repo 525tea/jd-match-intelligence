@@ -72,6 +72,18 @@ public class UserJob extends BaseTimeEntity {
         this.ignoredAt = ignoredAt;
     }
 
+    public void unsave(LocalDateTime viewedAt) {
+        this.status = UserJobStatus.VIEWED;
+        this.viewedAt = viewedAt;
+        this.savedAt = null;
+    }
+
+    public void unignore(LocalDateTime viewedAt) {
+        this.status = UserJobStatus.VIEWED;
+        this.viewedAt = viewedAt;
+        this.ignoredAt = null;
+    }
+
     public boolean isSaved() {
         return status == UserJobStatus.SAVED;
     }

@@ -27,6 +27,7 @@ import java.util.List;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -106,6 +107,36 @@ class UserJobControllerTest {
     }
 
     @Test
+    @DisplayName("공고 저장 취소 성공 시 200 ApiResponse를 반환한다")
+    void unsaveJob() throws Exception {
+        setAuthentication();
+
+        given(userJobService.unsaveJob(1L, 10L))
+                .willReturn(response(UserJobStatus.VIEWED));
+
+        mockMvc.perform(delete("/user/jobs/{jobId}/save", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(100))
+                .andExpect(jsonPath("$.data.status").value("VIEWED"));
+    }
+
+    @Test
+    @DisplayName("공고 무시 취소 성공 시 200 ApiResponse를 반환한다")
+    void unignoreJob() throws Exception {
+        setAuthentication();
+
+        given(userJobService.unignoreJob(1L, 10L))
+                .willReturn(response(UserJobStatus.VIEWED));
+
+        mockMvc.perform(delete("/user/jobs/{jobId}/ignore", 10L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(100))
+                .andExpect(jsonPath("$.data.status").value("VIEWED"));
+    }
+
+    @Test
     @DisplayName("존재하지 않는 공고 저장 시 404 ErrorResponse를 반환한다")
     void saveMissingJob() throws Exception {
         setAuthentication();
@@ -154,7 +185,7 @@ class UserJobControllerTest {
     void getMySavedJobs() throws Exception {
         setAuthentication();
 
-        given(userJobService.getMySavedJobs(1L))
+        given(userJobService.getMySavedJobs(1L, 0, 20))
                 .willReturn(List.of(response(UserJobStatus.SAVED)));
 
         mockMvc.perform(get("/user/jobs/saved"))
@@ -170,7 +201,7 @@ class UserJobControllerTest {
     void getMyIgnoredJobs() throws Exception {
         setAuthentication();
 
-        given(userJobService.getMyIgnoredJobs(1L))
+        given(userJobService.getMyIgnoredJobs(1L, 0, 20))
                 .willReturn(List.of(response(UserJobStatus.IGNORED)));
 
         mockMvc.perform(get("/user/jobs/ignored"))
@@ -185,7 +216,7 @@ class UserJobControllerTest {
     void getMyViewedJobs() throws Exception {
         setAuthentication();
 
-        given(userJobService.getMyViewedJobs(1L))
+        given(userJobService.getMyViewedJobs(1L, 0, 20))
                 .willReturn(List.of(response(UserJobStatus.VIEWED)));
 
         mockMvc.perform(get("/user/jobs/viewed"))
@@ -193,6 +224,23 @@ class UserJobControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data", hasSize(1)))
                 .andExpect(jsonPath("$.data[0].status").value("VIEWED"));
+    }
+
+    @Test
+    @DisplayName("내 저장 공고 목록 조회 시 page/size 요청 파라미터를 전달한다")
+    void getMySavedJobsWithPageAndSize() throws Exception {
+        setAuthentication();
+
+        given(userJobService.getMySavedJobs(1L, 2, 5))
+                .willReturn(List.of(response(UserJobStatus.SAVED)));
+
+        mockMvc.perform(get("/user/jobs/saved")
+                        .param("page", "2")
+                        .param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data", hasSize(1)))
+                .andExpect(jsonPath("$.data[0].status").value("SAVED"));
     }
 
     @Test
