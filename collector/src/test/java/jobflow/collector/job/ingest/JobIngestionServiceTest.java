@@ -6,6 +6,8 @@ import jobflow.collector.job.Job;
 import jobflow.collector.job.JobRepository;
 import jobflow.collector.job.JobRole;
 import jobflow.collector.job.RemoteType;
+import jobflow.collector.job.snapshot.RawJobSnapshotMetadata;
+import jobflow.collector.job.snapshot.RawJobSnapshotStorage;
 import jobflow.collector.outbox.OutboxEvent;
 import jobflow.collector.outbox.OutboxEventService;
 import jobflow.collector.outbox.OutboxEventTypes;
@@ -41,6 +43,9 @@ class JobIngestionServiceTest {
     @Mock
     private JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
 
+    @Mock
+    private RawJobSnapshotStorage rawJobSnapshotStorage;
+
     private final IngestedJobMapper mapper = new IngestedJobMapper(
             new CanonicalFingerprintGenerator(),
             new JdJobRoleClassificationService()
@@ -50,16 +55,12 @@ class JobIngestionServiceTest {
     @DisplayName("신규 수집 공고를 저장하고 JOB_CREATED outbox event를 기록한다")
     void ingestNewJob() {
         IngestedJobPosting posting = createPosting("zighang-123", "백엔드 개발자");
-        JobIngestionService service = new JobIngestionService(
-                jobRepository,
-                mapper,
-                outboxEventService,
-                jobSkillNormalizationService,
-                jobExperienceTagNormalizationService
-        );
+        JobIngestionService service = service();
 
         given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))
                 .willReturn(Optional.empty());
+        given(rawJobSnapshotStorage.save(posting.source(), posting.externalId(), posting.rawData()))
+                .willReturn(rawSnapshotMetadata("zighang/zighang-123/raw-created.json"));
         given(jobRepository.save(any(Job.class)))
                 .willAnswer(invocation -> {
                     Job savedJob = invocation.getArgument(0);
@@ -76,7 +77,13 @@ class JobIngestionServiceTest {
         assertThat(result.job().getTitle()).isEqualTo("백엔드 개발자");
         assertThat(result.job().getOriginalUrl()).isEqualTo("https://zighang.com/jobs/zighang-123?utm=test");
         assertThat(result.job().getCanonicalFingerprint()).hasSize(64);
+        assertThat(result.job().getRawSnapshotKey()).isEqualTo("zighang/zighang-123/raw-created.json");
+        assertThat(result.job().getRawSnapshotHash()).hasSize(64);
+        assertThat(result.job().getRawSnapshotSizeBytes()).isEqualTo(128L);
+        assertThat(result.job().getRawSnapshotStorageType()).isEqualTo("LOCAL_FILE");
+        assertThat(result.job().getRawSnapshotSavedAt()).isEqualTo(LocalDateTime.of(2026, 6, 4, 11, 0));
 
+        verify(rawJobSnapshotStorage).save(posting.source(), posting.externalId(), posting.rawData());
         verify(jobRepository).save(any(Job.class));
         verify(outboxEventService).save(
                 eq("JOB"),
@@ -119,16 +126,12 @@ class JobIngestionServiceTest {
                 "zighang-parser-0.1"
         );
 
-        JobIngestionService service = new JobIngestionService(
-                jobRepository,
-                mapper,
-                outboxEventService,
-                jobSkillNormalizationService,
-                jobExperienceTagNormalizationService
-        );
+        JobIngestionService service = service();
 
         given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))
                 .willReturn(Optional.of(existingJob));
+        given(rawJobSnapshotStorage.save(posting.source(), posting.externalId(), posting.rawData()))
+                .willReturn(rawSnapshotMetadata("zighang/zighang-123/raw-updated.json"));
 
         JobIngestionResult result = service.ingest(posting);
 
@@ -139,6 +142,10 @@ class JobIngestionServiceTest {
         assertThat(existingJob.getLastSeenAt()).isEqualTo(posting.lastSeenAt());
         assertThat(existingJob.getRawData()).contains("백엔드 개발자 수정");
         assertThat(existingJob.getCanonicalFingerprint()).hasSize(64);
+        assertThat(existingJob.getRawSnapshotKey()).isEqualTo("zighang/zighang-123/raw-updated.json");
+        assertThat(existingJob.getRawSnapshotHash()).hasSize(64);
+        assertThat(existingJob.getRawSnapshotSizeBytes()).isEqualTo(128L);
+        assertThat(existingJob.getRawSnapshotStorageType()).isEqualTo("LOCAL_FILE");
 
         verify(outboxEventService).save(
                 eq("JOB"),
@@ -168,16 +175,12 @@ class JobIngestionServiceTest {
         Job duplicateCandidate = createJob("JUMPIT", "jumpit-999", "백엔드 개발자");
         ReflectionTestUtils.setField(duplicateCandidate, "id", 2L);
 
-        JobIngestionService service = new JobIngestionService(
-                jobRepository,
-                mapper,
-                outboxEventService,
-                jobSkillNormalizationService,
-                jobExperienceTagNormalizationService
-        );
+        JobIngestionService service = service();
 
         given(jobRepository.findBySourceAndExternalId("ZIGHANG", "zighang-123"))
                 .willReturn(Optional.empty());
+        given(rawJobSnapshotStorage.save(posting.source(), posting.externalId(), posting.rawData()))
+                .willReturn(rawSnapshotMetadata("zighang/zighang-123/raw-duplicate.json"));
         given(jobRepository.save(any(Job.class)))
                 .willAnswer(invocation -> {
                     Job savedJob = invocation.getArgument(0);
@@ -192,6 +195,27 @@ class JobIngestionServiceTest {
         assertThat(result.type()).isEqualTo(JobIngestionResultType.CREATED);
         assertThat(result.hasDuplicateCandidates()).isTrue();
         assertThat(result.duplicateCandidates()).containsExactly(duplicateCandidate);
+    }
+
+    private JobIngestionService service() {
+        return new JobIngestionService(
+                jobRepository,
+                mapper,
+                outboxEventService,
+                jobSkillNormalizationService,
+                jobExperienceTagNormalizationService,
+                rawJobSnapshotStorage
+        );
+    }
+
+    private RawJobSnapshotMetadata rawSnapshotMetadata(String key) {
+        return new RawJobSnapshotMetadata(
+                key,
+                "a".repeat(64),
+                128L,
+                "LOCAL_FILE",
+                LocalDateTime.of(2026, 6, 4, 11, 0)
+        );
     }
 
     private Job createJob(String source, String externalId, String title) {
