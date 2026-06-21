@@ -2,6 +2,7 @@ package jobflow.domain.application;
 
 import jobflow.domain.application.dto.ApplicationCreateRequest;
 import jobflow.domain.application.dto.ApplicationResponse;
+import jobflow.domain.application.dto.ApplicationStatusHistoryResponse;
 import jobflow.domain.application.dto.ApplicationStatusUpdateRequest;
 import jobflow.domain.application.dto.ApplicationSummaryResponse;
 import jobflow.domain.job.*;
@@ -28,6 +29,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -48,6 +50,9 @@ class ApplicationServiceTest {
 
     @Mock
     private OutboxEventService outboxEventService;
+
+    @Mock
+    private ApplicationStatusHistoryRepository applicationStatusHistoryRepository;
 
     @InjectMocks
     private ApplicationService applicationService;
@@ -78,6 +83,12 @@ class ApplicationServiceTest {
         assertThat(response.status()).isEqualTo(ApplicationStatus.APPLIED);
 
         verify(applicationRepository).saveAndFlush(any(Application.class));
+        verify(applicationStatusHistoryRepository).save(argThat(history ->
+                history.getApplication() == savedApplication
+                        && history.getPreviousStatus() == null
+                        && history.getNextStatus() == ApplicationStatus.APPLIED
+                        && history.getChangedAt() == savedApplication.getAppliedAt()
+        ));
         verify(outboxEventService).save(
                 eq("APPLICATION"),
                 eq(100L),
@@ -241,6 +252,64 @@ class ApplicationServiceTest {
     }
 
     @Test
+    @DisplayName("내 지원 상태 변경 이력을 조회한다")
+    void getApplicationStatusHistories() {
+        Long userId = 1L;
+        Long applicationId = 100L;
+        User user = createUser(userId);
+        Job job = createJob(10L);
+        Application application = createApplicationEntity(applicationId, user, job);
+        ApplicationStatusHistory createdHistory = ApplicationStatusHistory.record(
+                application,
+                null,
+                ApplicationStatus.APPLIED,
+                LocalDateTime.of(2026, 6, 21, 10, 0)
+        );
+        ApplicationStatusHistory interviewHistory = ApplicationStatusHistory.record(
+                application,
+                ApplicationStatus.APPLIED,
+                ApplicationStatus.INTERVIEW,
+                LocalDateTime.of(2026, 6, 21, 11, 0)
+        );
+
+        ReflectionTestUtils.setField(createdHistory, "id", 1L);
+        ReflectionTestUtils.setField(interviewHistory, "id", 2L);
+
+        given(applicationRepository.findByIdAndUserId(applicationId, userId))
+                .willReturn(Optional.of(application));
+        given(applicationStatusHistoryRepository.findByApplicationIdOrderByChangedAtAsc(applicationId))
+                .willReturn(List.of(createdHistory, interviewHistory));
+
+        List<ApplicationStatusHistoryResponse> responses =
+                applicationService.getApplicationStatusHistories(userId, applicationId);
+
+        assertThat(responses).hasSize(2);
+        assertThat(responses.getFirst().id()).isEqualTo(1L);
+        assertThat(responses.getFirst().applicationId()).isEqualTo(applicationId);
+        assertThat(responses.getFirst().previousStatus()).isNull();
+        assertThat(responses.getFirst().nextStatus()).isEqualTo(ApplicationStatus.APPLIED);
+        assertThat(responses.get(1).previousStatus()).isEqualTo(ApplicationStatus.APPLIED);
+        assertThat(responses.get(1).nextStatus()).isEqualTo(ApplicationStatus.INTERVIEW);
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 지원 상태 변경 이력은 조회할 수 없다")
+    void getApplicationStatusHistoriesOfOtherUser() {
+        Long userId = 1L;
+        Long applicationId = 100L;
+
+        given(applicationRepository.findByIdAndUserId(applicationId, userId))
+                .willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> applicationService.getApplicationStatusHistories(userId, applicationId))
+                .isInstanceOf(EntityNotFoundException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.APPLICATION_NOT_FOUND);
+
+        verify(applicationStatusHistoryRepository, never()).findByApplicationIdOrderByChangedAtAsc(any());
+    }
+
+    @Test
     @DisplayName("내 지원 상태를 변경한다")
     void updateApplicationStatus() {
         Long userId = 1L;
@@ -261,6 +330,11 @@ class ApplicationServiceTest {
         assertThat(response.status()).isEqualTo(ApplicationStatus.INTERVIEW);
 
         verify(applicationRepository).flush();
+        verify(applicationStatusHistoryRepository).save(argThat(history ->
+                history.getApplication() == application
+                        && history.getPreviousStatus() == ApplicationStatus.APPLIED
+                        && history.getNextStatus() == ApplicationStatus.INTERVIEW
+        ));
         verify(outboxEventService).save(
                 eq("APPLICATION"),
                 eq(applicationId),
@@ -268,6 +342,32 @@ class ApplicationServiceTest {
                 any(),
                 eq("application.events")
         );
+    }
+
+    @Test
+    @DisplayName("허용되지 않은 지원 상태 전이는 거부한다")
+    void rejectInvalidApplicationStatusTransition() {
+        Long userId = 1L;
+        Long applicationId = 100L;
+        User user = createUser(userId);
+        Job job = createJob(10L);
+        Application application = createApplicationEntity(applicationId, user, job);
+
+        given(applicationRepository.findByIdAndUserId(applicationId, userId))
+                .willReturn(Optional.of(application));
+
+        assertThatThrownBy(() -> applicationService.updateApplicationStatus(
+                userId,
+                applicationId,
+                new ApplicationStatusUpdateRequest(ApplicationStatus.OFFER)
+        ))
+                .isInstanceOf(ConflictException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.APPLICATION_STATUS_CONFLICT);
+
+        verify(applicationStatusHistoryRepository, never()).save(any());
+        verify(applicationRepository, never()).flush();
+        verify(outboxEventService, never()).save(any(), any(), any(), any(), any());
     }
 
     @Test

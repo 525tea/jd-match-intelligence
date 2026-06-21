@@ -69,6 +69,44 @@ class UserJobTest {
     }
 
     @Test
+    @DisplayName("저장 상태를 취소하면 조회 상태로 되돌리고 저장 시각을 비운다")
+    void unsaveUserJob() {
+        UserJob userJob = UserJob.viewed(
+                User.signup("user@example.com", "encoded-password", "사용자"),
+                createJob(),
+                LocalDateTime.of(2026, 6, 4, 10, 0)
+        );
+        userJob.save(LocalDateTime.of(2026, 6, 4, 11, 0));
+        LocalDateTime viewedAt = LocalDateTime.of(2026, 6, 4, 12, 0);
+
+        userJob.unsave(viewedAt);
+
+        assertThat(userJob.getStatus()).isEqualTo(UserJobStatus.VIEWED);
+        assertThat(userJob.getViewedAt()).isEqualTo(viewedAt);
+        assertThat(userJob.getSavedAt()).isNull();
+        assertThat(userJob.getIgnoredAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("무시 상태를 취소하면 조회 상태로 되돌리고 무시 시각을 비운다")
+    void unignoreUserJob() {
+        UserJob userJob = UserJob.viewed(
+                User.signup("user@example.com", "encoded-password", "사용자"),
+                createJob(),
+                LocalDateTime.of(2026, 6, 4, 10, 0)
+        );
+        userJob.ignore(LocalDateTime.of(2026, 6, 4, 11, 0));
+        LocalDateTime viewedAt = LocalDateTime.of(2026, 6, 4, 12, 0);
+
+        userJob.unignore(viewedAt);
+
+        assertThat(userJob.getStatus()).isEqualTo(UserJobStatus.VIEWED);
+        assertThat(userJob.getViewedAt()).isEqualTo(viewedAt);
+        assertThat(userJob.getSavedAt()).isNull();
+        assertThat(userJob.getIgnoredAt()).isNull();
+    }
+
+    @Test
     @DisplayName("저장 또는 무시 상태에서 다시 조회 상태로 변경할 수 있다")
     void markViewedAgain() {
         UserJob userJob = UserJob.viewed(

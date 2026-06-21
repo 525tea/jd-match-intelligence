@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -20,11 +21,14 @@ import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSkillResponse;
 import jobflow.domain.job.dto.JobSummaryResponse;
+import jobflow.domain.userjob.UserJobService;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.GlobalExceptionHandler;
 import jobflow.global.error.exception.ConflictException;
 import jobflow.global.error.exception.EntityNotFoundException;
 import jobflow.global.security.JwtAuthenticationFilter;
+import jobflow.global.security.UserPrincipal;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +38,8 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -53,6 +59,14 @@ class JobControllerTest {
 
     @MockitoBean
     private JobService jobService;
+
+    @MockitoBean
+    private UserJobService userJobService;
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
+    }
 
     @Test
     @DisplayName("공고 생성 성공 시 201 ApiResponse를 반환한다")
@@ -172,6 +186,35 @@ class JobControllerTest {
                 .andExpect(jsonPath("$.data.descriptionSections[0].body").value("Spring Boot 기반 백엔드 개발자 채용"))
                 .andExpect(jsonPath("$.data.skills", hasSize(1)))
                 .andExpect(jsonPath("$.data.experienceTags", hasSize(1)));
+
+        verifyNoInteractions(userJobService);
+    }
+
+    @Test
+    @DisplayName("인증 사용자가 공고 상세를 조회하면 VIEWED 상태를 기록한다")
+    void getJobWithAuthenticatedUserRecordsView() throws Exception {
+        Long jobId = 1L;
+        UserPrincipal principal = new UserPrincipal(
+                7L,
+                "user@example.com",
+                "사용자",
+                "USER"
+        );
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                principal,
+                null,
+                principal.authorities()
+        ));
+
+        given(jobService.getJob(jobId))
+                .willReturn(jobResponse(JobStatus.OPEN));
+
+        mockMvc.perform(get("/jobs/{jobId}", jobId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(1));
+
+        verify(userJobService).markViewed(7L, jobId);
     }
 
     @Test

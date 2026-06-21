@@ -9,6 +9,7 @@ import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +61,26 @@ public class UserJobService {
         return UserJobResponse.from(userJob);
     }
 
+    @Transactional
+    public UserJobResponse unsaveJob(Long userId, Long jobId) {
+        UserJob userJob = findUserJob(userId, jobId);
+
+        userJob.unsave(LocalDateTime.now());
+
+        publishUserJobChangedEvent(userJob);
+        return UserJobResponse.from(userJob);
+    }
+
+    @Transactional
+    public UserJobResponse unignoreJob(Long userId, Long jobId) {
+        UserJob userJob = findUserJob(userId, jobId);
+
+        userJob.unignore(LocalDateTime.now());
+
+        publishUserJobChangedEvent(userJob);
+        return UserJobResponse.from(userJob);
+    }
+
     public UserJobResponse getMyJob(Long userId, Long jobId) {
         UserJob userJob = userJobRepository.findByUserIdAndJobId(userId, jobId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorCode.USER_JOB_NOT_FOUND));
@@ -68,22 +89,55 @@ public class UserJobService {
     }
 
     public List<UserJobResponse> getMyViewedJobs(Long userId) {
-        return getMyJobsByStatus(userId, UserJobStatus.VIEWED);
+        return getMyViewedJobs(userId, 0, 20);
     }
 
     public List<UserJobResponse> getMySavedJobs(Long userId) {
-        return getMyJobsByStatus(userId, UserJobStatus.SAVED);
+        return getMySavedJobs(userId, 0, 20);
     }
 
     public List<UserJobResponse> getMyIgnoredJobs(Long userId) {
-        return getMyJobsByStatus(userId, UserJobStatus.IGNORED);
+        return getMyIgnoredJobs(userId, 0, 20);
     }
 
-    private List<UserJobResponse> getMyJobsByStatus(Long userId, UserJobStatus status) {
-        return userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(userId, status)
+    public List<UserJobResponse> getMyViewedJobs(Long userId, int page, int size) {
+        return getMyJobsByStatus(userId, UserJobStatus.VIEWED, page, size);
+    }
+
+    public List<UserJobResponse> getMySavedJobs(Long userId, int page, int size) {
+        return getMyJobsByStatus(userId, UserJobStatus.SAVED, page, size);
+    }
+
+    public List<UserJobResponse> getMyIgnoredJobs(Long userId, int page, int size) {
+        return getMyJobsByStatus(userId, UserJobStatus.IGNORED, page, size);
+    }
+
+    private List<UserJobResponse> getMyJobsByStatus(Long userId, UserJobStatus status, int page, int size) {
+        return userJobRepository.findByUserIdAndStatusOrderByUpdatedAtDesc(
+                        userId,
+                        status,
+                        PageRequest.of(normalizePage(page), normalizeSize(size))
+                )
                 .stream()
                 .map(UserJobResponse::from)
                 .toList();
+    }
+
+    private int normalizePage(int page) {
+        return Math.max(page, 0);
+    }
+
+    private int normalizeSize(int size) {
+        if (size < 1) {
+            return 20;
+        }
+
+        return Math.min(size, 100);
+    }
+
+    private UserJob findUserJob(Long userId, Long jobId) {
+        return userJobRepository.findByUserIdAndJobId(userId, jobId)
+                .orElseThrow(() -> new EntityNotFoundException(ErrorCode.USER_JOB_NOT_FOUND));
     }
 
     private UserJob findOrCreateViewedUserJob(Long userId, Long jobId) {

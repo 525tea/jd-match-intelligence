@@ -43,7 +43,11 @@ class OpenApiDocsIntegrationTest {
 
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/{jobId}/view")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/{jobId}/save")))
+                .andExpect(jsonPath("$.paths['/user/jobs/{jobId}/save']", hasKey("post")))
+                .andExpect(jsonPath("$.paths['/user/jobs/{jobId}/save']", hasKey("delete")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/{jobId}/ignore")))
+                .andExpect(jsonPath("$.paths['/user/jobs/{jobId}/ignore']", hasKey("post")))
+                .andExpect(jsonPath("$.paths['/user/jobs/{jobId}/ignore']", hasKey("delete")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/saved")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/viewed")))
                 .andExpect(jsonPath("$.paths", hasKey("/user/jobs/ignored")))
@@ -51,6 +55,7 @@ class OpenApiDocsIntegrationTest {
                 .andExpect(jsonPath("$.paths", hasKey("/applications")))
                 .andExpect(jsonPath("$.paths", hasKey("/applications/{applicationId}")))
                 .andExpect(jsonPath("$.paths", hasKey("/applications/{applicationId}/status")))
+                .andExpect(jsonPath("$.paths", hasKey("/applications/{applicationId}/status-histories")))
 
                 .andExpect(jsonPath("$.paths", hasKey("/projects/{userProjectId}/skills")))
                 .andExpect(jsonPath("$.paths", hasKey("/projects/{userProjectId}/experience-tags")))
