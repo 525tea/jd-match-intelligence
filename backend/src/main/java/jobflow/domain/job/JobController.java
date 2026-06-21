@@ -7,10 +7,13 @@ import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSummaryResponse;
 import jobflow.domain.job.dto.JobUpdateRequest;
+import jobflow.domain.userjob.UserJobService;
 import jobflow.global.response.ApiResponse;
+import jobflow.global.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +31,7 @@ import java.util.List;
 public class JobController {
 
     private final JobService jobService;
+    private final UserJobService userJobService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<JobResponse>> createJob(
@@ -59,9 +63,13 @@ public class JobController {
 
     @GetMapping("/{jobId}")
     public ResponseEntity<ApiResponse<JobResponse>> getJob(
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long jobId
     ) {
         JobResponse response = jobService.getJob(jobId);
+        if (principal != null) {
+            userJobService.markViewed(principal.id(), jobId);
+        }
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
