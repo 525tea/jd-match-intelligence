@@ -9,7 +9,9 @@
 - 공고 목록 필터 지원
 - 공고 생성/수정 시 값 범위 검증
 - 공고 수정 시 `job_skills`, `job_experience_tags` 관계 교체 정책 명시 및 구현
+- 프론트엔드 `api.jobs()` 호출을 `/jobs?page&size` 계약에 맞춰 정렬
 - Gateway 기준 API 스모크 검증 추가
+- OpenAPI 문서와 repository filter 테스트 보강
 
 ## 변경 범위
 
@@ -56,6 +58,14 @@
 
 이 정책은 공고 수정 시 stale relation이 남는 문제를 방지한다.
 
+### 프론트 목록 호출 계약 정렬
+
+프론트엔드의 `api.jobs()` 호출도 변경된 `/jobs` 목록 계약에 맞췄다.
+
+- 기존: `/jobs` 전체 조회 또는 `limit` 기반 호출
+- 변경: `/jobs?page=0&size=50` 기본 호출
+- 효과: 프론트 화면과 backend API 계약이 같은 pagination 파라미터를 사용
+
 ## 검증 환경
 
 | 항목 | 값 |
@@ -64,7 +74,7 @@
 | 진입점 | Gateway |
 | Backend | Docker Compose backend |
 | DB | Docker Compose MySQL |
-| 검증 스크립트 | `performance/job/job-list-filter-smoke.sh` |
+| 검증 스크립트 | `performance/job/job-list-filter-smoke.sh`, `performance/openapi/openapi-contract-smoke.sh` |
 
 ## Gateway API Smoke
 
@@ -120,6 +130,39 @@ jobs_invalid_size_status=400
 Job list filter smoke completed.
 ```
 
+## OpenAPI Contract Smoke
+
+실행 명령:
+
+```bash
+BASE_URL=http://localhost:8081/api \
+bash performance/openapi/openapi-contract-smoke.sh
+```
+
+실행 결과:
+
+```text
+has_jobs_list=true
+has_jobs_list_page_param=true
+has_jobs_list_size_param=true
+has_jobs_list_status_param=true
+has_jobs_list_role_param=true
+has_jobs_list_career_level_param=true
+has_jobs_list_location_region_param=true
+has_jobs_list_remote_type_param=true
+
+OpenAPI contract smoke completed.
+```
+
+## 자동 테스트
+
+| 구분 | 명령 | 결과 |
+| --- | --- | --- |
+| 공고 수정 relation 교체 | `./gradlew -p backend test --tests jobflow.domain.job.JobServiceTest` | PASS |
+| 공고 목록 repository filter | `./gradlew -p backend test --tests jobflow.domain.job.JobRepositoryFilterTest` | PASS |
+| OpenAPI docs contract | `./gradlew -p backend test --tests jobflow.global.config.OpenApiDocsIntegrationTest` | PASS |
+| 프론트 빌드 | `npm --prefix frontend run build` | PASS |
+
 ## 검증 결과
 
 | 검증 항목 | 기대값 | 실제값 | 결과 |
@@ -129,6 +172,8 @@ Job list filter smoke completed.
 | `/jobs?locationRegion=Seoul` | 200, 지역 조건 일치 | 200, 5건 반환 | PASS |
 | `/jobs?remoteType=ONSITE` | 200, 근무 형태 조건 일치 | 200, 5건 반환 | PASS |
 | `/jobs?size=101` | 400 | 400 | PASS |
+| OpenAPI `/jobs` query parameter | page/size/status/role/careerLevel/locationRegion/remoteType 노출 | 모두 노출 | PASS |
+| Frontend `api.jobs()` | page/size 기반 호출 | build 통과 | PASS |
 
 ## 결론
 
@@ -136,8 +181,9 @@ Job list filter smoke completed.
 
 Gateway 기준으로 페이지네이션, 주요 필터, 요청 검증이 모두 동작하는 것을 확인했다. 공고 수정 시 스킬/경험 태그 관계도 명시적인 교체 정책으로 정리되어, DB relation stale 상태가 남을 위험을 줄였다.
 
+추가로 OpenAPI 문서에 `/jobs` query parameter가 노출되는지 확인했고, 프론트엔드 목록 호출도 backend 계약과 동일한 `page/size` 기반으로 정렬했다.
+
 ## 후속 확인
 
-- 프론트 공고 목록 화면에서 `/jobs` 페이지네이션/필터 API를 실제로 사용하도록 전환 여부 확인
 - k6 부하 테스트에서 `/jobs` 기본 목록 조회와 `/jobs/search` 검색 조회를 분리해 지표 수집
 - 공고 수정 관리자 화면이 생기면 relation 교체 정책을 UI 동작과 맞춰 재검증
