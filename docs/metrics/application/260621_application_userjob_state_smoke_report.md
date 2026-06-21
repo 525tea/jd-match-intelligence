@@ -8,7 +8,8 @@
 
 이번 검증은 다음 흐름을 확인한다.
 
-- 사용자는 공고를 조회, 저장, 저장 취소, 무시, 무시 취소할 수 있다.
+- 인증 사용자가 `GET /jobs/{jobId}`로 공고 상세를 조회하면 UserJob 상태가 `VIEWED`로 자동 기록된다.
+- 사용자는 공고를 저장, 저장 취소, 무시, 무시 취소할 수 있다.
 - 저장/무시 목록 API는 `page`, `size` 요청 파라미터를 받아 목록 크기를 제한한다.
 - 지원 상태는 허용된 방향으로만 전이된다.
 - 역방향 지원 상태 전이는 `409 APPLICATION_STATUS_CONFLICT`로 거부된다.
@@ -81,7 +82,8 @@ bash performance/application/application-userjob-state-smoke.sh
 
 | 구간 | API | 기대값 | 결과 |
 | --- | --- | ---: | ---: |
-| 조회 처리 | `POST /user/jobs/{jobId}/view` | 200 | 200 |
+| 공고 상세 조회 | `GET /jobs/{jobId}` with token | 200 | 200 |
+| 상세 조회 후 UserJob 확인 | `GET /user/jobs/{jobId}` | 200 | 200 |
 | 저장 처리 | `POST /user/jobs/{jobId}/save` | 200 | 200 |
 | 저장 목록 page 조회 | `GET /user/jobs/saved?page=0&size=1` | 200 | 200 |
 | 저장 취소 | `DELETE /user/jobs/{jobId}/save` | 200 | 200 |
@@ -92,7 +94,7 @@ bash performance/application/application-userjob-state-smoke.sh
 확인한 상태 전이:
 
 ```text
-VIEWED -> SAVED -> VIEWED -> IGNORED -> VIEWED
+GET /jobs/{jobId} -> VIEWED -> SAVED -> VIEWED -> IGNORED -> VIEWED
 ```
 
 목록 조회 확인:
@@ -126,7 +128,8 @@ INTERVIEW -> DOCUMENT_PASSED rejected
 ```text
 user_id=75
 selected_job_id=13
-user_job_view_status=200
+job_detail_status=200
+user_job_auto_view_status=200
 user_job_save_status=200
 user_job_unsave_status=200
 user_job_ignore_status=200
@@ -169,9 +172,10 @@ docker compose up -d --build backend gateway
 
 현재 Application/UserJob 상태 API는 Gateway 기준 smoke 검증을 통과했다.
 
+- 인증 사용자의 공고 상세 조회가 UserJob `VIEWED` 상태를 자동 기록한다.
 - UserJob 저장/무시 취소 API가 정상 동작한다.
 - 저장/무시 목록 API가 `page`, `size` 요청 파라미터를 반영한다.
 - Application 상태 전이는 허용된 방향으로만 진행된다.
 - 잘못된 역방향 전이는 `409 APPLICATION_STATUS_CONFLICT`로 거부된다.
 
-이 결과로 프론트의 저장/무시 토글 UX와 지원 상태 변경 UX를 실제 API 기반으로 연결할 수 있는 최소 상태 계약이 확보됐다.
+이 결과로 프론트의 공고 상세 조회, 저장/무시 토글 UX, 지원 상태 변경 UX를 실제 API 기반으로 연결할 수 있는 상태 계약이 확보됐다.
