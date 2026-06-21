@@ -3,6 +3,7 @@ package jobflow.domain.job;
 import jobflow.domain.job.dto.JobCreateRequest;
 import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobExperienceTagRequest;
+import jobflow.domain.job.dto.JobListRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSkillRequest;
@@ -22,9 +23,11 @@ import jobflow.global.error.exception.EntityNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Constructor;
@@ -360,20 +363,48 @@ class JobServiceTest {
     }
 
     @Test
-    @DisplayName("공고 목록을 조회한다")
+    @DisplayName("공고 목록을 pagination과 filter 기준으로 조회한다")
     void getJobs() {
         Job job = createJobEntity(1L);
+        JobListRequest request = new JobListRequest(
+                1,
+                10,
+                JobStatus.OPEN,
+                JobRole.BACKEND,
+                CareerLevel.JUNIOR,
+                " Seoul ",
+                RemoteType.ONSITE
+        );
 
-        given(jobRepository.findAllByOrderByCreatedAtDesc()).willReturn(List.of(job));
+        given(jobRepository.findSummaries(
+                eq(JobStatus.OPEN),
+                eq(JobRole.BACKEND),
+                eq(CareerLevel.JUNIOR),
+                eq("Seoul"),
+                eq(RemoteType.ONSITE),
+                any(Pageable.class)
+        )).willReturn(List.of(job));
         given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
 
-        List<JobSummaryResponse> responses = jobService.getJobs();
+        List<JobSummaryResponse> responses = jobService.getJobs(request);
 
         assertThat(responses).hasSize(1);
         assertThat(responses.getFirst().id()).isEqualTo(1L);
         assertThat(responses.getFirst().title()).isEqualTo("백엔드 개발자");
         assertThat(responses.getFirst().status()).isEqualTo(JobStatus.OPEN);
         assertThat(responses.getFirst().applyUrl()).isEqualTo("https://example.com/jobs/1");
+
+        ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
+        verify(jobRepository).findSummaries(
+                eq(JobStatus.OPEN),
+                eq(JobRole.BACKEND),
+                eq(CareerLevel.JUNIOR),
+                eq("Seoul"),
+                eq(RemoteType.ONSITE),
+                pageableCaptor.capture()
+        );
+        assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(1);
+        assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
     }
 
     @Test

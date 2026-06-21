@@ -14,8 +14,6 @@ import org.springframework.data.domain.Pageable;
 @Repository("jobDomainRepository")
 public interface JobRepository extends JpaRepository<Job, Long> {
 
-    List<Job> findAllByOrderByCreatedAtDesc();
-
     List<Job> findByIdGreaterThanOrderByIdAsc(Long id, Pageable pageable);
 
     List<Job> findByIdIn(Collection<Long> ids);
@@ -28,6 +26,25 @@ public interface JobRepository extends JpaRepository<Job, Long> {
             JobStatus status,
             LocalDateTime from,
             LocalDateTime to,
+            Pageable pageable
+    );
+
+    @Query("""
+        SELECT job
+        FROM Job job
+        WHERE (:status IS NULL OR job.status = :status)
+          AND (:role IS NULL OR job.role = :role)
+          AND (:careerLevel IS NULL OR job.careerLevel = :careerLevel)
+          AND (:locationRegion IS NULL OR job.locationRegion = :locationRegion)
+          AND (:remoteType IS NULL OR job.remoteType = :remoteType)
+        ORDER BY job.createdAt DESC, job.id DESC
+        """)
+    List<Job> findSummaries(
+            @Param("status") JobStatus status,
+            @Param("role") JobRole role,
+            @Param("careerLevel") CareerLevel careerLevel,
+            @Param("locationRegion") String locationRegion,
+            @Param("remoteType") RemoteType remoteType,
             Pageable pageable
     );
 

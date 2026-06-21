@@ -4,6 +4,7 @@ import jobflow.domain.job.dto.JobCreateRequest;
 import jobflow.domain.job.dto.JobCanonicalGroupItemResponse;
 import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobExperienceTagRequest;
+import jobflow.domain.job.dto.JobListRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSkillRequest;
@@ -21,6 +22,7 @@ import jobflow.domain.skill.SkillRepository;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -107,8 +109,17 @@ public class JobService {
         return JobResponse.of(job, jobSkills, jobExperienceTags, jobApplyUrlResolver.resolve(job));
     }
 
-    public List<JobSummaryResponse> getJobs() {
-        return jobRepository.findAllByOrderByCreatedAtDesc()
+    public List<JobSummaryResponse> getJobs(JobListRequest request) {
+        PageRequest pageable = PageRequest.of(request.pageOrDefault(), request.sizeOrDefault());
+
+        return jobRepository.findSummaries(
+                        request.status(),
+                        request.role(),
+                        request.careerLevel(),
+                        request.normalizedLocationRegion(),
+                        request.remoteType(),
+                        pageable
+                )
                 .stream()
                 .map(job -> JobSummaryResponse.from(job, jobApplyUrlResolver.resolve(job)))
                 .toList();

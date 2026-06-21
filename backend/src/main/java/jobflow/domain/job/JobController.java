@@ -3,6 +3,7 @@ package jobflow.domain.job;
 import jakarta.validation.Valid;
 import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobCreateRequest;
+import jobflow.domain.job.dto.JobListRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSummaryResponse;
@@ -15,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -45,8 +47,10 @@ public class JobController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<JobSummaryResponse>>> getJobs() {
-        List<JobSummaryResponse> response = jobService.getJobs();
+    public ResponseEntity<ApiResponse<List<JobSummaryResponse>>> getJobs(
+            @Valid @ModelAttribute JobListRequest request
+    ) {
+        List<JobSummaryResponse> response = jobService.getJobs(request);
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }

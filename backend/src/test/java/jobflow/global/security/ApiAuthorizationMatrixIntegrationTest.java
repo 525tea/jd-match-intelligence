@@ -58,7 +58,7 @@ class ApiAuthorizationMatrixIntegrationTest {
     @DisplayName("PUBLIC API는 토큰 없이 호출할 수 있다")
     void publicApisAllowAnonymousAccess() throws Exception {
         given(skillService.findSkills(null, null)).willReturn(List.of());
-        given(jobService.getJobs()).willReturn(List.of());
+        given(jobService.getJobs(any())).willReturn(List.of());
         given(jobService.searchJobs("backend", 3)).willReturn(List.of());
         given(analyticsTrendService.getSkillTrends(null, 3)).willReturn(List.of());
 

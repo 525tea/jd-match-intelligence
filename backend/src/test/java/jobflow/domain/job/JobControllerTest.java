@@ -1,5 +1,6 @@
 package jobflow.domain.job;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -17,6 +18,7 @@ import jobflow.domain.job.dto.JobCanonicalGroupItemResponse;
 import jobflow.domain.job.dto.JobCanonicalGroupResponse;
 import jobflow.domain.job.dto.JobDescriptionSectionResponse;
 import jobflow.domain.job.dto.JobExperienceTagResponse;
+import jobflow.domain.job.dto.JobListRequest;
 import jobflow.domain.job.dto.JobResponse;
 import jobflow.domain.job.dto.JobSearchResponse;
 import jobflow.domain.job.dto.JobSkillResponse;
@@ -31,6 +33,7 @@ import jobflow.global.security.UserPrincipal;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -253,7 +256,7 @@ class JobControllerTest {
     @Test
     @DisplayName("공고 목록 조회 성공 시 200 ApiResponse를 반환한다")
     void getJobs() throws Exception {
-        given(jobService.getJobs())
+        given(jobService.getJobs(any(JobListRequest.class)))
                 .willReturn(List.of(jobSummaryResponse()));
 
         mockMvc.perform(get("/jobs"))
@@ -263,6 +266,41 @@ class JobControllerTest {
                 .andExpect(jsonPath("$.data[0].id").value(1))
                 .andExpect(jsonPath("$.data[0].title").value("백엔드 개발자"))
                 .andExpect(jsonPath("$.data[0].status").value("OPEN"));
+
+        ArgumentCaptor<JobListRequest> requestCaptor = ArgumentCaptor.forClass(JobListRequest.class);
+        verify(jobService).getJobs(requestCaptor.capture());
+
+        assertThat(requestCaptor.getValue().pageOrDefault()).isZero();
+        assertThat(requestCaptor.getValue().sizeOrDefault()).isEqualTo(20);
+    }
+
+    @Test
+    @DisplayName("공고 목록 조회 시 pagination과 filter query parameter를 전달한다")
+    void getJobsWithFilters() throws Exception {
+        given(jobService.getJobs(any(JobListRequest.class)))
+                .willReturn(List.of(jobSummaryResponse()));
+
+        mockMvc.perform(get("/jobs")
+                        .param("page", "1")
+                        .param("size", "10")
+                        .param("status", "OPEN")
+                        .param("role", "BACKEND")
+                        .param("careerLevel", "JUNIOR")
+                        .param("locationRegion", " Seoul ")
+                        .param("remoteType", "ONSITE"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<JobListRequest> requestCaptor = ArgumentCaptor.forClass(JobListRequest.class);
+        verify(jobService).getJobs(requestCaptor.capture());
+
+        JobListRequest request = requestCaptor.getValue();
+        assertThat(request.pageOrDefault()).isEqualTo(1);
+        assertThat(request.sizeOrDefault()).isEqualTo(10);
+        assertThat(request.status()).isEqualTo(JobStatus.OPEN);
+        assertThat(request.role()).isEqualTo(JobRole.BACKEND);
+        assertThat(request.careerLevel()).isEqualTo(CareerLevel.JUNIOR);
+        assertThat(request.normalizedLocationRegion()).isEqualTo("Seoul");
+        assertThat(request.remoteType()).isEqualTo(RemoteType.ONSITE);
     }
 
     @Test
