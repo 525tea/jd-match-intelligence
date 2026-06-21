@@ -55,6 +55,7 @@ class OpenApiDocsIntegrationTest {
                 .andExpect(jsonPath("$.paths", hasKey("/applications")))
                 .andExpect(jsonPath("$.paths", hasKey("/applications/{applicationId}")))
                 .andExpect(jsonPath("$.paths", hasKey("/applications/{applicationId}/status")))
+                .andExpect(jsonPath("$.paths", hasKey("/applications/{applicationId}/status-histories")))
 
                 .andExpect(jsonPath("$.paths", hasKey("/projects/{userProjectId}/skills")))
                 .andExpect(jsonPath("$.paths", hasKey("/projects/{userProjectId}/experience-tags")))
