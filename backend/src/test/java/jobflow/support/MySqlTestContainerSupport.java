@@ -5,19 +5,19 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @ActiveProfiles("test")
 public abstract class MySqlTestContainerSupport {
 
-    @Container
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4")
             .withDatabaseName("jobflow_test")
             .withUsername("jobflow")
             .withPassword("jobflow");
+
+    static {
+        MYSQL.start();
+    }
 
     @DynamicPropertySource
     static void registerMySqlProperties(DynamicPropertyRegistry registry) {
@@ -34,6 +34,7 @@ public abstract class MySqlTestContainerSupport {
 
         registry.add("app.search.elasticsearch.initialize-on-startup", () -> "false");
         registry.add("app.search.elasticsearch.reindex-on-startup", () -> "false");
+        registry.add("jobflow.outbox.relay.enabled", () -> "false");
         registry.add("jobflow.notification.deadline-reminder.scheduler.enabled", () -> "false");
         registry.add("jobflow.notification.deadline-reminder.runner.enabled", () -> "false");
         registry.add("jobflow.notification.daily-digest.runner.enabled", () -> "false");
