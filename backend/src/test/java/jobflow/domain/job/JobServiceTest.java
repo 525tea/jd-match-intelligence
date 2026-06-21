@@ -460,17 +460,23 @@ class JobServiceTest {
 
 
     @Test
-    @DisplayName("공고 기본 정보를 수정한다")
+    @DisplayName("공고 기본 정보와 스킬/경험 태그 관계를 함께 수정한다")
     void updateJob() {
         Long jobId = 1L;
         Job job = createJobEntity(jobId);
         JobUpdateRequest request = updateRequest();
+        Skill skill = createSkill(1L);
+        ExperienceTagCode tagCode = createExperienceTagCode("HIGH_TRAFFIC");
+        JobSkill jobSkill = JobSkill.create(job, skill, RequirementType.REQUIRED);
+        JobExperienceTag jobExperienceTag = JobExperienceTag.create(job, tagCode, "대용량 트래픽");
 
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
         given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         givenRoleResolution(request, JobRole.BACKEND);
-        given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
-        given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
+        given(skillRepository.findById(1L)).willReturn(Optional.of(skill));
+        given(experienceTagCodeRepository.findById("HIGH_TRAFFIC")).willReturn(Optional.of(tagCode));
+        given(jobSkillRepository.saveAll(any())).willReturn(List.of(jobSkill));
+        given(jobExperienceTagRepository.saveAll(any())).willReturn(List.of(jobExperienceTag));
 
         JobResponse response = jobService.updateJob(jobId, request);
 
@@ -478,7 +484,15 @@ class JobServiceTest {
         assertThat(response.title()).isEqualTo("수정된 백엔드 개발자");
         assertThat(response.companyName()).isEqualTo("Updated JobFlow");
         assertThat(response.role()).isEqualTo(JobRole.BACKEND);
+        assertThat(response.skills()).hasSize(1);
+        assertThat(response.skills().getFirst().name()).isEqualTo("Spring Boot");
+        assertThat(response.experienceTags()).hasSize(1);
+        assertThat(response.experienceTags().getFirst().code()).isEqualTo("HIGH_TRAFFIC");
 
+        verify(jobSkillRepository).deleteByJobId(jobId);
+        verify(jobExperienceTagRepository).deleteByJobId(jobId);
+        verify(jobSkillRepository).saveAll(any());
+        verify(jobExperienceTagRepository).saveAll(any());
         verify(outboxEventService).save(
                 eq("JOB"),
                 eq(jobId),
@@ -498,8 +512,11 @@ class JobServiceTest {
         given(jobRepository.findById(jobId)).willReturn(Optional.of(job));
         given(jobApplyUrlResolver.resolve(job)).willReturn("https://example.com/jobs/1");
         givenRoleResolution(request, JobRole.BACKEND);
-        given(jobSkillRepository.findByJobId(jobId)).willReturn(List.of());
-        given(jobExperienceTagRepository.findByJobId(jobId)).willReturn(List.of());
+        given(skillRepository.findById(1L)).willReturn(Optional.of(createSkill(1L)));
+        given(experienceTagCodeRepository.findById("HIGH_TRAFFIC"))
+                .willReturn(Optional.of(createExperienceTagCode("HIGH_TRAFFIC")));
+        given(jobSkillRepository.saveAll(any())).willReturn(List.of());
+        given(jobExperienceTagRepository.saveAll(any())).willReturn(List.of());
 
         JobResponse response = jobService.updateJob(jobId, request);
 
@@ -726,7 +743,9 @@ class JobServiceTest {
                 true,
                 1,
                 LocalDateTime.of(2026, 6, 1, 9, 0),
-                LocalDateTime.of(2026, 7, 1, 23, 59)
+                LocalDateTime.of(2026, 7, 1, 23, 59),
+                List.of(new JobSkillRequest(1L, RequirementType.REQUIRED)),
+                List.of(new JobExperienceTagRequest("HIGH_TRAFFIC", "대용량 트래픽 처리 경험"))
         );
     }
 
@@ -755,7 +774,9 @@ class JobServiceTest {
                 true,
                 1,
                 LocalDateTime.of(2026, 6, 1, 9, 0),
-                LocalDateTime.of(2026, 7, 1, 23, 59)
+                LocalDateTime.of(2026, 7, 1, 23, 59),
+                List.of(new JobSkillRequest(1L, RequirementType.REQUIRED)),
+                List.of(new JobExperienceTagRequest("HIGH_TRAFFIC", "대용량 트래픽 처리 경험"))
         );
     }
 
