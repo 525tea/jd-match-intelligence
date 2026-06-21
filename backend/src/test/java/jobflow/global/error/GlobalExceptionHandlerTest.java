@@ -53,7 +53,9 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("COMMON_INVALID_INPUT"))
-                .andExpect(jsonPath("$.error.message").value("입력값이 올바르지 않습니다."));
+                .andExpect(jsonPath("$.error.message").value("입력값이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/test/business-exception"));
     }
 
     @Test
@@ -111,7 +113,9 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("COMMON_INVALID_REQUEST"))
-                .andExpect(jsonPath("$.error.message").value("요청 형식이 올바르지 않습니다."));
+                .andExpect(jsonPath("$.error.message").value("요청 형식이 올바르지 않습니다."))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/test/validation"));
     }
 
     @TestConfiguration

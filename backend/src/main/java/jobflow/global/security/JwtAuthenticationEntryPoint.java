@@ -24,7 +24,7 @@ public class JwtAuthenticationEntryPoint implements org.springframework.security
             HttpServletResponse response,
             org.springframework.security.core.AuthenticationException authException
     ) throws IOException {
-        ErrorResponse errorResponse = ErrorResponse.of(ErrorCode.COMMON_UNAUTHORIZED);
+        ErrorResponse errorResponse = ErrorResponse.of(ErrorCode.COMMON_UNAUTHORIZED, request);
 
         response.setStatus(ErrorCode.COMMON_UNAUTHORIZED.getStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

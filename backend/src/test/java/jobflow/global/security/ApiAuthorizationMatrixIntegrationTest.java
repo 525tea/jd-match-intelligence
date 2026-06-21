@@ -91,7 +91,9 @@ class ApiAuthorizationMatrixIntegrationTest {
         mockMvc.perform(get("/auth/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/auth/me"));
 
         mockMvc.perform(get("/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
@@ -131,7 +133,9 @@ class ApiAuthorizationMatrixIntegrationTest {
                         .content(requestBody))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/skills"));
 
         mockMvc.perform(post("/skills")
                         .header(HttpHeaders.AUTHORIZATION, bearer(userToken))
@@ -139,7 +143,9 @@ class ApiAuthorizationMatrixIntegrationTest {
                         .content(requestBody))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON_FORBIDDEN"));
+                .andExpect(jsonPath("$.error.code").value("COMMON_FORBIDDEN"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/skills"));
 
         mockMvc.perform(post("/skills")
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
@@ -161,12 +167,16 @@ class ApiAuthorizationMatrixIntegrationTest {
 
         mockMvc.perform(patch("/jobs/{jobId}/close", 1L))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"));
+                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/jobs/1/close"));
 
         mockMvc.perform(patch("/jobs/{jobId}/close", 1L)
                         .header(HttpHeaders.AUTHORIZATION, bearer(userToken)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code").value("COMMON_FORBIDDEN"));
+                .andExpect(jsonPath("$.error.code").value("COMMON_FORBIDDEN"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.path").value("/jobs/1/close"));
 
         given(jobService.closeJob(1L)).willReturn(null);
 
