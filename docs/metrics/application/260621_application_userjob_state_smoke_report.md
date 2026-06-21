@@ -12,6 +12,7 @@
 - 사용자는 공고를 저장, 저장 취소, 무시, 무시 취소할 수 있다.
 - 저장/무시 목록 API는 `page`, `size` 요청 파라미터를 받아 목록 크기를 제한한다.
 - 지원 상태는 허용된 방향으로만 전이된다.
+- 지원 상태 변경 이력 API는 생성 이력과 상태 변경 이력을 조회할 수 있다.
 - 역방향 지원 상태 전이는 `409 APPLICATION_STATUS_CONFLICT`로 거부된다.
 - 모든 검증은 Gateway `http://localhost:8081/api`를 기준으로 수행한다.
 
@@ -55,7 +56,7 @@ bash performance/application/application-userjob-state-smoke.sh
 ACCESS_TOKEN="$(
   curl -s -X POST 'http://localhost:8081/api/auth/login' \
     -H 'Content-Type: application/json' \
-    -d '{"email":"frontend-demo@example.com","password":"password123"}' \
+    -d "{\"email\":\"$USER_EMAIL\",\"password\":\"$USER_PASSWORD\"}" \
   | jq -r '.data.accessToken'
 )" \
 BASE_URL=http://localhost:8081/api \
@@ -112,6 +113,7 @@ GET /user/jobs/ignored?page=0&size=1
 | --- | --- | ---: | ---: |
 | 지원 생성 | `POST /applications` | 201 | 201 |
 | 상태 변경 | `PATCH /applications/{applicationId}/status` to `INTERVIEW` | 200 | 200 |
+| 상태 이력 조회 | `GET /applications/{applicationId}/status-histories` | 200 | 200 |
 | 역방향 전이 거부 | `PATCH /applications/{applicationId}/status` to `DOCUMENT_PASSED` | 409 | 409 |
 
 확인한 상태 전이:
@@ -136,6 +138,7 @@ user_job_ignore_status=200
 user_job_unignore_status=200
 application_id=4
 application_interview_status=200
+application_status_histories_status=200
 application_invalid_transition_status=409
 
 Application/UserJob state smoke completed.
@@ -176,6 +179,7 @@ docker compose up -d --build backend gateway
 - UserJob 저장/무시 취소 API가 정상 동작한다.
 - 저장/무시 목록 API가 `page`, `size` 요청 파라미터를 반영한다.
 - Application 상태 전이는 허용된 방향으로만 진행된다.
+- Application 상태 변경 이력 API가 생성 이력과 상태 변경 이력을 조회한다.
 - 잘못된 역방향 전이는 `409 APPLICATION_STATUS_CONFLICT`로 거부된다.
 
 이 결과로 프론트의 공고 상세 조회, 저장/무시 토글 UX, 지원 상태 변경 UX를 실제 API 기반으로 연결할 수 있는 상태 계약이 확보됐다.
