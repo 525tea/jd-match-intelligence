@@ -121,6 +121,42 @@ WORD_INTERNAL_BREAK_SUSPECT: 0 rows
 INLINE_MIDDLE_DOT_BULLET_SUSPECT: 0 rows
 ```
 
+## Frontend detail render smoke 결과
+
+실행 명령:
+
+```bash
+BASE_URL=http://localhost:8081/api \
+bash performance/frontend/frontend-wanted-detail-render-smoke.sh
+```
+
+결과:
+
+```text
+BASE_URL=http://localhost:8081/api
+DATA_ENGINEER_JOB_ID=459
+MIDDLE_DOT_JOB_ID=458
+
+### WANTED Data Engineer detail
+data_engineer_detail_status=200
+data_engineer_title=Data Engineer 4~7년
+data_engineer_role=DATA_ENGINEER
+data_engineer_description_section_count=5
+
+### WANTED middle dot detail
+middle_dot_detail_status=200
+middle_dot_title=프론트엔드 개발자 (1년~3년이상)
+middle_dot_description_section_count=6
+
+Frontend WANTED detail render smoke completed.
+```
+
+해석:
+
+- `/jobs/459` 상세 응답에서 `Data Engineer 4~7년`은 `DATA_ENGINEER`로 분류된다.
+- `/jobs/458` 상세 응답은 section parser를 통과해도 inline middle dot/bullet separator가 새 bullet line으로 깨지지 않는다.
+- 두 대표 회귀 케이스 모두 Gateway API 기준 상세 렌더링 smoke를 통과했다.
+
 ## 검증 기준
 
 | 항목 | 기대값 | 결과 |
@@ -132,6 +168,8 @@ INLINE_MIDDLE_DOT_BULLET_SUSPECT: 0 rows
 | missing snapshot metadata | 0 | 0 |
 | replay skipped count | 0 | 0 |
 | replay failed count | 0 | 0 |
+| Data Engineer detail role | DATA_ENGINEER | DATA_ENGINEER |
+| detail render smoke | completed | completed |
 
 ## 결론
 
