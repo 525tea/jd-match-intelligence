@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpStatus;
 
 import java.net.URI;
 
@@ -23,6 +24,11 @@ public class GatewayApplication {
             @Value("${gateway.backend-url:http://localhost:8080}") String backendUrl
     ) {
         return builder.routes()
+                .route("blocked-backend-actuator", route -> route
+                        .path("/api/actuator/**")
+                        .filters(filters -> filters.setStatus(HttpStatus.NOT_FOUND))
+                        .uri("no://op")
+                )
                 .route("backend-api", route -> route
                         .path("/api/**")
                         .filters(filters -> filters
