@@ -212,6 +212,11 @@ export default function App() {
         setAuthenticated(false);
         refreshData();
       },
+      async switchProject(projectId) {
+        if (!projectId || String(projectId) === String(jf.__userProjectId)) return;
+        projectStore.setProjectId(String(projectId));
+        await refreshData();
+      },
       async startGithubOAuth() {
         authStore.clear();
         await api.logout().catch(() => null);
@@ -224,8 +229,30 @@ export default function App() {
         const result = await api.importGithubRepository(repository);
         if (result?.userProjectId) {
           projectStore.setProjectId(String(result.userProjectId));
+          projectStore.setProjectMeta({
+            repositoryFullName: result.repositoryFullName || `${repository.owner}/${repository.name}`,
+            ref: result.ref || repository.ref,
+            htmlUrl: repository.htmlUrl,
+            name: repository.name,
+          });
         }
-        await refreshData();
+        const refreshed = await refreshData();
+        if (result?.userProjectId) {
+          setJf((prev) => ({
+            ...prev,
+            __userProjectId: String(result.userProjectId),
+            projectList: prev.projectList?.length
+              ? prev.projectList.map((project, index) => index === 0
+                  ? {
+                      ...project,
+                      name: result.repositoryFullName || project.name,
+                      repo: repository.htmlUrl || result.repositoryFullName || project.repo,
+                      analyzedAt: result.ref ? `최근 분석 · ${result.ref}` : project.analyzedAt,
+                    }
+                  : project)
+              : refreshed.projectList,
+          }));
+        }
         return result;
       },
     });

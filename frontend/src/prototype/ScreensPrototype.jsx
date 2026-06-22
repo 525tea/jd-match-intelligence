@@ -150,10 +150,15 @@ export function JobFlowScreens({ t, go, screen }) {
   const currentProjectName = primaryProject.name || previewProject || '내 프로젝트';
   const currentProjectRepo = primaryProject.repo || '연결된 GitHub repository';
   const currentProjectSkillSummary = (primaryProject.previewSkills || JF.skills?.map((skill) => skill.name) || []).slice(0, 3).join(' · ') || '스킬 분석 대기';
+  const repositoryLogoText = (value = '') => {
+    const repositoryName = String(value || '').split('/').filter(Boolean).pop() || value;
+    return String(repositoryName).replace(/[^A-Za-z0-9가-힣]/g, ' ').trim().split(/\s+/).map((x) => x[0]).join('').slice(0, 2).toUpperCase() || 'GH';
+  };
   const hasProjectContext = Boolean((JF.projectList?.length || 0) || (JF.skills?.length || 0) || (JF.matches?.length || 0) || JF.__userProjectId);
   const analyzedProjectCount = hasProjectContext ? Math.max(JF.projectList?.length || 0, 1) : 0;
   const fallbackAnalyzedProject = {
     name: currentProjectName,
+    logo: repositoryLogoText(currentProjectName),
     repo: currentProjectRepo,
     connected: true,
     analyzedAt: '최근 분석',
@@ -540,7 +545,7 @@ export function JobFlowScreens({ t, go, screen }) {
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 390px', gap: 18, alignItems: 'start' }}>
         <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(2, 1fr)', gap: 16 }}>
           {projectCards.map((p) => (
-            <div key={p.name} className="jf-jobcard" style={{ ...tile, cursor: 'pointer', borderColor: previewProject === p.name ? greenStrong : line, padding: 0, overflow: 'hidden' }} onClick={() => go('project-analysis')}>
+            <div key={p.name} className="jf-jobcard" style={{ ...tile, cursor: 'pointer', borderColor: previewProject === p.name ? greenStrong : line, padding: 0, overflow: 'hidden' }} onClick={() => { setPreviewProject(p.name); if (p.id && p.id !== JF.__userProjectId) { jobflowActions.switchProject?.(p.id); } go('project-analysis'); }}>
               <div style={{ height: 132, background: p.connected ? 'linear-gradient(135deg, #14151a, #283018 55%, #b9ec2a)' : 'linear-gradient(135deg, #f2f3f5, #dde2e8)', color: p.connected ? '#fff' : muted, padding: 18, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 11, fontWeight: 900, letterSpacing: 1 }}><GithubMark dark={p.connected} />연결된 프로젝트</span>
@@ -549,7 +554,7 @@ export function JobFlowScreens({ t, go, screen }) {
                 <div style={{ marginTop: 'auto', fontSize: 13, fontWeight: 900 }}>{p.repoVisual}</div>
               </div>
               <div style={{ padding: 18 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Logo text={p.name.slice(0,2).toUpperCase()} /><div><div style={{ fontSize: 18, fontWeight: 900 }}>{p.name}</div><div style={{ color: faint, fontSize: 12.5 }}>{p.repo}</div></div></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Logo text={p.logo || repositoryLogoText(p.name)} /><div><div style={{ fontSize: 18, fontWeight: 900 }}>{p.name}</div><div style={{ color: faint, fontSize: 12.5 }}>{p.repo}</div></div></div>
                 <p style={{ color: muted, fontSize: 13.5, lineHeight: 1.55 }}>{p.summary}</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{p.previewSkills.map((skill) => <SkillChip key={skill} s={skill} />)}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 15, flexWrap: 'wrap' }}>
@@ -713,7 +718,7 @@ export function JobFlowScreens({ t, go, screen }) {
             <SecTitle>OVERVIEW</SecTitle>
             <p style={{ fontSize: 15, lineHeight: 1.75, color: '#33363e', margin: '0 0 16px' }}>{p.overview}</p>
             <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap' }}>
-              <div><div style={{ fontSize: 11.5, color: faint, fontWeight: 700, marginBottom: 6 }}>도메인</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{projectDomain.length ? projectDomain.map((d) => <span key={d} style={{ fontSize: 12.5, fontWeight: 700, color: ink, background: soft, borderRadius: 8, padding: '5px 10px' }}>{d}</span>) : <span style={{ fontSize: 12.5, fontWeight: 700, color: muted, background: soft, borderRadius: 8, padding: '5px 10px' }}>분석 태그 대기</span>}</div></div>
+              <div><div style={{ fontSize: 11.5, color: faint, fontWeight: 700, marginBottom: 6 }}>도메인</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{projectDomain.length ? projectDomain.map((d) => <span key={d} style={{ fontSize: 12.5, fontWeight: 700, color: ink, background: soft, borderRadius: 8, padding: '5px 10px' }}>{d}</span>) : <span style={{ fontSize: 12.5, fontWeight: 700, color: muted, background: soft, borderRadius: 8, padding: '5px 10px' }}>태그 없음</span>}</div></div>
               <div><div style={{ fontSize: 11.5, color: faint, fontWeight: 700, marginBottom: 6 }}>아키텍처</div><span style={{ fontSize: 12.5, fontWeight: 700, color: greenInk, background: greenTint, border: '1px solid ' + greenTintBd, borderRadius: 8, padding: '5px 10px' }}>{p.architecture}</span></div>
             </div>
             <div style={{ borderTop: '1px solid ' + line, marginTop: 22, paddingTop: 18 }}>
@@ -733,7 +738,7 @@ export function JobFlowScreens({ t, go, screen }) {
             <SecTitle>CODE STATS</SecTitle>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 18 }}>{stat(projectStats.commits, '커밋')}{stat(projectStats.files, '파일')}{stat(projectStats.tests === '-' ? '-' : projectStats.tests + '%', '테스트 커버리지')}{stat(projectStats.contributors, '기여자')}</div>
             <div style={{ fontSize: 12, fontWeight: 800, color: muted, marginBottom: 9 }}>주요 디렉토리</div>
-            {projectDirs.length ? projectDirs.map((d) => <div key={d.path} style={{ display: 'grid', gridTemplateColumns: '1fr 76px 34px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span style={{ fontSize: 12.5, fontWeight: 600, fontFamily: 'monospace', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.path}</span><div style={{ height: 6, background: soft, borderRadius: 3, overflow: 'hidden' }}><div style={{ width: d.share + '%', height: '100%', background: green, borderRadius: 3 }} /></div><span style={{ fontSize: 11.5, color: muted, fontWeight: 700, textAlign: 'right', ...num }}>{d.share}%</span></div>) : <div style={{ color: muted, fontSize: 12.5, lineHeight: 1.55 }}>디렉토리 통계는 저장소 구조 분석 API가 연결되면 표시됩니다.</div>}
+            {projectDirs.length ? projectDirs.map((d) => <div key={d.path} style={{ display: 'grid', gridTemplateColumns: '1fr 76px 34px', gap: 8, alignItems: 'center', marginBottom: 8 }}><span style={{ fontSize: 12.5, fontWeight: 600, fontFamily: 'monospace', color: ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.path}</span><div style={{ height: 6, background: soft, borderRadius: 3, overflow: 'hidden' }}><div style={{ width: d.share + '%', height: '100%', background: green, borderRadius: 3 }} /></div><span style={{ fontSize: 11.5, color: muted, fontWeight: 700, textAlign: 'right', ...num }}>{d.share}%</span></div>) : <div style={{ color: muted, fontSize: 12.5, lineHeight: 1.55 }}>기존 분석 결과입니다. 재분석을 실행하면 커밋, 전체 파일, 기여자, 주요 디렉토리 통계가 표시됩니다.</div>}
           </div>
         </div>
 
