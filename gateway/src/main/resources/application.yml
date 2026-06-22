@@ -38,7 +38,7 @@ resilience4j:
   timelimiter:
     instances:
       backendApiCircuitBreaker:
-        timeout-duration: 3s
+        timeout-duration: 30s
 
 management:
   endpoints:

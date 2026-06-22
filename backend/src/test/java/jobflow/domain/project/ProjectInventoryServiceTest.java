@@ -60,8 +60,9 @@ class ProjectInventoryServiceTest {
                 "0.9000",
                 "build.gradle plugin"
         );
+        UserProject userProject = analysis.getUserProject();
 
-        given(userProjectRepository.existsByIdAndUserId(10L, 1L)).willReturn(true);
+        given(userProjectRepository.findByIdAndUserId(10L, 1L)).willReturn(Optional.of(userProject));
         given(userProjectAnalysisRepository.findFirstByUserProjectIdAndUserProjectUserIdOrderByAnalyzedAtDescIdDesc(
                 10L,
                 1L
@@ -90,7 +91,8 @@ class ProjectInventoryServiceTest {
     @Test
     @DisplayName("프로젝트는 존재하지만 분석 결과가 없으면 빈 스킬 목록을 반환한다")
     void getProjectSkillsWithoutAnalysis() {
-        given(userProjectRepository.existsByIdAndUserId(10L, 1L)).willReturn(true);
+        UserProject userProject = project(10L);
+        given(userProjectRepository.findByIdAndUserId(10L, 1L)).willReturn(Optional.of(userProject));
         given(userProjectAnalysisRepository.findFirstByUserProjectIdAndUserProjectUserIdOrderByAnalyzedAtDescIdDesc(
                 10L,
                 1L
@@ -113,8 +115,9 @@ class ProjectInventoryServiceTest {
                 "0.8800",
                 "controller/service package"
         );
+        UserProject userProject = analysis.getUserProject();
 
-        given(userProjectRepository.existsByIdAndUserId(10L, 1L)).willReturn(true);
+        given(userProjectRepository.findByIdAndUserId(10L, 1L)).willReturn(Optional.of(userProject));
         given(userProjectAnalysisRepository.findFirstByUserProjectIdAndUserProjectUserIdOrderByAnalyzedAtDescIdDesc(
                 10L,
                 1L
@@ -140,7 +143,8 @@ class ProjectInventoryServiceTest {
     @Test
     @DisplayName("프로젝트는 존재하지만 분석 결과가 없으면 빈 경험 태그 목록을 반환한다")
     void getProjectExperienceTagsWithoutAnalysis() {
-        given(userProjectRepository.existsByIdAndUserId(10L, 1L)).willReturn(true);
+        UserProject userProject = project(10L);
+        given(userProjectRepository.findByIdAndUserId(10L, 1L)).willReturn(Optional.of(userProject));
         given(userProjectAnalysisRepository.findFirstByUserProjectIdAndUserProjectUserIdOrderByAnalyzedAtDescIdDesc(
                 10L,
                 1L
@@ -156,7 +160,7 @@ class ProjectInventoryServiceTest {
     @Test
     @DisplayName("사용자 소유 프로젝트가 아니면 USER_PROJECT_NOT_FOUND 예외를 던진다")
     void getProjectSkillsWithMissingOwnedProject() {
-        given(userProjectRepository.existsByIdAndUserId(999L, 1L)).willReturn(false);
+        given(userProjectRepository.findByIdAndUserId(999L, 1L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> projectInventoryService.getProjectSkills(1L, 999L))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
@@ -214,8 +218,7 @@ class ProjectInventoryServiceTest {
     }
 
     private UserProjectAnalysis analysis(Long userProjectId, Long analysisId, int analysisVersion) {
-        UserProject userProject = mock(UserProject.class);
-        given(userProject.getId()).willReturn(userProjectId);
+        UserProject userProject = project(userProjectId);
 
         UserProjectAnalysis analysis = mock(UserProjectAnalysis.class);
         given(analysis.getId()).willReturn(analysisId);
@@ -224,6 +227,17 @@ class ProjectInventoryServiceTest {
         given(analysis.getAnalyzedAt()).willReturn(LocalDateTime.of(2026, 6, 15, 9, 0));
 
         return analysis;
+    }
+
+    private UserProject project(Long userProjectId) {
+        UserProject userProject = mock(UserProject.class);
+        given(userProject.getId()).willReturn(userProjectId);
+        given(userProject.getName()).willReturn("sample-repo");
+        given(userProject.getSourceType()).willReturn(ProjectSourceType.GITHUB);
+        given(userProject.getExternalId()).willReturn("example-org/sample-repo");
+        given(userProject.getRepositoryUrl()).willReturn("https://github.example/example-org/sample-repo");
+        given(userProject.getDescription()).willReturn("sample repository");
+        return userProject;
     }
 
     private UserProjectSkill projectSkill(

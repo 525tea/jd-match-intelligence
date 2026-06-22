@@ -18,5 +18,7 @@ public interface UserProjectRepository extends JpaRepository<UserProject, Long> 
 
     List<UserProject> findAllByOrderByUpdatedAtDescIdDesc();
 
+    List<UserProject> findAllByUserIdOrderByUpdatedAtDescIdDesc(Long userId);
+
     Optional<UserProject> findFirstByUserIdOrderByUpdatedAtDescIdDesc(Long userId);
 }

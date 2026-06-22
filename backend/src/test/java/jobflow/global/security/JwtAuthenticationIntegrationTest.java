@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -27,6 +28,7 @@ import java.util.Date;
 import java.util.List;
 
 import static org.mockito.BDDMockito.given;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -160,6 +162,23 @@ class JwtAuthenticationIntegrationTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"))
                 .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
+    }
+
+    @Test
+    @DisplayName("기존 인증 객체가 있어도 JWT UserPrincipal로 보호 API를 인증한다")
+    void requestProtectedApiWithExistingAuthenticationAndJwt() throws Exception {
+        User user = saveLocalUser("oauth-jwt-user@example.com");
+        String accessToken = jwtTokenProvider.createAccessToken(user);
+        UsernamePasswordAuthenticationToken existingAuthentication =
+                new UsernamePasswordAuthenticationToken("oauth-principal", null, List.of());
+
+        mockMvc.perform(get("/auth/me")
+                        .with(authentication(existingAuthentication))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(user.getId()))
+                .andExpect(jsonPath("$.data.email").value("oauth-jwt-user@example.com"));
     }
 
     @Test

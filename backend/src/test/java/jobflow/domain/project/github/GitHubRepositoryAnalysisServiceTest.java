@@ -14,6 +14,7 @@ import jobflow.domain.project.UserProject;
 import jobflow.domain.project.UserProjectRepository;
 import jobflow.domain.project.analysis.ProjectRepositoryStaticAnalysisImportResult;
 import jobflow.domain.project.analysis.ProjectRepositoryStaticAnalysisImportService;
+import jobflow.domain.project.analysis.RepositoryAnalysisStats;
 import jobflow.domain.project.analysis.RepositoryRef;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
@@ -27,6 +28,9 @@ class GitHubRepositoryAnalysisServiceTest {
     private final GitHubRepositoryCatalogClient repositoryCatalogClient =
             mock(GitHubRepositoryCatalogClient.class);
 
+    private final GitHubRepositoryStatsClient repositoryStatsClient =
+            mock(GitHubRepositoryStatsClient.class);
+
     private final ProjectRepositoryStaticAnalysisImportService staticAnalysisImportService =
             mock(ProjectRepositoryStaticAnalysisImportService.class);
 
@@ -39,6 +43,7 @@ class GitHubRepositoryAnalysisServiceTest {
     private final GitHubRepositoryAnalysisService service =
             new GitHubRepositoryAnalysisService(
                     repositoryCatalogClient,
+                    repositoryStatsClient,
                     staticAnalysisImportService,
                     userRepository,
                     userProjectRepository
@@ -84,10 +89,13 @@ class GitHubRepositoryAnalysisServiceTest {
         )).willReturn(Optional.empty());
         given(userProjectRepository.save(any(UserProject.class))).willReturn(savedProject);
         given(savedProject.getId()).willReturn(10L);
+        given(repositoryStatsClient.getRepositoryStats(userId, new RepositoryRef("example-org", "sample-repo", "main")))
+                .willReturn(RepositoryAnalysisStats.empty());
         given(staticAnalysisImportService.importRepositoryStaticAnalysis(
                 userId,
                 10L,
-                new RepositoryRef("example-org", "sample-repo", "main")
+                new RepositoryRef("example-org", "sample-repo", "main"),
+                RepositoryAnalysisStats.empty()
         )).willReturn(importResult);
 
         GitHubRepositoryImportResponse response = service.importRepository(userId, request);
@@ -102,7 +110,8 @@ class GitHubRepositoryAnalysisServiceTest {
         verify(staticAnalysisImportService).importRepositoryStaticAnalysis(
                 userId,
                 10L,
-                new RepositoryRef("example-org", "sample-repo", "main")
+                new RepositoryRef("example-org", "sample-repo", "main"),
+                RepositoryAnalysisStats.empty()
         );
     }
 

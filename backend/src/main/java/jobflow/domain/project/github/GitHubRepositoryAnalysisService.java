@@ -24,6 +24,7 @@ import org.springframework.util.StringUtils;
 public class GitHubRepositoryAnalysisService {
 
     private final GitHubRepositoryCatalogClient repositoryCatalogClient;
+    private final GitHubRepositoryStatsClient repositoryStatsClient;
     private final ProjectRepositoryStaticAnalysisImportService staticAnalysisImportService;
     private final UserRepository userRepository;
     private final UserProjectRepository userProjectRepository;
@@ -49,7 +50,8 @@ public class GitHubRepositoryAnalysisService {
                     staticAnalysisImportService.importRepositoryStaticAnalysis(
                             userId,
                             userProject.getId(),
-                            repositoryRef
+                            repositoryRef,
+                            repositoryStatsClient.getRepositoryStats(userId, repositoryRef)
                     );
 
             return GitHubRepositoryImportResponse.of(

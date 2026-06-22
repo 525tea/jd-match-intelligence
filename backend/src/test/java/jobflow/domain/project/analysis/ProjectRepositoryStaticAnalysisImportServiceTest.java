@@ -168,7 +168,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                 .findFirstByUserProjectIdAndUserProjectUserIdAndModelVersionOrderByAnalyzedAtDescIdDesc(
                         userProjectId,
                         userId,
-                        "repository-static-v1"
+                        "repository-static-v2"
                 ))
                 .willReturn(Optional.empty());
         given(userProjectAnalysisRepository.findMaxAnalysisVersionByUserProjectId(userProjectId))
@@ -214,7 +214,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
         assertThat(savedAnalysis.getAnalysisVersion()).isEqualTo(8);
         assertThat(savedAnalysis.getSourceHash()).hasSize(64);
         assertThat(savedAnalysis.getCommitSha()).isEqualTo("main");
-        assertThat(savedAnalysis.getModelVersion()).isEqualTo("repository-static-v1");
+        assertThat(savedAnalysis.getModelVersion()).isEqualTo("repository-static-v2");
         assertThat(savedAnalysis.getRawAnalysis()).contains("\"repository\":\"example-org/sample-repo\"");
         assertThat(savedAnalysis.getRawAnalysis()).contains("\"buildFileAnalysis\"");
         assertThat(savedAnalysis.getRawAnalysis()).contains("\"infraFileAnalysis\"");
@@ -292,7 +292,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                 .findFirstByUserProjectIdAndUserProjectUserIdAndModelVersionOrderByAnalyzedAtDescIdDesc(
                         userProjectId,
                         userId,
-                        "repository-static-v1"
+                        "repository-static-v2"
                 ))
                 .willReturn(Optional.empty());
         given(userProjectAnalysisRepository.findMaxAnalysisVersionByUserProjectId(userProjectId))
@@ -337,7 +337,7 @@ class ProjectRepositoryStaticAnalysisImportServiceTest {
                 .findFirstByUserProjectIdAndUserProjectUserIdAndModelVersionOrderByAnalyzedAtDescIdDesc(
                         userProjectId,
                         userId,
-                        "repository-static-v1"
+                        "repository-static-v2"
                 ))
                 .willReturn(Optional.of(latestAnalysis));
         clearInvocations(
