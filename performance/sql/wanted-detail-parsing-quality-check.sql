@@ -70,7 +70,13 @@ SELECT
                 OR description_sections LIKE '%One\\nTeam%'
                 THEN 1
             ELSE 0
-        END) AS display_section_word_split_count
+        END) AS display_section_word_split_count,
+    SUM(CASE
+            WHEN description_sections LIKE '% • %'
+                OR description_sections LIKE '% ・ %'
+                THEN 1
+            ELSE 0
+        END) AS display_section_flat_bullet_count
 FROM wanted_detail_parsing_quality_target;
 
 SELECT
@@ -129,8 +135,8 @@ SELECT
     JSON_PRETTY(description_sections) AS description_sections_sample
 FROM wanted_detail_parsing_quality_target
 WHERE external_id IN (
-                      @wanted_data_engineer_external_id,
-                      @wanted_middle_dot_external_id
+                      @wanted_data_engineer_external_id COLLATE utf8mb4_unicode_ci,
+                      @wanted_middle_dot_external_id COLLATE utf8mb4_unicode_ci
     )
 ORDER BY external_id;
 
@@ -163,6 +169,8 @@ WHERE description_sections LIKE '%CS\\\\n• 관제%'
    OR description_sections LIKE '%AI Agent N\\nlayer%'
    OR description_sections LIKE '%One\\\\nTeam%'
    OR description_sections LIKE '%One\\nTeam%'
+   OR description_sections LIKE '% • %'
+   OR description_sections LIKE '% ・ %'
 ORDER BY id
 LIMIT 20;
 

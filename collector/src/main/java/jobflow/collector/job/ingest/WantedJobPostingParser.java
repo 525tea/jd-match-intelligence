@@ -481,9 +481,15 @@ public class WantedJobPostingParser implements JobPostingParser {
             return "";
         }
 
-        return value.replace("\r\n", "\n")
+        return restoreWantedWordBreaks(value)
+                .replace("\r\n", "\n")
                 .replace('\r', '\n')
                 .replace('\u00A0', ' ')
+                .replaceAll("[ \\t]+", " ")
+                .replaceAll("\\s*([•・])\\s*", "\n$1 ")
+                .replaceAll("\\s*(=\\s*=\\s*=\\s*=+)\\s*", "\n\n$1\n\n")
+                .replaceAll("\\n{3,}", "\n\n")
+                .replaceAll("(?m)^ +", "")
                 .trim();
     }
 

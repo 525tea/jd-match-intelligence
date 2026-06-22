@@ -547,11 +547,75 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       <span>[{children}]</span>
     </div>
   );
+  const RichOriginalText = ({ children }) => {
+    const source = String(children || '');
+    const parts = source.split(/(\*\*[^*]+\*\*)/gu).filter((part) => part !== '');
+
+    return (
+      <>
+        {parts.map((part, index) => {
+          const boldMatch = part.match(/^\*\*([^*]+)\*\*$/u);
+
+          return boldMatch
+            ? <strong key={part + index} style={{ fontWeight: 900 }}>{boldMatch[1]}</strong>
+            : <span key={part + index}>{part}</span>;
+        })}
+      </>
+    );
+  };
   const OriginalTextBlock = ({ block, bullet }) => block.type === 'subheading'
     ? <OriginalSubheading>{block.value}</OriginalSubheading>
     : bullet
       ? <div className="jf-original-bullet"><span className="jf-original-dot" /><span>{block.value}</span></div>
       : <p style={originalLineStyle(block.compact)}>{block.value}</p>;
+  const SourceOriginalBody = ({ body }) => {
+    const normalized = String(body || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trim();
+    const paragraphs = normalized
+      .split(/\n{2,}/gu)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+
+    return (
+      <div style={{ display: 'grid', gap: 13, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.76, letterSpacing: -0.12, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
+        {paragraphs.map((paragraph, paragraphIndex) => {
+          const lines = paragraph.split('\n').map((line) => line.trim()).filter(Boolean);
+
+          if (lines.every((line) => /^[•・]\s*/u.test(line))) {
+            return (
+              <div key={paragraph + paragraphIndex} className="jf-original-list" style={{ display: 'grid', gap: 5 }}>
+                {lines.map((line, lineIndex) => (
+                  <div key={line + lineIndex} className="jf-original-bullet">
+                    <span className="jf-original-dot" />
+                    <span><RichOriginalText>{line.replace(/^[•・]\s*/u, '')}</RichOriginalText></span>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
+          return (
+            <div key={paragraph + paragraphIndex} style={{ display: 'grid', gap: 5 }}>
+              {lines.map((line, lineIndex) => {
+                const bulletMatch = line.match(/^[•・]\s*(.+)$/u);
+
+                return bulletMatch
+                  ? (
+                    <div key={line + lineIndex} className="jf-original-bullet">
+                      <span className="jf-original-dot" />
+                      <span><RichOriginalText>{bulletMatch[1]}</RichOriginalText></span>
+                    </div>
+                  )
+                  : <p key={line + lineIndex} style={{ margin: 0 }}><RichOriginalText>{line}</RichOriginalText></p>;
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
   const TextSection = ({ title, children }) => <section style={{ paddingTop: 24, marginTop: 24, borderTop: '1px solid ' + line }}>
     <h2 style={{ margin: 0, color: muted, fontSize: 16, fontWeight: 900, letterSpacing: -0.2 }}>{title}</h2>
     <div style={{ marginTop: 11 }}>{children}</div>
@@ -571,9 +635,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
             <span style={{ width: 4, height: 18, borderRadius: 999, background: green, flexShrink: 0 }} />
             <h3 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 18 : 21, lineHeight: 1.24, fontWeight: 920, letterSpacing: -0.35 }}>{title}</h3>
           </div>}
-          {sourceBody && <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.12, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
-            {sourceBody}
-          </p>}
+          {sourceBody && <SourceOriginalBody body={sourceBody} />}
         </section>
       );
     }
@@ -733,15 +795,6 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
             </div>
 
             <article style={{ background: card, border: '1px solid ' + line, borderRadius: 24, padding: narrow ? '22px 18px' : '34px 46px', boxShadow: shadow, marginTop: 18, overflow: 'hidden' }}>
-              <div>
-                <h2 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 23 : 28, fontWeight: 950, letterSpacing: -0.65 }}>공고 원문</h2>
-                <div style={{ marginTop: 20 }}>
-                  {mainOriginalSections.length
-                    ? mainOriginalSections.map((section, index) => <OriginalSection key={section.title + index} title={section.title} body={section.body} index={index} preserveSource={section.preserveSource} />)
-                    : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.25, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{formatOriginalDescription(job.desc)}</p>}
-                </div>
-              </div>
-
               <TextSection title="필수 스킬">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{reqList.length ? reqList.map((s) => <Pill key={s} owned={has(s)} miss={!has(s)}>{s}</Pill>) : <span style={{ color: muted, fontSize: 14 }}>필수 스킬 정보가 없습니다.</span>}</div>
               </TextSection>
@@ -753,6 +806,12 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
               <TextSection title="경험 태그">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{tags.length ? tags.map((c, i) => <TagPill key={c} muted={i > 0}>{tagLabels[c] || c}</TagPill>) : <span style={{ color: muted, fontSize: 14 }}>경험 태그 정보가 없습니다.</span>}</div>
               </TextSection>
+
+              <div style={{ paddingTop: 24, marginTop: 24, borderTop: '1px solid ' + line }}>
+                {mainOriginalSections.length
+                  ? mainOriginalSections.map((section, index) => <OriginalSection key={section.title + index} title={section.title} body={section.body} index={index} preserveSource={section.preserveSource} />)
+                  : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.25, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{formatOriginalDescription(job.desc)}</p>}
+              </div>
 
               <TextSection title="채용 절차">
                 {processItems.length
