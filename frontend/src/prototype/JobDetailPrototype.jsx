@@ -556,7 +556,28 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     <h2 style={{ margin: 0, color: muted, fontSize: 16, fontWeight: 900, letterSpacing: -0.2 }}>{title}</h2>
     <div style={{ marginTop: 11 }}>{children}</div>
   </section>;
-  const OriginalSection = ({ title, body, index }) => {
+  const OriginalSection = ({ title, body, index, preserveSource = false }) => {
+    const showTitle = !(index === 0 && title === '공고 원문');
+
+    if (preserveSource) {
+      const sourceBody = String(body || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .trim();
+
+      return (
+        <section className="jf-original-section" style={{ paddingTop: index ? 22 : 0, marginTop: index ? 22 : 0, borderTop: index ? '1px solid ' + line : 'none', minWidth: 0 }}>
+          {showTitle && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: sourceBody ? 10 : 0 }}>
+            <span style={{ width: 4, height: 18, borderRadius: 999, background: green, flexShrink: 0 }} />
+            <h3 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 18 : 21, lineHeight: 1.24, fontWeight: 920, letterSpacing: -0.35 }}>{title}</h3>
+          </div>}
+          {sourceBody && <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.12, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
+            {sourceBody}
+          </p>}
+        </section>
+      );
+    }
+
     const normalized = body
       ? body
         .replace(/([^\n])\s*(•)/g, '$1\n$2')
@@ -580,7 +601,6 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       ? paragraphToOriginalBlocks(lines, compactInfo)
       : toOriginalBlocks(lines).map((block) => ({ ...block, compact: compactInfo }));
     const skillItems = isSkillSection ? [...new Set(normalized.split(/\s+/).map((x) => x.trim()).filter(Boolean))].slice(0, 24) : [];
-    const showTitle = !(index === 0 && title === '공고 원문');
     return (
       <section className="jf-original-section" style={{ paddingTop: index ? 22 : 0, marginTop: index ? 22 : 0, borderTop: index ? '1px solid ' + line : 'none', minWidth: 0 }}>
         {showTitle && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: body ? 10 : 0 }}>
@@ -663,6 +683,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       .map((section) => ({
         title: canonicalizeHeading(section.title || '공고 원문'),
         body: section.body || '',
+        preserveSource: true,
       }))
       .filter((section) => section.body)
     : [];
@@ -672,16 +693,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       title: canonicalizeHeading(section.title),
     }));
   const sectionHasMeaningfulBody = (section) => String(section?.body || '').replace(/\s+/g, ' ').trim().length >= 16;
-  const originalSections = apiOriginalSections.length
-    ? rawOriginalSections.reduce((merged, section) => {
-      const existingIndex = merged.findIndex((item) => item.title === section.title);
-      if (existingIndex < 0) return merged.concat(section);
-      if (!sectionHasMeaningfulBody(merged[existingIndex]) && sectionHasMeaningfulBody(section)) {
-        return merged.map((item, index) => index === existingIndex ? section : item);
-      }
-      return merged;
-    }, apiOriginalSections)
-    : rawOriginalSections;
+  const originalSections = apiOriginalSections.length ? apiOriginalSections : rawOriginalSections;
   const mainOriginalSections = sortOriginalSections(originalSections)
     .filter((section) => !/기술스택|기술 스택|스킬/.test(section.title));
   const processItems = bullets.process.length ? bullets.process : processItemsFromOriginalSections(originalSections);
@@ -725,7 +737,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
                 <h2 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 23 : 28, fontWeight: 950, letterSpacing: -0.65 }}>공고 원문</h2>
                 <div style={{ marginTop: 20 }}>
                   {mainOriginalSections.length
-                    ? mainOriginalSections.map((section, index) => <OriginalSection key={section.title + index} title={section.title} body={section.body} index={index} />)
+                    ? mainOriginalSections.map((section, index) => <OriginalSection key={section.title + index} title={section.title} body={section.body} index={index} preserveSource={section.preserveSource} />)
                     : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.25, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{formatOriginalDescription(job.desc)}</p>}
                 </div>
               </div>

@@ -15,6 +15,7 @@ SELECT
     j.role,
     j.deadline_at,
     j.description,
+    j.description_sections,
     j.raw_snapshot_key,
     j.raw_snapshot_hash,
     j.raw_snapshot_storage_type,
@@ -49,7 +50,27 @@ SELECT
                 OR raw_snapshot_saved_at IS NULL
                 THEN 1
             ELSE 0
-        END) AS missing_snapshot_metadata_count
+        END) AS missing_snapshot_metadata_count,
+    SUM(CASE
+            WHEN description_sections IS NULL
+                OR JSON_LENGTH(description_sections) = 0
+                THEN 1
+            ELSE 0
+        END) AS missing_description_sections_count,
+    SUM(CASE
+            WHEN description_sections LIKE '%CS\\\\n• 관제%'
+                OR description_sections LIKE '%CS\\n• 관제%'
+                THEN 1
+            ELSE 0
+        END) AS display_section_inline_middle_dot_split_count,
+    SUM(CASE
+            WHEN description_sections LIKE '%AI Agent N\\\\nlayer%'
+                OR description_sections LIKE '%AI Agent N\\nlayer%'
+                OR description_sections LIKE '%One\\\\nTeam%'
+                OR description_sections LIKE '%One\\nTeam%'
+                THEN 1
+            ELSE 0
+        END) AS display_section_word_split_count
 FROM wanted_detail_parsing_quality_target;
 
 SELECT
@@ -104,12 +125,45 @@ SELECT
         WHEN deadline_at IS NULL THEN '상시/마감일 원문 없음'
         ELSE DATE_FORMAT(deadline_at, '%Y-%m-%d %H:%i:%s')
         END AS deadline_display_hint,
-    LEFT(description, 1200) AS description_sample
+    LEFT(description, 1200) AS description_sample,
+    JSON_PRETTY(description_sections) AS description_sections_sample
 FROM wanted_detail_parsing_quality_target
 WHERE external_id IN (
                       @wanted_data_engineer_external_id,
                       @wanted_middle_dot_external_id
     )
 ORDER BY external_id;
+
+SELECT
+    'DESCRIPTION_SECTIONS_MISSING' AS check_name,
+    id,
+    external_id,
+    title,
+    company_name,
+    role,
+    LEFT(description, 500) AS description_sample
+FROM wanted_detail_parsing_quality_target
+WHERE description_sections IS NULL
+   OR JSON_LENGTH(description_sections) = 0
+ORDER BY id
+LIMIT 20;
+
+SELECT
+    'DESCRIPTION_SECTIONS_DISPLAY_SPLIT_SUSPECT' AS check_name,
+    id,
+    external_id,
+    title,
+    company_name,
+    role,
+    JSON_PRETTY(description_sections) AS description_sections_sample
+FROM wanted_detail_parsing_quality_target
+WHERE description_sections LIKE '%CS\\\\n• 관제%'
+   OR description_sections LIKE '%CS\\n• 관제%'
+   OR description_sections LIKE '%AI Agent N\\\\nlayer%'
+   OR description_sections LIKE '%AI Agent N\\nlayer%'
+   OR description_sections LIKE '%One\\\\nTeam%'
+   OR description_sections LIKE '%One\\nTeam%'
+ORDER BY id
+LIMIT 20;
 
 DROP TEMPORARY TABLE IF EXISTS wanted_detail_parsing_quality_target;
