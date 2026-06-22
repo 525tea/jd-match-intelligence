@@ -25,6 +25,7 @@ import jobflow.collector.job.ingest.JobPostingParser;
 import jobflow.collector.job.ingest.JobSkillNormalizationService;
 import jobflow.collector.job.ingest.JumpitJobPostingParser;
 import jobflow.collector.job.ingest.WantedJobPostingParser;
+import jobflow.collector.job.snapshot.RawJobSnapshotStorage;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -47,6 +48,9 @@ class RawJobDescriptionReplayBackfillServiceTest {
 
     @Mock
     private JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
+
+    @Mock
+    private RawJobSnapshotStorage rawJobSnapshotStorage;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -163,6 +167,46 @@ class RawJobDescriptionReplayBackfillServiceTest {
         assertThat(job.getDescription()).contains("[주요 업무]\nBuild backend APIs.");
     }
 
+    @Test
+    @DisplayName("DB raw_data가 없으면 raw snapshot storage에서 원문을 읽어 description을 재생성한다")
+    void replayFromRawSnapshotWhenRawDataMissing() {
+        Job job = createJob(
+                "WANTED",
+                "wanted-snapshot-100",
+                "Old snapshot description",
+                null
+        );
+        job.updateRawSnapshotMetadata(
+                "wanted/wanted-snapshot-100/raw.json",
+                "a".repeat(64),
+                512L,
+                "LOCAL_FILE",
+                LocalDateTime.of(2026, 6, 4, 11, 0)
+        );
+        RawJobDescriptionReplayBackfillService service = createService();
+
+        given(jobRepository.findBySourceInOrderByIdAsc(List.of("WANTED")))
+                .willReturn(List.of(job));
+        given(rawJobSnapshotStorage.read("wanted/wanted-snapshot-100/raw.json"))
+                .willReturn(wantedRawData());
+        given(jobSkillNormalizationService.replaceNormalizedSkills(any(), anyString(), anyString(), any()))
+                .willReturn(List.of());
+        given(jobExperienceTagNormalizationService.replaceNormalizedExperienceTags(any(), anyString(), anyString(), any()))
+                .willReturn(List.of());
+
+        RawJobDescriptionReplayBackfillSummary summary = service.backfill(List.of("WANTED"));
+
+        assertThat(job.getDescription())
+                .contains("[회사 소개]\nExample Labs builds hiring tools.")
+                .contains("[주요 업무]\nBuild backend APIs.")
+                .contains("[자격 요건]\nJava and Spring Boot experience.")
+                .contains("[채용절차 및 기타 지원 유의사항]\nDocument review and technical interview.");
+        assertThat(summary.processedCount()).isEqualTo(1);
+        assertThat(summary.updatedDescriptionCount()).isEqualTo(1);
+        assertThat(summary.skippedCount()).isZero();
+        assertThat(summary.failedCount()).isZero();
+    }
+
     private RawJobDescriptionReplayBackfillService createService() {
         JdJobRoleClassificationService roleClassificationService = new JdJobRoleClassificationService();
         List<JobPostingParser> parsers = List.of(
@@ -175,7 +219,8 @@ class RawJobDescriptionReplayBackfillServiceTest {
                 objectMapper,
                 parsers,
                 jobSkillNormalizationService,
-                jobExperienceTagNormalizationService
+                jobExperienceTagNormalizationService,
+                rawJobSnapshotStorage
         );
     }
 
