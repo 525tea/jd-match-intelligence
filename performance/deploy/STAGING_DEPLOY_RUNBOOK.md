@@ -174,7 +174,35 @@ bash performance/observability/zipkin-tracing-smoke.sh
 Zipkin tracing smoke completed.
 ```
 
-## 10. 배포 전 gate
+## 10. Actuator exposure smoke
+
+Prometheus scrape에 필요한 직접 actuator endpoint는 유지하되, Gateway API prefix로 backend actuator가 프록시 노출되지 않는지 확인한다.
+
+```bash
+BACKEND_URL=http://localhost:8080 \
+GATEWAY_URL=http://localhost:8081 \
+BASE_URL=http://localhost:8081/api \
+bash performance/security/actuator-exposure-smoke.sh
+```
+
+성공 기준:
+
+```text
+Actuator exposure smoke completed.
+```
+
+확인 기준:
+
+- `backend /actuator/health`: 200
+- `backend /actuator/prometheus`: 200
+- `gateway /actuator/health`: 200
+- `gateway /actuator/prometheus`: 200
+- `gateway /api/actuator/health`: 404
+- `gateway /api/actuator/prometheus`: 404
+
+Prometheus는 compose 내부 네트워크에서 backend/gateway actuator를 직접 scrape한다. 외부 API entrypoint인 `/api/actuator/**`는 Gateway route에서 먼저 차단한다.
+
+## 11. 배포 전 gate
 
 아래 항목이 모두 충족되어야 k6 측정으로 넘어간다.
 
@@ -191,7 +219,7 @@ Zipkin tracing smoke completed.
 - Collector Prometheus 노출 설정 확인
 - scheduler 기본 enabled 정책 확인
 
-## 11. 장애 대응
+## 12. 장애 대응
 
 ### Gateway 503
 
@@ -241,7 +269,7 @@ curl http://localhost:9200/_cat/indices?v
 
 `red`면 검색 품질/성능 측정을 진행하지 않는다.
 
-## 12. k6 전 최종 확인
+## 13. k6 전 최종 확인
 
 k6 실행 전 최소 확인:
 
@@ -254,6 +282,11 @@ bash performance/job/job-list-filter-smoke.sh
 
 BASE_URL=http://localhost:8081/api \
 bash performance/elasticsearch/search-intent-smoke.sh
+
+BACKEND_URL=http://localhost:8080 \
+GATEWAY_URL=http://localhost:8081 \
+BASE_URL=http://localhost:8081/api \
+bash performance/security/actuator-exposure-smoke.sh
 ```
 
 세 smoke가 모두 통과한 뒤 k6 Round 1로 넘어간다.
