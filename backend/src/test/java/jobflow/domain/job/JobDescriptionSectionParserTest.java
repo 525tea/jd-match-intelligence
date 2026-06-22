@@ -155,4 +155,50 @@ class JobDescriptionSectionParserTest {
                 .contains("• 배치 안정화")
                 .contains("• 장애 대응");
     }
+
+    @Test
+    @DisplayName("본문 중간의 섹션명 단어는 새 섹션으로 오인하지 않는다")
+    void doNotSplitInlineSectionKeywordText() {
+        String description = """
+                [회사 소개]
+                우리는 운영 플랫폼을 개발합니다.
+
+                [주요 업무]
+                우리 조직의 주요 업무 / 역할은 주문 배정 흐름을 안정화하는 것입니다.
+                주요 업무를 수행하며 CS · 관제 · 고객을 잇는 운영 흐름을 어드민 안에서 구현합니다.
+
+                [자격 요건]
+                Java 개발 경험
+                """;
+
+        List<JobDescriptionSectionResponse> sections = parser.parse(description);
+
+        assertThat(sections)
+                .extracting(JobDescriptionSectionResponse::type)
+                .containsExactly("COMPANY_INTRO", "RESPONSIBILITIES", "REQUIREMENTS");
+
+        assertThat(sections.get(1).body())
+                .contains("우리 조직의 주요 업무 / 역할")
+                .contains("주요 업무를 수행하며 CS · 관제 · 고객");
+    }
+
+    @Test
+    @DisplayName("plain 섹션 제목은 단독 라인일 때만 섹션으로 인식한다")
+    void parsePlainSectionHeadingOnlyWhenStandaloneLine() {
+        String description = """
+                주요업무
+                API 설계 및 운영
+
+                자격요건
+                Java 개발 경험
+                """;
+
+        List<JobDescriptionSectionResponse> sections = parser.parse(description);
+
+        assertThat(sections)
+                .extracting(JobDescriptionSectionResponse::type)
+                .containsExactly("RESPONSIBILITIES", "REQUIREMENTS");
+        assertThat(sections.get(0).body()).isEqualTo("API 설계 및 운영");
+        assertThat(sections.get(1).body()).isEqualTo("Java 개발 경험");
+    }
 }

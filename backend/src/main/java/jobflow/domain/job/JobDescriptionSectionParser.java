@@ -189,7 +189,7 @@ public class JobDescriptionSectionParser {
                 .orElseThrow();
 
         return Pattern.compile(
-                "(?:\\[\\s*(" + aliases + ")\\s*\\])|(?:^|\\n|\\s{1,})(" + aliases + ")(?=\\s|$)",
+                "(?:\\[\\s*(" + aliases + ")\\s*\\])|(?m)^\\s*(" + aliases + ")\\s*(?::)?\\s*$",
                 Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
         );
     }
