@@ -6,7 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.backfill.raw-job-snapshot")
 public record RawJobSnapshotBackfillProperties(
         boolean enabled,
-        List<String> sources
+        List<String> sources,
+        boolean purgeRawDataAfterSnapshot
 ) {
 
     private static final List<String> DEFAULT_SOURCES = List.of("JUMPIT", "WANTED");

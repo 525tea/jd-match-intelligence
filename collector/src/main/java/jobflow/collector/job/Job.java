@@ -285,6 +285,10 @@ public class Job extends BaseTimeEntity {
         this.rawSnapshotSavedAt = rawSnapshotSavedAt;
     }
 
+    public void clearRawData() {
+        this.rawData = null;
+    }
+
     public void expire() {
         validateOpenStatus();
         this.status = JobStatus.EXPIRED;

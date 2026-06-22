@@ -40,7 +40,8 @@ class RawJobSnapshotBackfillServiceTest {
                 """);
         RawJobSnapshotBackfillService service = new RawJobSnapshotBackfillService(
                 jobRepository,
-                rawJobSnapshotStorage
+                rawJobSnapshotStorage,
+                new RawJobSnapshotBackfillProperties(false, List.of("JUMPIT"), false)
         );
 
         given(jobRepository.findBySourceInOrderByIdAsc(List.of("JUMPIT")))
@@ -58,6 +59,7 @@ class RawJobSnapshotBackfillServiceTest {
 
         assertThat(summary.processedCount()).isEqualTo(1);
         assertThat(summary.snapshottedCount()).isEqualTo(1);
+        assertThat(summary.purgedRawDataCount()).isZero();
         assertThat(summary.skippedMissingRawDataCount()).isZero();
         assertThat(summary.skippedAlreadySnapshottedCount()).isZero();
         assertThat(summary.failedCount()).isZero();
@@ -66,6 +68,40 @@ class RawJobSnapshotBackfillServiceTest {
         assertThat(job.getRawSnapshotSizeBytes()).isEqualTo(128L);
         assertThat(job.getRawSnapshotStorageType()).isEqualTo("LOCAL_FILE");
         assertThat(job.getRawSnapshotSavedAt()).isEqualTo(LocalDateTime.of(2026, 6, 4, 11, 0));
+        assertThat(job.getRawData()).contains("Backend Engineer");
+    }
+
+    @Test
+    @DisplayName("purge 옵션이 켜져 있으면 snapshot 저장 후 raw_data를 비운다")
+    void purgeRawDataAfterSnapshot() {
+        Job job = createJob("JUMPIT", "jumpit-1002", """
+                {"rawBody":"<html>Frontend Engineer</html>"}
+                """);
+        RawJobSnapshotBackfillService service = new RawJobSnapshotBackfillService(
+                jobRepository,
+                rawJobSnapshotStorage,
+                new RawJobSnapshotBackfillProperties(false, List.of("JUMPIT"), true)
+        );
+
+        given(jobRepository.findBySourceInOrderByIdAsc(List.of("JUMPIT")))
+                .willReturn(List.of(job));
+        given(rawJobSnapshotStorage.save(JobIngestionSource.JUMPIT, "jumpit-1002", job.getRawData()))
+                .willReturn(new RawJobSnapshotMetadata(
+                        "jumpit/jumpit-1002/raw.json",
+                        "c".repeat(64),
+                        256L,
+                        "LOCAL_FILE",
+                        LocalDateTime.of(2026, 6, 4, 11, 30)
+                ));
+
+        RawJobSnapshotBackfillSummary summary = service.backfill(List.of("JUMPIT"));
+
+        assertThat(summary.processedCount()).isEqualTo(1);
+        assertThat(summary.snapshottedCount()).isEqualTo(1);
+        assertThat(summary.purgedRawDataCount()).isEqualTo(1);
+        assertThat(summary.failedCount()).isZero();
+        assertThat(job.getRawSnapshotKey()).isEqualTo("jumpit/jumpit-1002/raw.json");
+        assertThat(job.getRawData()).isNull();
     }
 
     @Test
@@ -83,7 +119,8 @@ class RawJobSnapshotBackfillServiceTest {
         );
         RawJobSnapshotBackfillService service = new RawJobSnapshotBackfillService(
                 jobRepository,
-                rawJobSnapshotStorage
+                rawJobSnapshotStorage,
+                new RawJobSnapshotBackfillProperties(false, List.of("WANTED"), false)
         );
 
         given(jobRepository.findBySourceInOrderByIdAsc(List.of("WANTED")))
@@ -107,7 +144,8 @@ class RawJobSnapshotBackfillServiceTest {
         Job job = createJob("JUMPIT", "jumpit-blank", null);
         RawJobSnapshotBackfillService service = new RawJobSnapshotBackfillService(
                 jobRepository,
-                rawJobSnapshotStorage
+                rawJobSnapshotStorage,
+                new RawJobSnapshotBackfillProperties(false, List.of("JUMPIT"), false)
         );
 
         given(jobRepository.findBySourceInOrderByIdAsc(List.of("JUMPIT")))

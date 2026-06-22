@@ -26,14 +26,18 @@ public class RawJobSnapshotBackfillRunner implements ApplicationRunner {
         List<String> sources = properties.sourcesOrDefault();
 
         log.info("Raw job snapshot backfill started. sources={}", sources);
+        if (properties.purgeRawDataAfterSnapshot()) {
+            log.warn("Raw job snapshot backfill will purge jobs.raw_data after snapshot metadata is saved.");
+        }
 
         RawJobSnapshotBackfillSummary summary = backfillService.backfill(sources);
 
         log.info(
-                "Raw job snapshot backfill completed. sources={}, processedCount={}, snapshottedCount={}, skippedMissingRawDataCount={}, skippedAlreadySnapshottedCount={}, failedCount={}",
+                "Raw job snapshot backfill completed. sources={}, processedCount={}, snapshottedCount={}, purgedRawDataCount={}, skippedMissingRawDataCount={}, skippedAlreadySnapshottedCount={}, failedCount={}",
                 sources,
                 summary.processedCount(),
                 summary.snapshottedCount(),
+                summary.purgedRawDataCount(),
                 summary.skippedMissingRawDataCount(),
                 summary.skippedAlreadySnapshottedCount(),
                 summary.failedCount()

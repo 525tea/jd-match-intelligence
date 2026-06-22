@@ -18,12 +18,14 @@ public class RawJobSnapshotBackfillService {
 
     private final JobRepository jobRepository;
     private final RawJobSnapshotStorage rawJobSnapshotStorage;
+    private final RawJobSnapshotBackfillProperties properties;
 
     @Transactional
     public RawJobSnapshotBackfillSummary backfill(List<String> sources) {
         List<Job> jobs = jobRepository.findBySourceInOrderByIdAsc(sources);
 
         int snapshottedCount = 0;
+        int purgedRawDataCount = 0;
         int skippedMissingRawDataCount = 0;
         int skippedAlreadySnapshottedCount = 0;
         int failedCount = 0;
@@ -54,6 +56,10 @@ public class RawJobSnapshotBackfillService {
                         metadata.storageType(),
                         metadata.savedAt()
                 );
+                if (properties.purgeRawDataAfterSnapshot()) {
+                    job.clearRawData();
+                    purgedRawDataCount++;
+                }
                 snapshottedCount++;
             } catch (IllegalArgumentException exception) {
                 failedCount++;
@@ -78,6 +84,7 @@ public class RawJobSnapshotBackfillService {
         return new RawJobSnapshotBackfillSummary(
                 jobs.size(),
                 snapshottedCount,
+                purgedRawDataCount,
                 skippedMissingRawDataCount,
                 skippedAlreadySnapshottedCount,
                 failedCount
