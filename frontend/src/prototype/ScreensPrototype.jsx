@@ -34,6 +34,12 @@ export function JobFlowScreens({ t, go, screen }) {
   const [addingApplication, setAddingApplication] = React.useState(false);
   const [settingsModal, setSettingsModal] = React.useState(null);
   const [screenNotice, setScreenNotice] = React.useState(null);
+  const [githubRepositories, setGithubRepositories] = React.useState([]);
+  const [githubRepositoriesLoading, setGithubRepositoriesLoading] = React.useState(false);
+  const [githubRepositoriesError, setGithubRepositoriesError] = React.useState('');
+  const [selectedRepositoryFullName, setSelectedRepositoryFullName] = React.useState('');
+  const [selectedRepositoryRef, setSelectedRepositoryRef] = React.useState('');
+  const [importingRepository, setImportingRepository] = React.useState(false);
   const screenNoticeTimerRef = React.useRef(null);
   const [trendSkill, setTrendSkill] = React.useState(() => getJobflowState()?.trends?.[0]?.name || '');
   const [openGroups, setOpenGroups] = React.useState(isV3 ? { role: true, career: true, skill: false, employment: false, remote: false, region: false, tag: false, deadline: false } : { role: true, career: true, skill: true, employment: false, remote: false, region: false, tag: false, deadline: false });
@@ -72,6 +78,32 @@ export function JobFlowScreens({ t, go, screen }) {
     observer.observe(jobListSentinelRef.current);
     return () => observer.disconnect();
   }, [screen, visibleJobCount]);
+  React.useEffect(() => {
+    if (screen !== 'project-new' || !login) return undefined;
+    let alive = true;
+    setGithubRepositoriesLoading(true);
+    setGithubRepositoriesError('');
+    jobflowActions.listGithubRepositories?.()
+      ?.then((repositories) => {
+        if (!alive) return;
+        const rows = Array.isArray(repositories) ? repositories : [];
+        setGithubRepositories(rows);
+        const currentSelected = rows.find((repo) => repo.fullName === selectedRepositoryFullName);
+        const nextSelected = currentSelected || rows[0] || null;
+        if (nextSelected) {
+          setSelectedRepositoryFullName(nextSelected.fullName);
+          setSelectedRepositoryRef(nextSelected.defaultBranch || 'HEAD');
+        }
+      })
+      ?.catch((error) => {
+        if (!alive) return;
+        setGithubRepositoriesError(error.message || 'GitHub 저장소 목록을 불러오지 못했습니다.');
+      })
+      ?.finally(() => {
+        if (alive) setGithubRepositoriesLoading(false);
+      });
+    return () => { alive = false; };
+  }, [screen, login]);
   const labelMap = {
     BACKEND: '백엔드', FRONTEND: '프론트엔드', FULLSTACK: '풀스택', ANDROID: '안드로이드', IOS: 'iOS',
     DEVOPS: 'DevOps', SRE: 'SRE', DBA: 'DBA', SECURITY: '보안', DATA_ENGINEER: '데이터 엔지니어',
@@ -540,46 +572,120 @@ export function JobFlowScreens({ t, go, screen }) {
     </Shell>;
   };
 
-  const projectNewScreen = () => <Shell title="새 프로젝트 분석" sub="지금은 분석된 프로젝트 결과를 기준으로 추천과 갭 분석을 확인합니다. 새 프로젝트 등록은 다음 단계에서 연결됩니다." actions={<ActionButton onClick={() => go('projects')}>프로젝트 목록</ActionButton>}>
-    <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1.05fr 0.95fr', gap: 18, alignItems: 'start' }}>
-      <section style={{ ...tile, padding: 28 }}>
-        <SecTitle>현재 사용 가능</SecTitle>
-        <div style={{ fontSize: narrow ? 28 : 34, fontWeight: 950, letterSpacing: -1, lineHeight: 1.15 }}>GitHub 권한을 확인하고 프로젝트 분석 흐름으로 이어갑니다.</div>
-        <p style={{ color: muted, fontSize: 15, lineHeight: 1.72, margin: '14px 0 0' }}>현재 프론트에서는 저장소 선택 UI까지 먼저 노출하고, 실제 저장소 등록/재분석 API가 붙으면 같은 화면에서 프로젝트를 연결합니다. GitHub OAuth 권한 확인은 지금 바로 가능합니다.</p>
-        <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          <ActionButton primary onClick={() => jobflowActions.startGithubOAuth?.()}>GitHub 권한 확인</ActionButton>
-          <ActionButton onClick={() => go('projects')}>프로젝트 목록으로</ActionButton>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(3, 1fr)', gap: 10, marginTop: 20 }}>
-          {[['스킬 인벤토리', `${JF.skills?.length || 0}개`], ['경험 태그', `${JF.expTags?.length || 0}개`], ['매칭 공고', `${JF.matches?.length || 0}개`]].map(([label, value]) => <div key={label} style={{ background: soft, border: '1px solid ' + line, borderRadius: 16, padding: 16 }}><b style={{ fontSize: 26, letterSpacing: -0.7, ...num }}>{value}</b><div style={{ color: muted, fontSize: 12.5, fontWeight: 850, marginTop: 4 }}>{label}</div></div>)}
-        </div>
-        <div style={{ marginTop: 20, display: 'flex', flexWrap: 'wrap', gap: 8 }}><ActionButton primary onClick={() => go('project-analysis')}>현재 프로젝트 분석 보기</ActionButton><ActionButton onClick={() => go('recommendations')}>추천 공고 보기</ActionButton><ActionButton onClick={() => go('gap')}>갭 분석 보기</ActionButton></div>
-      </section>
-      <aside style={{ display: 'grid', gap: 14 }}>
-        <section style={{ ...tile, background: ink, color: '#fff' }}>
-          <SecTitle color={green}>다음 연결 흐름</SecTitle>
-          <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: -0.5, lineHeight: 1.28 }}>새 프로젝트를 연결하면 분석부터 추천까지 순서대로 진행됩니다.</div>
-          <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
-            {[
-              ['프로젝트 등록', 'GitHub 저장소 주소와 기준 브랜치를 선택합니다.'],
-              ['코드 분석', '빌드 파일과 프로젝트 구조에서 스킬과 경험 태그를 추출합니다.'],
-              ['매칭 반영', '분석 결과를 JD 매칭, 갭 분석, 추천 피드에 연결합니다.'],
-            ].map(([title, desc]) => <div key={title} style={{ borderTop: '1px solid rgba(255,255,255,0.13)', paddingTop: 12 }}><b style={{ color: green, fontSize: 13.5, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{title}</b><div style={{ color: 'rgba(255,255,255,0.68)', fontSize: 13, lineHeight: 1.55, marginTop: 4 }}>{desc}</div></div>)}
+  const projectNewScreen = () => {
+    const selectedRepository = githubRepositories.find((repo) => repo.fullName === selectedRepositoryFullName) || githubRepositories[0] || null;
+    const selectedRef = selectedRepositoryRef || selectedRepository?.defaultBranch || 'HEAD';
+    const canImportRepository = Boolean(selectedRepository && selectedRef && !importingRepository);
+    const importSelectedRepository = async () => {
+      if (!selectedRepository) {
+        notify('분석할 GitHub 저장소를 먼저 선택해주세요.');
+        return;
+      }
+
+      setImportingRepository(true);
+      try {
+        const result = await jobflowActions.importGithubRepository?.({
+          owner: selectedRepository.owner,
+          name: selectedRepository.name,
+          ref: selectedRef,
+          htmlUrl: selectedRepository.htmlUrl,
+          description: selectedRepository.description,
+        });
+        notify(result?.skipped ? '이미 최신 분석 결과가 있어요.' : '프로젝트 분석이 완료됐어요.');
+        go('project-analysis');
+      } catch (error) {
+        notify(error.message || '프로젝트 분석에 실패했어요.');
+      } finally {
+        setImportingRepository(false);
+      }
+    };
+
+    return <Shell title="새 프로젝트 분석" sub="GitHub 로그인으로 저장소를 고르고, 기준 브랜치를 선택한 뒤 코드에서 스킬과 경험 태그를 추출합니다." actions={<ActionButton onClick={() => go('projects')}>프로젝트 목록</ActionButton>}>
+      <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1.12fr 0.88fr', gap: 18, alignItems: 'start' }}>
+        <section style={{ ...tile, padding: 28 }}>
+          <SecTitle>GitHub 저장소 선택</SecTitle>
+          <div style={{ fontSize: narrow ? 28 : 34, fontWeight: 950, letterSpacing: -1, lineHeight: 1.15 }}>분석할 저장소를 선택하세요.</div>
+          <p style={{ color: muted, fontSize: 15, lineHeight: 1.72, margin: '14px 0 0' }}>선택한 저장소의 빌드 파일, Docker/설정 파일, GitHub Actions workflow를 읽어 프로젝트 스킬과 경험 태그를 갱신합니다.</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 18 }}>
+            <ActionButton primary onClick={() => jobflowActions.startGithubOAuth?.()}>GitHub 재연동</ActionButton>
+            <ActionButton onClick={() => {
+              setGithubRepositories([]);
+              setSelectedRepositoryFullName('');
+              setSelectedRepositoryRef('');
+              setGithubRepositoriesError('');
+              setGithubRepositoriesLoading(true);
+              jobflowActions.listGithubRepositories?.()
+                ?.then((rows) => {
+                  const repositories = Array.isArray(rows) ? rows : [];
+                  setGithubRepositories(repositories);
+                  const first = repositories[0];
+                  if (first) {
+                    setSelectedRepositoryFullName(first.fullName);
+                    setSelectedRepositoryRef(first.defaultBranch || 'HEAD');
+                  }
+                })
+                ?.catch((error) => setGithubRepositoriesError(error.message || 'GitHub 저장소 목록을 불러오지 못했습니다.'))
+                ?.finally(() => setGithubRepositoriesLoading(false));
+            }}>목록 새로고침</ActionButton>
           </div>
+
+          {!login && <div style={{ marginTop: 18 }}><StatePanel type="unauthorized" title="로그인이 필요합니다" desc="GitHub 저장소 목록을 보려면 GitHub 로그인을 먼저 진행해주세요." action="GitHub 권한 확인" /></div>}
+          {login && githubRepositoriesLoading && <div style={{ marginTop: 18 }}><StatePanel type="loading" title="저장소 목록을 불러오는 중입니다" desc="GitHub API에서 접근 가능한 저장소를 최신순으로 가져오고 있습니다." /></div>}
+          {login && githubRepositoriesError && <div style={{ marginTop: 18 }}><StatePanel type="error" title="저장소 목록을 불러오지 못했습니다" desc={githubRepositoriesError} action="GitHub 재연동" /></div>}
+          {login && !githubRepositoriesLoading && !githubRepositoriesError && !githubRepositories.length && <div style={{ marginTop: 18 }}><StatePanel type="empty" title="표시할 저장소가 없습니다" desc="GitHub 권한 범위에 읽을 수 있는 저장소가 없거나, 저장소 접근 권한 승인이 필요합니다." action="GitHub 재연동" /></div>}
+
+          {githubRepositories.length > 0 && <div style={{ display: 'grid', gap: 10, marginTop: 20, maxHeight: 430, overflow: 'auto', paddingRight: 4 }}>
+            {githubRepositories.map((repo) => {
+              const selected = repo.fullName === selectedRepositoryFullName;
+              return <button key={repo.fullName} onClick={() => {
+                setSelectedRepositoryFullName(repo.fullName);
+                setSelectedRepositoryRef(repo.defaultBranch || 'HEAD');
+              }} style={{ font: 'inherit', cursor: 'pointer', textAlign: 'left', border: '1px solid ' + (selected ? greenStrong : line), background: selected ? greenTint : '#fff', borderRadius: 16, padding: 16, color: ink }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <GithubMark />
+                  <b style={{ fontSize: 15.5 }}>{repo.fullName}</b>
+                  <span style={{ color: repo.privateRepository ? coralDeep : greenInk, background: repo.privateRepository ? coralTint : greenTint, border: '1px solid ' + (repo.privateRepository ? coralTintBd : greenTintBd), borderRadius: 999, padding: '3px 8px', fontSize: 11, fontWeight: 900 }}>{repo.privateRepository ? 'private' : 'public'}</span>
+                  <span style={{ marginLeft: 'auto', color: muted, fontSize: 12, fontWeight: 800 }}>{repo.defaultBranch || 'HEAD'}</span>
+                </div>
+                {repo.description && <div style={{ color: muted, fontSize: 13, lineHeight: 1.5, marginTop: 8 }}>{repo.description}</div>}
+              </button>;
+            })}
+          </div>}
         </section>
-        <section style={tile}>
-          <SecTitle>현재 프로젝트</SecTitle>
-          <div style={{ display: 'grid', gap: 10 }}>
-            {[
-              ['프로젝트', currentProjectName],
-              ['저장소', currentProjectRepo],
-              ['스킬', currentProjectSkillSummary],
-            ].map(([label, value]) => <div key={label} style={{ display: 'grid', gridTemplateColumns: '86px 1fr', gap: 10, borderTop: '1px solid ' + line, paddingTop: 10 }}><span style={{ color: faint, fontSize: 12, fontWeight: 900 }}>{label}</span><b style={{ fontSize: 13.5, lineHeight: 1.45 }}>{value}</b></div>)}
-          </div>
-        </section>
-      </aside>
-    </div>
-  </Shell>;
+
+        <aside style={{ display: 'grid', gap: 14 }}>
+          <section style={{ ...tile, background: ink, color: '#fff' }}>
+            <SecTitle color={green}>분석 실행</SecTitle>
+            <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: -0.5, lineHeight: 1.28 }}>{selectedRepository ? selectedRepository.fullName : '저장소를 선택해주세요.'}</div>
+            <label style={{ display: 'block', marginTop: 18 }}>
+              <div style={{ color: 'rgba(255,255,255,0.68)', fontSize: 12, fontWeight: 900, marginBottom: 7 }}>기준 브랜치 / ref</div>
+              <input value={selectedRef} onChange={(event) => setSelectedRepositoryRef(event.target.value)} placeholder="main" style={{ width: '100%', boxSizing: 'border-box', font: 'inherit', border: '1px solid rgba(255,255,255,0.16)', background: 'rgba(255,255,255,0.08)', color: '#fff', borderRadius: 12, padding: '12px 13px', outline: 'none' }} />
+            </label>
+            <button disabled={!canImportRepository} onClick={importSelectedRepository} style={{ marginTop: 16, font: 'inherit', cursor: canImportRepository ? 'pointer' : 'not-allowed', width: '100%', border: 'none', background: canImportRepository ? green : 'rgba(255,255,255,0.10)', color: canImportRepository ? ink : 'rgba(255,255,255,0.42)', borderRadius: 14, padding: 14, fontWeight: 950 }}>
+              {importingRepository ? '분석 중...' : '이 저장소 분석하기'}
+            </button>
+            <div style={{ display: 'grid', gap: 10, marginTop: 18 }}>
+              {[
+                ['1', '저장소 등록', '선택한 repository를 내 프로젝트로 저장합니다.'],
+                ['2', '정적 분석', '빌드/인프라/workflow 파일에서 스킬과 경험 태그를 추출합니다.'],
+                ['3', '매칭 연결', '프로젝트 ID를 저장하고 추천, 갭 분석, 매칭 화면에 반영합니다.'],
+              ].map(([step, title, desc]) => <div key={step} style={{ borderTop: '1px solid rgba(255,255,255,0.13)', paddingTop: 12, display: 'grid', gridTemplateColumns: '30px 1fr', gap: 10 }}><span style={{ width: 26, height: 26, borderRadius: 10, background: 'rgba(185,236,42,0.14)', color: green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 1000 }}>{step}</span><div><b style={{ color: '#fff', fontSize: 13.5 }}>{title}</b><div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12.5, lineHeight: 1.5, marginTop: 3 }}>{desc}</div></div></div>)}
+            </div>
+          </section>
+          <section style={tile}>
+            <SecTitle>현재 프로젝트</SecTitle>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {[
+                ['프로젝트', currentProjectName],
+                ['저장소', currentProjectRepo],
+                ['스킬', currentProjectSkillSummary],
+              ].map(([label, value]) => <div key={label} style={{ display: 'grid', gridTemplateColumns: '86px 1fr', gap: 10, borderTop: '1px solid ' + line, paddingTop: 10 }}><span style={{ color: faint, fontSize: 12, fontWeight: 900 }}>{label}</span><b style={{ fontSize: 13.5, lineHeight: 1.45 }}>{value}</b></div>)}
+            </div>
+          </section>
+        </aside>
+      </div>
+    </Shell>;
+  };
 
   const projectAnalysisScreen = () => {
     if (!hasProjectContext) {

@@ -106,6 +106,8 @@ export const api = {
   projectSkills: (projectId) => request(`/projects/${projectId}/skills`),
   projectExperienceTags: (projectId) => request(`/projects/${projectId}/experience-tags`),
   projectJobMatches: (projectId, params = {}) => request(`/projects/${projectId}/job-matches`, { params }),
+  githubRepositories: () => request('/github/repositories'),
+  importGithubRepository: (body) => request('/projects/github-import', { method: 'POST', body: JSON.stringify(body) }),
   recommendations: (projectId, params = {}) => request('/recommendations/jobs', { params: { userProjectId: projectId, ...params } }),
   gapAnalysis: (projectId, params = {}) => request(`/gap-analysis/projects/${projectId}`, { params }),
 

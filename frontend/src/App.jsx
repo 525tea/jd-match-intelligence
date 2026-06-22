@@ -217,6 +217,17 @@ export default function App() {
         await api.logout().catch(() => null);
         window.location.href = `${API_BASE_URL}/oauth2/authorization/github`;
       },
+      async listGithubRepositories() {
+        return api.githubRepositories();
+      },
+      async importGithubRepository(repository) {
+        const result = await api.importGithubRepository(repository);
+        if (result?.userProjectId) {
+          projectStore.setProjectId(String(result.userProjectId));
+        }
+        await refreshData();
+        return result;
+      },
     });
     return clearJobflowActions;
   }, [jf, refreshData, resolveJobId]);
