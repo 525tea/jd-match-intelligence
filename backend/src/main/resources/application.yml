@@ -1,12 +1,29 @@
+server:
+  shutdown: graceful
+
 spring:
   application:
     name: jobflow
+
+  datasource:
+    hikari:
+      maximum-pool-size: ${HIKARI_MAXIMUM_POOL_SIZE:20}
+      minimum-idle: ${HIKARI_MINIMUM_IDLE:5}
+      connection-timeout: ${HIKARI_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${HIKARI_IDLE_TIMEOUT:600000}
+      max-lifetime: ${HIKARI_MAX_LIFETIME:1800000}
 
   batch:
     job:
       enabled: false
     jdbc:
-      initialize-schema: embedded
+      initialize-schema: never
+
+  jpa:
+    open-in-view: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_PHASE_TIMEOUT:30s}
 
   elasticsearch:
     uris: ${ELASTICSEARCH_URL:http://localhost:9200}

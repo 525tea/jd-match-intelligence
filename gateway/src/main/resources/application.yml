@@ -1,5 +1,6 @@
 server:
   port: ${GATEWAY_PORT:8081}
+  shutdown: graceful
 
 gateway:
   backend-url: ${BACKEND_URL:http://localhost:8080}
@@ -9,6 +10,9 @@ gateway:
 spring:
   application:
     name: jobflow-gateway
+
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_PHASE_TIMEOUT:30s}
 
   data:
     redis:
