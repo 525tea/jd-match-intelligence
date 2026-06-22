@@ -2,6 +2,7 @@ import React from 'react';
 import { api } from '../api/client.js';
 import { jobflowActions } from '../api/jobflowActions.js';
 import { getJobflowState } from './jobflowState.js';
+import { toPrototypeJob } from './adapters.js';
 
 // JobFlow — 공고 상세. JD + matching report.
 // Palette: lime = owned/match, charcoal = analysis, coral = urgent/missing.
@@ -14,6 +15,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const [hidden, setHidden] = React.useState(false);
   const [canonicalGroup, setCanonicalGroup] = React.useState(null);
   const [canonicalGroupStatus, setCanonicalGroupStatus] = React.useState('idle');
+  const [routeDetailJob, setRouteDetailJob] = React.useState(null);
   const fire = (label) => {
     setToast(label);
     clearTimeout(toastTimerRef.current);
@@ -210,6 +212,23 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     ...((userJobs.ignored) || []),
   ];
   const targetById = jobId ? allJobs.find((x) => String(x.jobId || x.id) === String(jobId)) : null;
+  React.useEffect(() => {
+    setRouteDetailJob(null);
+    if (!jobId) return undefined;
+
+    let alive = true;
+    api.job(jobId)
+      .then((detail) => {
+        if (!alive || !detail) return;
+        setRouteDetailJob(toPrototypeJob(detail));
+      })
+      .catch(() => {
+        if (alive) setRouteDetailJob(null);
+      });
+
+    return () => { alive = false; };
+  }, [jobId]);
+
   const targetCompany = company || targetById?.companyKo;
   const primaryProject = JF.projectList?.[0] || {};
   const currentProjectName = primaryProject.name || '내 프로젝트';
@@ -220,7 +239,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     ? `${currentProjectName}에서 ${currentProjectSkillSummary} 근거를 확인했고, 부족 스킬은 갭 분석에서 우선순위로 볼 수 있어요.`
     : '프로젝트 분석 결과를 연결하면 보유 스킬과 부족 스킬 기준으로 매칭률을 다시 계산합니다.';
   const userSkills = new Set(userSkillRows.map((s) => s.name));
-  const m = targetById || matches.find((x) => x.companyKo === targetCompany);
+  const m = routeDetailJob || targetById || matches.find((x) => x.companyKo === targetCompany);
   const l = !m && (listings.find((x) => x.companyKo === targetCompany) || popular.find((x) => x.companyKo === targetCompany) || closing.find((x) => x.companyKo === targetCompany));
   const trackingJobId = (targetById && (targetById.jobId || targetById.id)) || (m && (m.jobId || m.id)) || (l && (l.jobId || l.id)) || jobId;
   const trackingCompany = targetCompany || (m && m.companyKo) || (l && l.companyKo);
@@ -402,6 +421,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const isOriginalListSection = (title) => /주요|업무|자격|요건|우대|복지|혜택|채용|절차/.test(title);
   const isOriginalParagraphSection = (title) => /포지션 상세|기업\/서비스 소개|기업 소개|회사 소개|서비스 소개|팀 소개|공고 원문/.test(title);
   const isCompactInfoSection = (title) => /포지션 상세|기업\/서비스 소개|기업 소개|회사 소개|서비스 소개|팀 소개/.test(title);
+  const isPositionMetaSection = (title) => /포지션 상세|포지션 경력\/학력\/마감일\/근무지역 정보/.test(title);
   const originalLineStyle = (compact = false) => ({
     margin: 0,
     color: '#2f343d',
@@ -547,16 +567,113 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       <span>[{children}]</span>
     </div>
   );
+  const RichOriginalText = ({ children }) => {
+    const source = String(children || '').replace(/\*{4,}/gu, '');
+    const parts = source.split(/(\*\*[^*]+\*\*)/gu).filter((part) => part !== '');
+
+    return (
+      <>
+        {parts.map((part, index) => {
+          const boldMatch = part.match(/^\*\*([^*]+)\*\*$/u);
+
+          return boldMatch
+            ? <strong key={part + index} style={{ fontWeight: 900 }}>{boldMatch[1]}</strong>
+            : <span key={part + index}>{part}</span>;
+        })}
+      </>
+    );
+  };
+  const stripBracketHeading = (line) => line.replace(/^\[([^\]\n]{2,70})\]$/u, '$1');
+  const isSourceSubheadingLine = (line) => /^\[[^\]\n]{2,70}\]$/u.test(line.trim());
+  const sourceBulletPattern = /^[•・ㆍ]\s*(.+)$/u;
   const OriginalTextBlock = ({ block, bullet }) => block.type === 'subheading'
     ? <OriginalSubheading>{block.value}</OriginalSubheading>
     : bullet
       ? <div className="jf-original-bullet"><span className="jf-original-dot" /><span>{block.value}</span></div>
       : <p style={originalLineStyle(block.compact)}>{block.value}</p>;
+  const SourceOriginalBody = ({ body }) => {
+    const normalized = String(body || '')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .replace(/[\u200B-\u200D\uFEFF\u2060]/gu, '')
+      .replace(/\*{4,}/gu, '')
+      .replace(/(?<=\))1(?=\s*[•・ㆍ])/gu, '')
+      .replace(/(?<=\))[\s\u200B-\u200D\uFEFF\u2060]*1[\s\u200B-\u200D\uFEFF\u2060]+(?=[가-힣])/gu, '\n')
+      .replace(/\n{3,}/gu, '\n\n')
+      .trim();
+    const paragraphs = normalized
+      .split(/\n{2,}/gu)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+
+    return (
+      <div style={{ display: 'grid', gap: 13, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.76, letterSpacing: -0.12, wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>
+        {paragraphs.map((paragraph, paragraphIndex) => {
+          const lines = paragraph.split('\n').map((line) => line.trim()).filter(Boolean);
+
+          if (lines.every((line) => /^[•・ㆍ]\s*/u.test(line))) {
+            return (
+              <div key={paragraph + paragraphIndex} className="jf-original-list" style={{ display: 'grid', gap: 5 }}>
+                {lines.map((line, lineIndex) => (
+                  <div key={line + lineIndex} className="jf-original-bullet">
+                    <span className="jf-original-dot" />
+                    <span><RichOriginalText>{line.replace(/^[•・ㆍ]\s*/u, '')}</RichOriginalText></span>
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
+          return (
+            <div key={paragraph + paragraphIndex} style={{ display: 'grid', gap: 5 }}>
+              {lines.map((line, lineIndex) => {
+                const bulletMatch = line.match(sourceBulletPattern);
+
+                if (isSourceSubheadingLine(line)) {
+                  return <OriginalSubheading key={line + lineIndex}>{stripBracketHeading(line)}</OriginalSubheading>;
+                }
+
+                if (bulletMatch) {
+                  return (
+                      <div key={line + lineIndex} className="jf-original-bullet">
+                        <span className="jf-original-dot" />
+                        <span><RichOriginalText>{bulletMatch[1]}</RichOriginalText></span>
+                      </div>
+                  );
+                }
+
+                return <p key={line + lineIndex} style={{ margin: 0, whiteSpace: 'pre-wrap' }}><RichOriginalText>{line}</RichOriginalText></p>;
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
   const TextSection = ({ title, children }) => <section style={{ paddingTop: 24, marginTop: 24, borderTop: '1px solid ' + line }}>
     <h2 style={{ margin: 0, color: muted, fontSize: 16, fontWeight: 900, letterSpacing: -0.2 }}>{title}</h2>
     <div style={{ marginTop: 11 }}>{children}</div>
   </section>;
-  const OriginalSection = ({ title, body, index }) => {
+  const OriginalSection = ({ title, body, index, preserveSource = false }) => {
+    const showTitle = !(index === 0 && title === '공고 원문');
+
+    if (preserveSource) {
+      const sourceBody = String(body || '')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .trim();
+
+      return (
+        <section className="jf-original-section" style={{ paddingTop: index ? 22 : 0, marginTop: index ? 22 : 0, borderTop: index ? '1px solid ' + line : 'none', minWidth: 0 }}>
+          {showTitle && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: sourceBody ? 10 : 0 }}>
+            <span style={{ width: 4, height: 18, borderRadius: 999, background: green, flexShrink: 0 }} />
+            <h3 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 18 : 21, lineHeight: 1.24, fontWeight: 920, letterSpacing: -0.35 }}>{title}</h3>
+          </div>}
+          {sourceBody && <SourceOriginalBody body={sourceBody} />}
+        </section>
+      );
+    }
+
     const normalized = body
       ? body
         .replace(/([^\n])\s*(•)/g, '$1\n$2')
@@ -580,7 +697,6 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       ? paragraphToOriginalBlocks(lines, compactInfo)
       : toOriginalBlocks(lines).map((block) => ({ ...block, compact: compactInfo }));
     const skillItems = isSkillSection ? [...new Set(normalized.split(/\s+/).map((x) => x.trim()).filter(Boolean))].slice(0, 24) : [];
-    const showTitle = !(index === 0 && title === '공고 원문');
     return (
       <section className="jf-original-section" style={{ paddingTop: index ? 22 : 0, marginTop: index ? 22 : 0, borderTop: index ? '1px solid ' + line : 'none', minWidth: 0 }}>
         {showTitle && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: body ? 10 : 0 }}>
@@ -663,6 +779,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       .map((section) => ({
         title: canonicalizeHeading(section.title || '공고 원문'),
         body: section.body || '',
+        preserveSource: true,
       }))
       .filter((section) => section.body)
     : [];
@@ -672,19 +789,10 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       title: canonicalizeHeading(section.title),
     }));
   const sectionHasMeaningfulBody = (section) => String(section?.body || '').replace(/\s+/g, ' ').trim().length >= 16;
-  const originalSections = apiOriginalSections.length
-    ? rawOriginalSections.reduce((merged, section) => {
-      const existingIndex = merged.findIndex((item) => item.title === section.title);
-      if (existingIndex < 0) return merged.concat(section);
-      if (!sectionHasMeaningfulBody(merged[existingIndex]) && sectionHasMeaningfulBody(section)) {
-        return merged.map((item, index) => index === existingIndex ? section : item);
-      }
-      return merged;
-    }, apiOriginalSections)
-    : rawOriginalSections;
+  const originalSections = apiOriginalSections.length ? apiOriginalSections : rawOriginalSections;
   const mainOriginalSections = sortOriginalSections(originalSections)
-    .filter((section) => !/기술스택|기술 스택|스킬/.test(section.title));
-  const processItems = bullets.process.length ? bullets.process : processItemsFromOriginalSections(originalSections);
+    .filter((section) => !/기술스택|기술 스택|스킬/.test(section.title))
+    .filter((section) => !isPositionMetaSection(section.title));
 
   return (
     <div style={{ minHeight: '100vh', background: '#f7f8fa', fontFamily: font, color: ink }}>
@@ -721,15 +829,6 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
             </div>
 
             <article style={{ background: card, border: '1px solid ' + line, borderRadius: 24, padding: narrow ? '22px 18px' : '34px 46px', boxShadow: shadow, marginTop: 18, overflow: 'hidden' }}>
-              <div>
-                <h2 style={{ margin: 0, color: '#20242c', fontSize: narrow ? 23 : 28, fontWeight: 950, letterSpacing: -0.65 }}>공고 원문</h2>
-                <div style={{ marginTop: 20 }}>
-                  {mainOriginalSections.length
-                    ? mainOriginalSections.map((section, index) => <OriginalSection key={section.title + index} title={section.title} body={section.body} index={index} />)
-                    : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.25, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{formatOriginalDescription(job.desc)}</p>}
-                </div>
-              </div>
-
               <TextSection title="필수 스킬">
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{reqList.length ? reqList.map((s) => <Pill key={s} owned={has(s)} miss={!has(s)}>{s}</Pill>) : <span style={{ color: muted, fontSize: 14 }}>필수 스킬 정보가 없습니다.</span>}</div>
               </TextSection>
@@ -742,11 +841,12 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{tags.length ? tags.map((c, i) => <TagPill key={c} muted={i > 0}>{tagLabels[c] || c}</TagPill>) : <span style={{ color: muted, fontSize: 14 }}>경험 태그 정보가 없습니다.</span>}</div>
               </TextSection>
 
-              <TextSection title="채용 절차">
-                {processItems.length
-                  ? <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 8 }}>{processItems.slice(0, 8).map((x, i) => <div key={x + i} style={{ background: soft, border: '1px solid ' + line, borderRadius: 14, padding: '10px 12px', fontSize: 13, fontWeight: 850, lineHeight: 1.45, wordBreak: 'keep-all', overflowWrap: 'anywhere', minWidth: 0 }}><span style={{ color: faint, marginRight: 6, ...num }}>{i + 1}.</span>{cleanItemText(x)}</div>)}</div>
-                  : <div style={{ color: muted, fontSize: 14, lineHeight: 1.65 }}>원문 공고에서 채용 절차 정보가 제공되지 않았습니다. 자세한 전형 안내는 원본 공고에서 확인해주세요.</div>}
-              </TextSection>
+              <div style={{ paddingTop: 24, marginTop: 24, borderTop: '1px solid ' + line }}>
+                {mainOriginalSections.length
+                  ? mainOriginalSections.map((section, index) => <OriginalSection key={section.title + index} title={section.title} body={section.body} index={index} preserveSource={section.preserveSource} />)
+                  : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.25, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{formatOriginalDescription(job.desc)}</p>}
+              </div>
+
             </article>
           </div>
 

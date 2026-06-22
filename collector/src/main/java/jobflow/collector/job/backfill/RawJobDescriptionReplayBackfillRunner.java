@@ -30,11 +30,12 @@ public class RawJobDescriptionReplayBackfillRunner implements ApplicationRunner 
         RawJobDescriptionReplayBackfillSummary summary = backfillService.backfill(sources);
 
         log.info(
-                "Raw job description replay backfill completed. sources={}, processedCount={}, updatedDescriptionCount={}, unchangedDescriptionCount={}, updatedRoleCount={}, skippedCount={}, failedCount={}, normalizedSkillJobCount={}, normalizedExperienceTagJobCount={}",
+                "Raw job description replay backfill completed. sources={}, processedCount={}, updatedDescriptionCount={}, unchangedDescriptionCount={}, updatedDescriptionSectionsCount={}, updatedRoleCount={}, skippedCount={}, failedCount={}, normalizedSkillJobCount={}, normalizedExperienceTagJobCount={}",
                 sources,
                 summary.processedCount(),
                 summary.updatedDescriptionCount(),
                 summary.unchangedDescriptionCount(),
+                summary.updatedDescriptionSectionsCount(),
                 summary.updatedRoleCount(),
                 summary.skippedCount(),
                 summary.failedCount(),

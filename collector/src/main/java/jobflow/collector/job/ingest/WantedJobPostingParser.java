@@ -22,7 +22,7 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class WantedJobPostingParser implements JobPostingParser {
 
-    private static final String CRAWLER_VERSION = "wanted-parser-0.1";
+    private static final String CRAWLER_VERSION = "wanted-parser-0.2";
     private static final int ROLE_DETAIL_MAX_LENGTH = 100;
     private static final int MAX_REASONABLE_EXPERIENCE_YEARS = 80;
     private static final Pattern EXPERIENCE_RANGE_PATTERN =
@@ -54,6 +54,7 @@ public class WantedJobPostingParser implements JobPostingParser {
         String title = normalize(job.path("position").asText(""));
         String companyName = normalize(company.path("name").asText(""));
         String description = buildDescription(detail);
+        String descriptionSections = buildDescriptionSections(detail);
 
         validateRequired("title", title, fetchedJobPosting);
         validateRequired("companyName", companyName, fetchedJobPosting);
@@ -95,7 +96,8 @@ public class WantedJobPostingParser implements JobPostingParser {
                 now,
                 null,
                 fetchedJobPosting.body(),
-                CRAWLER_VERSION
+                CRAWLER_VERSION,
+                descriptionSections
         );
     }
 
@@ -145,9 +147,53 @@ public class WantedJobPostingParser implements JobPostingParser {
         return String.join("\n\n", parts);
     }
 
+    private String buildDescriptionSections(JsonNode detail) {
+        List<DisplayDescriptionSection> sections = new ArrayList<>();
+
+        appendDisplaySection(sections, "COMPANY_INTRO", "기업/서비스 소개", detail.path("intro").asText(""));
+        appendDisplaySection(sections, "RESPONSIBILITIES", "주요 업무", detail.path("main_tasks").asText(""));
+        appendDisplaySection(sections, "REQUIREMENTS", "자격 요건", detail.path("requirements").asText(""));
+        appendDisplaySection(sections, "PREFERRED", "우대 사항", detail.path("preferred_points").asText(""));
+        appendDisplaySection(sections, "BENEFITS", "혜택 및 복지", detail.path("benefits").asText(""));
+        appendDisplaySection(sections, "PROCESS", "채용절차 및 기타 지원 유의사항", firstDisplayText(
+                detail,
+                "hiring_process",
+                "recruitment_process",
+                "selection_process",
+                "interview_process",
+                "process",
+                "caution",
+                "notice"
+        ));
+
+        if (sections.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.writeValueAsString(sections);
+        } catch (JacksonException exception) {
+            throw new JobPostingParseException(
+                    "Failed to serialize Wanted description sections. error=" + exception.getMessage()
+            );
+        }
+    }
+
     private String firstText(JsonNode node, String... fieldNames) {
         for (String fieldName : fieldNames) {
             String value = normalize(node.path(fieldName).asText(""));
+
+            if (!value.isBlank()) {
+                return value;
+            }
+        }
+
+        return "";
+    }
+
+    private String firstDisplayText(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            String value = displayBody(node.path(fieldName).asText(""));
 
             if (!value.isBlank()) {
                 return value;
@@ -162,6 +208,19 @@ public class WantedJobPostingParser implements JobPostingParser {
 
         if (!normalized.isBlank()) {
             parts.add("[" + label + "]\n" + normalized);
+        }
+    }
+
+    private void appendDisplaySection(
+            List<DisplayDescriptionSection> sections,
+            String type,
+            String title,
+            String body
+    ) {
+        String displayBody = displayBody(body);
+
+        if (!displayBody.isBlank()) {
+            sections.add(new DisplayDescriptionSection(type, title, displayBody));
         }
     }
 
@@ -417,6 +476,28 @@ public class WantedJobPostingParser implements JobPostingParser {
                 .trim();
     }
 
+    private String displayBody(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return restoreWantedWordBreaks(value)
+                .replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .replace('\u00A0', ' ')
+                .replaceAll("[\\u200B-\\u200D\\uFEFF\\u2060]", "")
+                .replaceAll("\\*{4,}", "")
+                .replaceAll("(?<=\\))1(?=\\s*[•・ㆍ])", "")
+                .replaceAll("(?<=\\))[\\s\\u200B-\\u200D\\uFEFF\\u2060]*1[\\s\\u200B-\\u200D\\uFEFF\\u2060]+(?=[가-힣])", "\n")
+                .replaceAll("[ \\t]+", " ")
+                .replaceAll("\\s*([•・ㆍ])\\s*", "\n$1 ")
+                .replaceAll("\\s+(?=\\[[^\\]\\n]{2,70}])", "\n\n")
+                .replaceAll("\\s*(=\\s*=\\s*=\\s*=+)\\s*", "\n\n$1\n\n")
+                .replaceAll("\\n{3,}", "\n\n")
+                .replaceAll("(?m)^ +", "")
+                .trim();
+    }
+
     private String restoreWantedWordBreaks(String value) {
         return value
                 .replaceAll("(?<=[A-Za-z])\\R(?=[a-z])", "")
@@ -435,6 +516,13 @@ public class WantedJobPostingParser implements JobPostingParser {
     private record ExperienceRange(
             Integer min,
             Integer max
+    ) {
+    }
+
+    private record DisplayDescriptionSection(
+            String type,
+            String title,
+            String body
     ) {
     }
 }

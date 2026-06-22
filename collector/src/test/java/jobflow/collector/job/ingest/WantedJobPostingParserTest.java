@@ -89,7 +89,10 @@ class WantedJobPostingParserTest {
         assertThat(posting.salaryVisible()).isTrue();
         assertThat(posting.deadlineAt()).isEqualTo(LocalDateTime.of(2026, 6, 22, 23, 59));
         assertThat(posting.rawData()).contains("367044");
-        assertThat(posting.crawlerVersion()).isEqualTo("wanted-parser-0.1");
+        assertThat(posting.crawlerVersion()).isEqualTo("wanted-parser-0.2");
+        assertThat(posting.descriptionSections())
+                .contains("\"title\":\"기업/서비스 소개\"")
+                .contains("\"body\":\"채용 플랫폼을 개발합니다.\"");
         assertThat(posting.collectedAt()).isNotNull();
         assertThat(posting.lastSeenAt()).isNotNull();
     }
@@ -370,5 +373,71 @@ class WantedJobPostingParserTest {
                 .contains("AI Agent Nlayer 아키텍처")
                 .doesNotContain("anti bot")
                 .doesNotContain("N layer");
+    }
+
+    @Test
+    @DisplayName("원티드 표시 섹션은 항목 구분자만 줄바꿈하고 문장 내부 middle dot은 보존한다")
+    void preserveWantedDisplaySectionsWithSourceLikeLineBreaks() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "366667",
+                "https://www.wanted.co.kr/wd/366667",
+                "https://www.wanted.co.kr/api/v4/jobs/366667",
+                """
+                        {
+                          "job": {
+                            "position": "프론트엔드 개발자",
+                            "company": {"name": "Example Company"},
+                            "detail": {
+                              "main_tasks": "[주요업무] • 배정/배차 어드민을 개발 • CS · 관제 · 고객을 잇는 운영 흐름을 어드민 안에서 구현",
+                              "requirements": "학력 : 대졸 이상(4년) • React 개발 경험 • TypeScript 개발 경험",
+                              "preferred_points": "• **어드민/운영툴 대시보드**를 개발한 경험이 있는 분"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.descriptionSections())
+                .contains("[주요업무]\\n• 배정/배차 어드민을 개발\\n• CS · 관제 · 고객을 잇는 운영 흐름")
+                .contains("학력 : 대졸 이상(4년)\\n• React 개발 경험\\n• TypeScript 개발 경험")
+                .contains("\"body\":\"• **어드민/운영툴 대시보드**를 개발한 경험이 있는 분\"")
+                .doesNotContain("CS\\n• 관제")
+                .doesNotContain("CS • 관제");
+    }
+
+    @Test
+    @DisplayName("원티드 표시 섹션은 빈 markdown 강조 표식을 제거하고 bracket heading을 보존한다")
+    void cleanWantedDisplaySectionMarkdownNoise() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "366668",
+                "https://www.wanted.co.kr/wd/366668",
+                "https://www.wanted.co.kr/api/v4/jobs/366668",
+                """
+                        {
+                          "job": {
+                            "position": "프론트엔드 개발자",
+                            "company": {"name": "Example Company"},
+                            "detail": {
+                              "intro": "[서비스 소개] **** Example service",
+                              "requirements": "웹 크롤링 운영 경험이 있으신 분 (Scrapy / Playwright / Selenium, anti-bot 우회 포함)1 • 데이터 품질 모니터링 경험이 있으신 분",
+                              "benefits": "[근무 환경] • 장비 지원 • 교육비 지원"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.descriptionSections())
+                .contains("[서비스 소개] Example service")
+                .contains("anti-bot 우회 포함)\\n• 데이터 품질 모니터링 경험")
+                .doesNotContain("포함)1")
+                .contains("[근무 환경]\\n• 장비 지원\\n• 교육비 지원")
+                .doesNotContain("****");
     }
 }

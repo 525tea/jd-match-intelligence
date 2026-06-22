@@ -115,6 +115,7 @@ class RawJobDescriptionReplayBackfillServiceTest {
                 .contains("Docker");
         assertThat(summary.processedCount()).isEqualTo(1);
         assertThat(summary.updatedDescriptionCount()).isEqualTo(1);
+        assertThat(summary.updatedDescriptionSectionsCount()).isEqualTo(1);
         assertThat(summary.updatedRoleCount()).isZero();
         assertThat(summary.normalizedSkillJobCount()).isZero();
         assertThat(summary.normalizedExperienceTagJobCount()).isZero();
@@ -243,7 +244,7 @@ class RawJobDescriptionReplayBackfillServiceTest {
         JdJobRoleClassificationService roleClassificationService = new JdJobRoleClassificationService();
         List<JobPostingParser> parsers = List.of(
                 new WantedJobPostingParser(objectMapper, roleClassificationService),
-                new JumpitJobPostingParser(roleClassificationService)
+                new JumpitJobPostingParser(roleClassificationService, objectMapper)
         );
 
         return new RawJobDescriptionReplayBackfillService(

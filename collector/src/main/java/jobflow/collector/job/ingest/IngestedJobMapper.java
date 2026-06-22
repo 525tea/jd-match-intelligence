@@ -58,6 +58,7 @@ public class IngestedJobMapper {
                 posting.rawData(),
                 posting.crawlerVersion()
         );
+        job.updateDescriptionSections(posting.descriptionSections());
 
         return job;
     }

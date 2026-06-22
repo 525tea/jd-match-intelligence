@@ -6,6 +6,7 @@ import jobflow.collector.job.JobRole;
 import jobflow.collector.job.RemoteType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 
@@ -15,7 +16,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class JumpitJobPostingParserTest {
 
     private final JumpitJobPostingParser parser = new JumpitJobPostingParser(
-            new JdJobRoleClassificationService()
+            new JdJobRoleClassificationService(),
+            new ObjectMapper()
     );
 
     @Test

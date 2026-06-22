@@ -1,6 +1,7 @@
 package jobflow.domain.job.dto;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.EmploymentType;
@@ -11,6 +12,9 @@ import jobflow.domain.job.JobRole;
 import jobflow.domain.job.JobSkill;
 import jobflow.domain.job.JobStatus;
 import jobflow.domain.job.RemoteType;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 public record JobResponse(
         Long id,
@@ -49,6 +53,8 @@ public record JobResponse(
         List<JobExperienceTagResponse> experienceTags
 ) {
 
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     public static JobResponse of(
             Job job,
             List<JobSkill> jobSkills,
@@ -66,7 +72,7 @@ public record JobResponse(
                 job.getUrl(),
                 job.getOriginalUrl(),
                 applyUrl,
-                new JobDescriptionSectionParser().parse(job.getDescription()),
+                descriptionSections(job),
                 job.getRole(),
                 job.getRoleDetail(),
                 job.getCareerLevel(),
@@ -95,5 +101,47 @@ public record JobResponse(
                         .map(JobExperienceTagResponse::from)
                         .toList()
         );
+    }
+
+    private static List<JobDescriptionSectionResponse> descriptionSections(Job job) {
+        List<JobDescriptionSectionResponse> storedSections = parseStoredDescriptionSections(
+                job.getDescriptionSections()
+        );
+
+        if (!storedSections.isEmpty()) {
+            return storedSections;
+        }
+
+        return new JobDescriptionSectionParser().parse(job.getDescription());
+    }
+
+    private static List<JobDescriptionSectionResponse> parseStoredDescriptionSections(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(value);
+
+            if (!root.isArray()) {
+                return List.of();
+            }
+
+            List<JobDescriptionSectionResponse> sections = new ArrayList<>();
+
+            for (JsonNode node : root) {
+                String type = node.path("type").asText("");
+                String title = node.path("title").asText("");
+                String body = node.path("body").asText("");
+
+                if (!title.isBlank() && !body.isBlank()) {
+                    sections.add(new JobDescriptionSectionResponse(type, title, body));
+                }
+            }
+
+            return sections;
+        } catch (JacksonException exception) {
+            return List.of();
+        }
     }
 }

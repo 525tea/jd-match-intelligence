@@ -103,6 +103,7 @@ public class JobIngestionService {
                 crawledJob.getRawSnapshotStorageType(),
                 crawledJob.getRawSnapshotSavedAt()
         );
+        existingJob.updateDescriptionSections(crawledJob.getDescriptionSections());
 
         saveNormalizedSkills(existingJob);
         saveNormalizedExperienceTags(existingJob);
