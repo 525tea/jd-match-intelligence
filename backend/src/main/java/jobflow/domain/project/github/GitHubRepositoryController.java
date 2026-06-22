@@ -3,6 +3,8 @@ package jobflow.domain.project.github;
 import jakarta.validation.Valid;
 import java.util.List;
 import jobflow.global.response.ApiResponse;
+import jobflow.global.error.ErrorCode;
+import jobflow.global.error.exception.BusinessException;
 import jobflow.global.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +26,10 @@ public class GitHubRepositoryController {
     public ResponseEntity<ApiResponse<List<GitHubRepositoryResponse>>> getRepositories(
             @AuthenticationPrincipal UserPrincipal principal
     ) {
+        if (principal == null) {
+            throw new BusinessException(ErrorCode.COMMON_UNAUTHORIZED);
+        }
+
         List<GitHubRepositoryResponse> response =
                 gitHubRepositoryAnalysisService.listRepositories(principal.id());
 
@@ -35,6 +41,10 @@ public class GitHubRepositoryController {
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody GitHubRepositoryImportRequest request
     ) {
+        if (principal == null) {
+            throw new BusinessException(ErrorCode.COMMON_UNAUTHORIZED);
+        }
+
         GitHubRepositoryImportResponse response =
                 gitHubRepositoryAnalysisService.importRepository(principal.id(), request);
 

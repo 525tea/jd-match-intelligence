@@ -81,6 +81,15 @@ class GitHubRepositoryControllerTest {
     }
 
     @Test
+    @DisplayName("인증 principal 없이 GitHub repository 목록을 조회하면 401을 반환한다")
+    void getRepositoriesWithoutPrincipal() throws Exception {
+        mockMvc.perform(get("/github/repositories"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"));
+    }
+
+    @Test
     @DisplayName("GitHub repository import 성공 시 분석 결과를 반환한다")
     void importRepository() throws Exception {
         setAuthentication();
@@ -123,6 +132,23 @@ class GitHubRepositoryControllerTest {
 
         verify(gitHubRepositoryAnalysisService)
                 .importRepository(any(Long.class), any(GitHubRepositoryImportRequest.class));
+    }
+
+    @Test
+    @DisplayName("인증 principal 없이 GitHub repository import를 요청하면 401을 반환한다")
+    void importRepositoryWithoutPrincipal() throws Exception {
+        mockMvc.perform(post("/projects/github-import")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "owner": "example-org",
+                                  "name": "sample-repo",
+                                  "ref": "main"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"));
     }
 
     private void setAuthentication() {
