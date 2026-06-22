@@ -30,6 +30,7 @@ bash performance/deploy/staging-config-gate.sh
 | Spring Batch metadata migration | ok | `BATCH_JOB_INSTANCE`, `BATCH_STEP_EXECUTION` |
 | Staging env template | ok | secret placeholders, OAuth redirect, scheduler defaults |
 | Actuator exposure artifacts | ok | smoke, report, runbook linkage |
+| Pre-k6 smoke artifacts | ok | integrated smoke runner and runbook linkage |
 | Docker Compose config | ok | memory limits, healthchecks, depends_on conditions, JVM options |
 
 ## Raw Output
@@ -58,6 +59,9 @@ staging_env_template=ok
 ### Actuator exposure artifacts
 actuator_exposure_artifacts=ok
 
+### Pre-k6 smoke artifacts
+pre_k6_smoke_artifacts=ok
+
 ### Docker Compose config
 docker_compose_config=ok
 
@@ -69,6 +73,7 @@ gateway_runtime_settings=ok
 spring_batch_metadata_migration=ok
 staging_env_template=ok
 actuator_exposure_artifacts=ok
+pre_k6_smoke_artifacts=ok
 docker_compose_config=ok
 
 Staging config gate completed.
@@ -105,6 +110,15 @@ Staging config gate completed.
 - smoke verifies `/api/actuator/health` proxy boundary
 - smoke verifies `/api/actuator/prometheus` proxy boundary
 
+### Pre-k6 Smoke
+
+- staging pre-k6 smoke script exists
+- pre-k6 smoke runs staging readiness smoke
+- pre-k6 smoke runs job list filter smoke
+- pre-k6 smoke runs search intent smoke
+- pre-k6 smoke runs actuator exposure smoke
+- staging runbook includes pre-k6 integrated smoke
+
 ### Docker Compose
 
 - memory limits for MySQL, Redis, Elasticsearch, backend, gateway, Prometheus, Grafana, Zipkin
@@ -129,6 +143,7 @@ Staging/performance 배포 전 설정 gate는 통과했다.
 - backend 준비 전 gateway/Prometheus 기동
 - OAuth redirect/env 값 누락
 - Gateway API prefix를 통한 backend actuator 외부 노출
+- k6 실행 전 필수 smoke 누락 또는 수동 실행 순서 오류
 - scheduler가 staging 첫 기동 직후 의도치 않게 실행되는 문제
 
 ## Follow-up
