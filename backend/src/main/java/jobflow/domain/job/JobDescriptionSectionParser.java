@@ -76,7 +76,8 @@ public class JobDescriptionSectionParser {
 
     private static final Pattern LINE_BREAK_MARKER_PATTERN = Pattern.compile("\\\\n");
     private static final Pattern MULTIPLE_BLANK_LINE_PATTERN = Pattern.compile("\\n{3,}");
-    private static final Pattern BULLET_BOUNDARY_PATTERN = Pattern.compile("\\s+(?=(?:[-•]\\s+|\\d+\\.\\s+))");
+    private static final Pattern INLINE_BULLET_BOUNDARY_PATTERN =
+            Pattern.compile("(?m)(^\\s*(?:[-•]\\s+|\\d+\\.\\s+)[^\\n]*?)\\s+(?=(?:[-•]\\s+|\\d+\\.\\s+))");
     private static final Pattern LINE_START_DOT_BULLET_PATTERN = Pattern.compile("(?m)^\\s*(?:ㆍ|·|﹒)\\s*");
     private static final Map<String, SectionDefinition> ALIASES_BY_NORMALIZED_TEXT = aliasesByNormalizedText();
     private static final Pattern SECTION_HEADING_PATTERN = sectionHeadingPattern();
@@ -162,10 +163,22 @@ public class JobDescriptionSectionParser {
                 .replace("\r", "\n")
                 .replaceAll("[ \\t]+", " ")
                 .replaceAll("[ \\t]*\\n[ \\t]*", "\n");
-        text = BULLET_BOUNDARY_PATTERN.matcher(text).replaceAll("\n");
+        text = splitInlineBulletBoundaries(text);
         text = LINE_START_DOT_BULLET_PATTERN.matcher(text).replaceAll("• ");
         text = MULTIPLE_BLANK_LINE_PATTERN.matcher(text.trim()).replaceAll("\n\n");
         return text;
+    }
+
+    private String splitInlineBulletBoundaries(String value) {
+        String previous;
+        String current = value;
+
+        do {
+            previous = current;
+            current = INLINE_BULLET_BOUNDARY_PATTERN.matcher(current).replaceAll("$1\n");
+        } while (!current.equals(previous));
+
+        return current;
     }
 
     private static Map<String, SectionDefinition> aliasesByNormalizedText() {

@@ -138,6 +138,39 @@ class JobDescriptionSectionParserTest {
     }
 
     @Test
+    @DisplayName("문장 중간 bullet-looking separator는 새 bullet로 분리하지 않는다")
+    void keepInlineBulletLookingSeparatorText() {
+        String description = """
+                [주요 업무]
+                CS • 관제 • 고객을 잇는 운영 흐름을 어드민 안에서 구현
+                배정/배차 어드민을 개발·운영자가 사용할 수 있게 설계
+                """;
+
+        List<JobDescriptionSectionResponse> sections = parser.parse(description);
+
+        assertThat(sections).hasSize(1);
+        assertThat(sections.get(0).body())
+                .contains("CS • 관제 • 고객을 잇는 운영 흐름")
+                .doesNotContain("CS\n• 관제")
+                .doesNotContain("관제\n• 고객");
+    }
+
+    @Test
+    @DisplayName("bullet로 시작한 한 줄 안의 다음 bullet은 새 항목으로 분리한다")
+    void splitInlineBulletListOnlyWhenLineStartsWithBullet() {
+        String description = """
+                [주요 업무]
+                • 데이터 파이프라인 구성 및 관리 • 대용량 데이터 처리 • ETL 프로세스 관리
+                """;
+
+        List<JobDescriptionSectionResponse> sections = parser.parse(description);
+
+        assertThat(sections).hasSize(1);
+        assertThat(sections.get(0).body())
+                .contains("• 데이터 파이프라인 구성 및 관리\n• 대용량 데이터 처리\n• ETL 프로세스 관리");
+    }
+
+    @Test
     @DisplayName("줄 시작 middle dot만 bullet로 변환한다")
     void convertLineStartMiddleDotToBullet() {
         String description = """
