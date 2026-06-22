@@ -10,6 +10,7 @@ import jobflow.collector.job.ingest.JobIngestionSource;
 import jobflow.collector.job.ingest.JobPostingParseException;
 import jobflow.collector.job.ingest.JobPostingParser;
 import jobflow.collector.job.ingest.JobSkillNormalizationService;
+import jobflow.collector.job.snapshot.RawJobSnapshotStorage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class RawJobDescriptionReplayBackfillService {
     private final List<JobPostingParser> parsers;
     private final JobSkillNormalizationService jobSkillNormalizationService;
     private final JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
+    private final RawJobSnapshotStorage rawJobSnapshotStorage;
 
     @Transactional
     public RawJobDescriptionReplayBackfillSummary backfill(List<String> sources) {
@@ -97,11 +99,14 @@ public class RawJobDescriptionReplayBackfillService {
     }
 
     private ReplayResult replay(Job job) {
-        if (job.getRawData() == null || job.getRawData().isBlank()) {
-            log.warn("Raw description replay skipped. reason=missing_raw_data, jobId={}, source={}, externalId={}",
+        String rawData = rawDataFor(job);
+
+        if (rawData == null || rawData.isBlank()) {
+            log.warn("Raw description replay skipped. reason=missing_raw_data_and_snapshot, jobId={}, source={}, externalId={}, rawSnapshotKey={}",
                     job.getId(),
                     job.getSource(),
-                    job.getExternalId());
+                    job.getExternalId(),
+                    job.getRawSnapshotKey());
             return ReplayResult.skipped();
         }
 
@@ -128,7 +133,7 @@ public class RawJobDescriptionReplayBackfillService {
         }
 
         try {
-            String body = bodyFor(job, source);
+            String body = bodyFor(source, rawData);
             FetchedJobPosting fetched = new FetchedJobPosting(
                     source,
                     job.getExternalId(),
@@ -164,6 +169,18 @@ public class RawJobDescriptionReplayBackfillService {
         }
     }
 
+    private String rawDataFor(Job job) {
+        if (job.getRawData() != null && !job.getRawData().isBlank()) {
+            return job.getRawData();
+        }
+
+        if (job.getRawSnapshotKey() == null || job.getRawSnapshotKey().isBlank()) {
+            return null;
+        }
+
+        return rawJobSnapshotStorage.read(job.getRawSnapshotKey());
+    }
+
     private JobPostingParser parserFor(JobIngestionSource source) {
         return parsers.stream()
                 .filter(parser -> parser.supports(source))
@@ -171,13 +188,13 @@ public class RawJobDescriptionReplayBackfillService {
                 .orElse(null);
     }
 
-    private String bodyFor(Job job, JobIngestionSource source) throws JacksonException {
+    private String bodyFor(JobIngestionSource source, String rawData) throws JacksonException {
         if (source == JobIngestionSource.JUMPIT) {
-            JsonNode root = objectMapper.readTree(job.getRawData());
+            JsonNode root = objectMapper.readTree(rawData);
             return root.path("rawBody").asText("");
         }
 
-        return job.getRawData();
+        return rawData;
     }
 
     private String sourceUrl(Job job) {

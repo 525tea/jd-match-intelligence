@@ -4,6 +4,8 @@ import java.util.List;
 import java.time.LocalDateTime;
 import jobflow.collector.job.Job;
 import jobflow.collector.job.JobRepository;
+import jobflow.collector.job.snapshot.RawJobSnapshotMetadata;
+import jobflow.collector.job.snapshot.RawJobSnapshotStorage;
 import jobflow.collector.outbox.OutboxEvent;
 import jobflow.collector.outbox.OutboxEventService;
 import jobflow.collector.outbox.OutboxEventTypes;
@@ -21,6 +23,7 @@ public class JobIngestionService {
     private final OutboxEventService outboxEventService;
     private final JobSkillNormalizationService jobSkillNormalizationService;
     private final JobExperienceTagNormalizationService jobExperienceTagNormalizationService;
+    private final RawJobSnapshotStorage rawJobSnapshotStorage;
 
     @Transactional
     public JobIngestionResult ingest(IngestedJobPosting posting) {
@@ -33,6 +36,8 @@ public class JobIngestionService {
 
     private JobIngestionResult create(IngestedJobPosting posting) {
         Job job = ingestedJobMapper.toJob(posting);
+        saveRawSnapshotMetadata(job, posting);
+
         Job savedJob = jobRepository.save(job);
         saveNormalizedSkills(savedJob);
         saveNormalizedExperienceTags(savedJob);
@@ -52,6 +57,7 @@ public class JobIngestionService {
 
     private JobIngestionResult update(Job existingJob, IngestedJobPosting posting) {
         Job crawledJob = ingestedJobMapper.toJob(posting);
+        saveRawSnapshotMetadata(crawledJob, posting);
 
         existingJob.update(
                 crawledJob.getTitle(),
@@ -88,6 +94,14 @@ public class JobIngestionService {
                 crawledJob.getSourceUpdatedAt(),
                 crawledJob.getRawData(),
                 crawledJob.getCrawlerVersion()
+        );
+
+        existingJob.updateRawSnapshotMetadata(
+                crawledJob.getRawSnapshotKey(),
+                crawledJob.getRawSnapshotHash(),
+                crawledJob.getRawSnapshotSizeBytes(),
+                crawledJob.getRawSnapshotStorageType(),
+                crawledJob.getRawSnapshotSavedAt()
         );
 
         saveNormalizedSkills(existingJob);
@@ -136,6 +150,22 @@ public class JobIngestionService {
         return jobRepository.findByCanonicalFingerprintAndSourceNot(
                 job.getCanonicalFingerprint(),
                 job.getSource()
+        );
+    }
+
+    private void saveRawSnapshotMetadata(Job job, IngestedJobPosting posting) {
+        RawJobSnapshotMetadata metadata = rawJobSnapshotStorage.save(
+                posting.source(),
+                posting.externalId(),
+                posting.rawData()
+        );
+
+        job.updateRawSnapshotMetadata(
+                metadata.key(),
+                metadata.hash(),
+                metadata.sizeBytes(),
+                metadata.storageType(),
+                metadata.savedAt()
         );
     }
 }
