@@ -7,10 +7,10 @@ const asList = unwrapList;
 const initials = (text = '') => String(text).replace(/[^A-Za-z0-9가-힣]/g, ' ').trim().split(/\s+/).map((x) => x[0]).join('').slice(0, 2).toUpperCase() || 'JF';
 
 const dday = (deadlineAt) => {
-  if (!deadlineAt) return '마감 정보 없음';
+  if (!deadlineAt) return '상시';
   const now = new Date();
   const due = new Date(deadlineAt);
-  if (Number.isNaN(due.getTime())) return '마감 정보 없음';
+  if (Number.isNaN(due.getTime())) return '상시';
   const diff = Math.ceil((due.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0)) / 86400000);
   if (diff < 0) return '마감';
   if (diff === 0) return 'D-DAY';
@@ -333,6 +333,8 @@ async function hydrateJobDetails(jobs, limit = 24) {
   });
 }
 
+export const hydrateUserFacingJobs = (jobs = [], limit = 120) => hydrateJobDetails(dedupeJobs(jobs.filter(isUserFacingJob)), limit);
+
 export const dedupeJobs = (jobs = []) => {
   const seen = new Set();
   return jobs.filter((job) => {
@@ -347,6 +349,23 @@ export const dedupeJobs = (jobs = []) => {
     return true;
   });
 };
+
+export async function fetchUserFacingJobs(params = {}, options = {}) {
+  const pageSize = options.size || 100;
+  const maxPages = options.maxPages || 10;
+  const targetCount = options.targetCount || 500;
+  const rows = [];
+
+  for (let page = 0; page < maxPages && rows.length < targetCount; page += 1) {
+    const pageRows = asList(await api.jobs({ ...params, page, size: pageSize }));
+    if (!pageRows.length) break;
+    rows.push(...pageRows.filter(isUserFacingJob));
+    if (pageRows.length < pageSize) break;
+  }
+
+  const deduped = dedupeJobs(rows).slice(0, targetCount);
+  return options.hydrate ? hydrateJobDetails(deduped, options.hydrateLimit || 120) : deduped;
+}
 
 function attachLookup(next) {
   const everyJob = [
@@ -444,7 +463,7 @@ export async function loadJobFlowData(baseJF) {
     RELIABILITY: '안정성',
   };
   const publicResults = await Promise.all([
-    settle('jobs', () => api.searchJobs('백엔드', 40)),
+    settle('jobs', () => fetchUserFacingJobs({}, { hydrate: true, hydrateLimit: 120 })),
     settle('trends', () => api.skillTrends({ limit: 8 })),
     settle('market', () => api.market({ role: 'BACKEND', limit: 5 })),
   ]);
@@ -453,8 +472,7 @@ export async function loadJobFlowData(baseJF) {
   const jobs = publicResults.find((x) => x.key === 'jobs');
   const jobRows = asList(jobs?.data).filter(isUserFacingJob);
   if (jobs?.ok && jobRows.length) {
-    const detailedJobs = await hydrateJobDetails(jobRows);
-    const mapped = dedupeJobs(detailedJobs.filter(isUserFacingJob)).map(toPrototypeJob);
+    const mapped = dedupeJobs(jobRows.filter(isUserFacingJob)).map(toPrototypeJob);
     next.listings = mapped;
     next.popular = mapped.slice(0, 4);
     next.closing = mapped.slice().sort((a, b) => parseDdayNumber(a.deadline) - parseDdayNumber(b.deadline)).slice(0, 3);
