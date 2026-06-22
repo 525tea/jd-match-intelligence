@@ -12,6 +12,7 @@ COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 BATCH_MIGRATION="${ROOT_DIR}/backend/src/main/resources/db/migration/V17__add_spring_batch_metadata_tables.sql"
 ENV_TEMPLATE="${ROOT_DIR}/performance/deploy/staging.env.example"
 RUNBOOK="${ROOT_DIR}/performance/deploy/STAGING_DEPLOY_RUNBOOK.md"
+PRE_K6_SMOKE="${ROOT_DIR}/performance/deploy/staging-pre-k6-smoke.sh"
 ACTUATOR_SMOKE="${ROOT_DIR}/performance/security/actuator-exposure-smoke.sh"
 ACTUATOR_REPORT="${ROOT_DIR}/docs/metrics/security/260622_actuator_exposure_smoke_report.md"
 
@@ -74,6 +75,7 @@ assert_file_exists "${COMPOSE_FILE}" "docker-compose.yml should exist"
 assert_file_exists "${BATCH_MIGRATION}" "Spring Batch metadata migration should exist"
 assert_file_exists "${ENV_TEMPLATE}" "staging env template should exist"
 assert_file_exists "${RUNBOOK}" "staging deploy runbook should exist"
+assert_file_exists "${PRE_K6_SMOKE}" "staging pre-k6 smoke should exist"
 assert_file_exists "${ACTUATOR_SMOKE}" "actuator exposure smoke should exist"
 assert_file_exists "${ACTUATOR_REPORT}" "actuator exposure smoke report should exist"
 echo "required_files=ok"
@@ -153,6 +155,20 @@ assert_contains "${ACTUATOR_REPORT}" "Gateway-proxied" \
 echo "actuator_exposure_artifacts=ok"
 echo
 
+echo "### Pre-k6 smoke artifacts"
+assert_contains "${PRE_K6_SMOKE}" "staging-readiness-smoke.sh" \
+  "pre-k6 smoke should run staging readiness smoke"
+assert_contains "${PRE_K6_SMOKE}" "job-list-filter-smoke.sh" \
+  "pre-k6 smoke should run job list filter smoke"
+assert_contains "${PRE_K6_SMOKE}" "search-intent-smoke.sh" \
+  "pre-k6 smoke should run search intent smoke"
+assert_contains "${PRE_K6_SMOKE}" "actuator-exposure-smoke.sh" \
+  "pre-k6 smoke should run actuator exposure smoke"
+assert_contains "${RUNBOOK}" "staging-pre-k6-smoke.sh" \
+  "runbook should include staging pre-k6 smoke"
+echo "pre_k6_smoke_artifacts=ok"
+echo
+
 echo "### Docker Compose config"
 compose_json="$(
   cd "${ROOT_DIR}" \
@@ -213,6 +229,7 @@ echo "gateway_runtime_settings=ok"
 echo "spring_batch_metadata_migration=ok"
 echo "staging_env_template=ok"
 echo "actuator_exposure_artifacts=ok"
+echo "pre_k6_smoke_artifacts=ok"
 echo "docker_compose_config=ok"
 
 echo
