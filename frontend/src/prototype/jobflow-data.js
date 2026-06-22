@@ -11,7 +11,7 @@ const filterOptions = {
   statuses: ['OPEN', 'CLOSED', 'EXPIRED', 'HIDDEN'],
   regions: ['서울', '경기', '인천', '부산', '대전', '대구', '광주', '원격', '전국'],
   companySizes: ['스타트업', '중소기업', '중견기업', '대기업', '외국계'],
-  deadlines: ['전체', '오늘 마감', '3일 이내', '7일 이내', '마감일 없음'],
+  deadlines: ['전체', '오늘 마감', '3일 이내', '7일 이내', '상시'],
   skills: [
     'Java', 'JavaScript', 'TypeScript', 'Python', 'Go', 'Kotlin', 'Spring Boot',
     'Spring Security', 'Spring Data JPA', 'React', 'Node.js', 'MySQL', 'PostgreSQL',

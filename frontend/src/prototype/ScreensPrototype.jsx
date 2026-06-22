@@ -14,6 +14,7 @@ const DEFAULT_JOB_FILTER = {
   tag: '전체',
   deadline: '전체',
 };
+const JOB_LIST_BATCH_SIZE = 40;
 
 export function JobFlowScreens({ t, go, screen }) {
   const JF = getJobflowState();
@@ -25,6 +26,8 @@ export function JobFlowScreens({ t, go, screen }) {
   const [draftFilter, setDraftFilter] = React.useState(DEFAULT_JOB_FILTER);
   const [appliedFilter, setAppliedFilter] = React.useState(DEFAULT_JOB_FILTER);
   const [jobResultMode, setJobResultMode] = React.useState('전체 공고');
+  const [visibleJobCount, setVisibleJobCount] = React.useState(JOB_LIST_BATCH_SIZE);
+  const jobListSentinelRef = React.useRef(null);
   const [previewProject, setPreviewProject] = React.useState(() => getJobflowState()?.projectList?.[0]?.name || '내 프로젝트');
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [editingProject, setEditingProject] = React.useState(null);
@@ -45,6 +48,7 @@ export function JobFlowScreens({ t, go, screen }) {
   const green = t.green || '#b9ec2a';
   const greenStrong = green, greenInk = '#3f5c08', greenTint = '#eef8cf', greenTintBd = '#dbeca8';
   const coral = '#f0603f', coralDeep = '#c2391f', coralTint = '#ffe8e1', coralTintBd = '#f6c9bc';
+  const deadlineTone = { bg: '#f4f6f9', fg: '#5b616e', bd: '#e1e5ec' };
   const font = "'Space Grotesk', 'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif";
   const shadow = '0 1px 2px rgba(20,21,26,0.04), 0 8px 22px rgba(20,21,26,0.06)';
   const login = t.state !== '비로그인';
@@ -55,6 +59,19 @@ export function JobFlowScreens({ t, go, screen }) {
   const tile = { background: card, border: '1px solid ' + line, borderRadius: 18, padding: 22, boxShadow: shadow };
   const navItems = [['home', '홈'], ['jobs', '공고'], ['projects', '프로젝트'], ['gap', '갭 분석'], ['trends', '트렌드']];
   const navOn = (key) => screen === key || (key === 'projects' && ['project-analysis', 'project-new'].includes(screen));
+  React.useEffect(() => {
+    if (screen === 'jobs') setVisibleJobCount(JOB_LIST_BATCH_SIZE);
+  }, [screen, jobResultMode, query, appliedFilter, sort, JF.listings.length]);
+  React.useEffect(() => {
+    if (screen !== 'jobs' || !jobListSentinelRef.current || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisibleJobCount((count) => count + JOB_LIST_BATCH_SIZE);
+      }
+    }, { rootMargin: '420px 0px' });
+    observer.observe(jobListSentinelRef.current);
+    return () => observer.disconnect();
+  }, [screen, visibleJobCount]);
   const labelMap = {
     BACKEND: '백엔드', FRONTEND: '프론트엔드', FULLSTACK: '풀스택', ANDROID: '안드로이드', IOS: 'iOS',
     DEVOPS: 'DevOps', SRE: 'SRE', DBA: 'DBA', SECURITY: '보안', DATA_ENGINEER: '데이터 엔지니어',
@@ -159,9 +176,14 @@ export function JobFlowScreens({ t, go, screen }) {
   const MoreChip = ({ count }) => <span style={{ fontSize: 12, fontWeight: 900, padding: '4px 9px', borderRadius: 8, background: soft, color: muted, border: '1px solid ' + line, whiteSpace: 'nowrap' }}>+{count}</span>;
 
   const JobThumbnail = ({ job, score, compact, locked, scoreLabel = '프로젝트 매칭' }) => {
-    const ownedSkills = job.matched || job.skills || [];
+    const ownedSkills = [...new Set([
+      ...(job.matched || []),
+      ...(job.skills || []),
+      ...(job.requiredSkills || []),
+      ...(job.preferredSkills || []),
+    ])];
     const missingSkills = job.missing || [];
-    const tags = job.tags || [];
+    const tags = [...new Set(job.tags || [])];
     const matchScore = score || job.score || 0;
     const visibleSkills = missingSkills.length
       ? ownedSkills.slice(0, compact ? 2 : 3).map((skill) => ({ skill })).concat([{ skill: missingSkills[0], miss: true }])
@@ -183,7 +205,7 @@ export function JobFlowScreens({ t, go, screen }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 10, alignItems: 'center', marginTop: 14 }}>
         <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 6, minWidth: 0, overflow: 'hidden' }}>{visibleSkills.map(({ skill, miss }) => <SkillChip key={skill} s={skill} miss={miss} />)}{hiddenSkills > 0 && <MoreChip count={hiddenSkills} />}</div>
-        <span style={{ fontSize: 11.5, fontWeight: 900, color: coralDeep, background: coralTint, border: '1px solid ' + coralTintBd, padding: '4px 9px', borderRadius: 999, whiteSpace: 'nowrap' }}>{job.deadline}</span>
+        <span style={{ fontSize: 11.5, fontWeight: 900, color: deadlineTone.fg, background: deadlineTone.bg, border: '1px solid ' + deadlineTone.bd, padding: '4px 9px', borderRadius: 999, whiteSpace: 'nowrap' }}>{job.deadline}</span>
       </div>
       <div style={{ display: 'flex', flexWrap: 'nowrap', gap: 6, marginTop: 9, minHeight: 25, overflow: 'hidden' }}>{visibleTags.map((c, idx) => <TagChip key={c} code={c} muted={idx > 0 && missingSkills.length > 0} />)}{hiddenTags > 0 && <MoreChip count={hiddenTags} />}</div>
       <div style={{ marginTop: 'auto', paddingTop: 15, display: 'flex', alignItems: 'center', gap: 10, color: faint, fontSize: 11.5, fontWeight: 650 }}>
@@ -306,7 +328,7 @@ export function JobFlowScreens({ t, go, screen }) {
       if (value === '오늘 마감') return String(job.deadline).includes('DAY') || d === 0;
       if (value === '3일 이내') return d <= 3;
       if (value === '7일 이내') return d <= 7;
-      if (value === '마감일 없음') return job.deadline === '마감 정보 없음';
+      if (value === '상시' || value === '마감일 없음') return job.deadline === '상시' || job.deadline === '마감 정보 없음';
       return true;
     };
     const filteredListings = JF.listings
@@ -329,6 +351,8 @@ export function JobFlowScreens({ t, go, screen }) {
         if (sort === '최신순') return (b.jobId || b.id || 0) - (a.jobId || a.id || 0);
         return (b.score || 0) - (a.score || 0);
       });
+    const visibleListings = filteredListings.slice(0, visibleJobCount);
+    const hasMoreVisibleJobs = visibleListings.length < filteredListings.length;
     const runKeywordSearch = async () => {
       setSearchingJobs(true);
       try {
@@ -431,7 +455,12 @@ export function JobFlowScreens({ t, go, screen }) {
 	              {(isV3 || selectedFilters.length > 0) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}><span style={{ color: faint, fontSize: 12, fontWeight: 900 }}>적용 조건</span>{Object.entries(appliedFilter).filter(([, v]) => v && v !== '전체').length ? Object.entries(appliedFilter).filter(([, v]) => v && v !== '전체').map(([id, v]) => <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: greenTint, color: greenInk, border: '1px solid ' + greenTintBd, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>{v}<span onClick={() => removeAppliedFilter(id)} style={{ cursor: searchingJobs ? 'default' : 'pointer', opacity: 0.55 }}>✕</span></span>) : <span style={{ background: soft, color: muted, border: '1px solid ' + line, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>전체</span>}</div>}
             </div>
             {narrow && <div style={{ marginBottom: 14 }}>{filterOpen ? filterPanel : <div style={{ ...tile, padding: 14, display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto' }}><b style={{ whiteSpace: 'nowrap' }}>선택 필터</b>{(selectedFilters.length ? selectedFilters : ['필터 없음']).map((x) => <span key={x} style={{ background: x === '필터 없음' ? soft : greenTint, color: x === '필터 없음' ? muted : greenInk, border: '1px solid ' + (x === '필터 없음' ? line : greenTintBd), borderRadius: 16, padding: '6px 10px', fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap' }}>{x}</span>)}</div>}</div>}
-            {filteredListings.length ? <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(2, 1fr)', gap: 14 }}>{filteredListings.map((j) => <JobThumbnail key={(j.jobId || j.id || '') + j.companyKo + j.fullTitle} job={j} locked={!login} scoreLabel="검색 점수" />)}</div> : <div style={{ ...tile, textAlign: 'center', padding: narrow ? 28 : 38 }}>
+            {filteredListings.length ? <>
+              <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(2, 1fr)', gap: 14 }}>{visibleListings.map((j) => <JobThumbnail key={(j.jobId || j.id || '') + j.companyKo + j.fullTitle} job={j} locked={!login} scoreLabel="검색 점수" />)}</div>
+              <div ref={jobListSentinelRef} style={{ minHeight: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 18 }}>
+                {hasMoreVisibleJobs ? <button onClick={() => setVisibleJobCount((count) => count + JOB_LIST_BATCH_SIZE)} style={{ font: 'inherit', cursor: 'pointer', border: '1px solid ' + line, background: '#fff', color: ink, borderRadius: 999, padding: '11px 18px', fontWeight: 900, boxShadow: shadow }}>더 보기 · {visibleListings.length.toLocaleString()} / {filteredListings.length.toLocaleString()}</button> : <span style={{ color: faint, fontSize: 12.5, fontWeight: 800 }}>전체 {filteredListings.length.toLocaleString()}개를 모두 표시했어요.</span>}
+              </div>
+            </> : <div style={{ ...tile, textAlign: 'center', padding: narrow ? 28 : 38 }}>
               <div style={{ fontSize: 18, fontWeight: 900, letterSpacing: -0.35 }}>조건에 맞는 공고가 없습니다</div>
               <div style={{ color: muted, fontSize: 14, lineHeight: 1.6, marginTop: 8 }}>선택한 필터를 줄이거나 검색어를 지우면 더 많은 공고를 볼 수 있어요.</div>
               <button onClick={() => { setQuery(''); resetFilters(); }} style={{ marginTop: 16, font: 'inherit', cursor: 'pointer', border: 'none', background: ink, color: '#fff', borderRadius: 14, padding: '11px 16px', fontWeight: 900 }}>필터 초기화</button>

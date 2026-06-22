@@ -75,9 +75,17 @@ export function JobFlowHome({ t, go }) {
   const JobCard = ({ job, featured, darkSection, urgent }) => {
     const score = job.score || (JF.matches.find((m) => m.companyKo === job.companyKo) || {}).score || 0;
     const tags = (job.tags || []).map((c) => JF.tagLabel[c] || c);
-    const ownedSkills = job.matched || job.skills || [];
+    const ownedSkills = [...new Set([
+      ...(job.matched || []),
+      ...(job.skills || []),
+      ...(job.requiredSkills || []),
+      ...(job.preferredSkills || []),
+    ])];
     const missingSkills = job.missing || [];
     const darkCard = darkSection && !featured;
+    const deadlineTone = darkCard
+      ? { bg: 'rgba(255,255,255,0.08)', fg: 'rgba(255,255,255,0.72)', bd: 'rgba(255,255,255,0.14)' }
+      : { bg: '#f4f6f9', fg: '#5b616e', bd: '#e1e5ec' };
     const visibleSkills = missingSkills.length
       ? ownedSkills.slice(0, 3).map((skill) => ({ skill })).concat([{ skill: missingSkills[0], missing: true }])
       : ownedSkills.slice(0, 3).map((skill) => ({ skill }));
@@ -86,11 +94,11 @@ export function JobFlowHome({ t, go }) {
     const visibleTags = tags.length > maxTags ? tags.slice(0, maxTags - 1) : tags.slice(0, maxTags);
     const hiddenTags = Math.max(0, tags.length - visibleTags.length);
     return (
-      <div className="jf-jobcard" onClick={() => openJob(job)} style={{ cursor: 'pointer', background: v2 && featured ? green : darkCard ? '#171a20' : card, color: darkCard ? '#fff' : ink, border: '1px solid ' + (featured ? (v3 ? greenTintBd : green) : urgent ? coralTintBd : darkCard ? 'rgba(255,255,255,0.1)' : '#edf0f3'), borderRadius: 18, padding: v3 ? 18 : 20, display: 'flex', flexDirection: 'column', minHeight: 252, boxShadow: urgent ? '0 3px 16px rgba(240,96,63,0.13)' : featured && !v2 ? (v3 ? '0 8px 22px rgba(20,21,26,0.055)' : '0 0 0 2px rgba(185,236,42,0.16), 0 8px 24px rgba(20,21,26,0.06)') : shadow }}>
+      <div className="jf-jobcard" onClick={() => openJob(job)} style={{ cursor: 'pointer', background: v2 && featured ? green : darkCard ? '#171a20' : card, color: darkCard ? '#fff' : ink, border: '1px solid ' + (featured ? (v3 ? greenTintBd : green) : darkCard ? 'rgba(255,255,255,0.1)' : '#edf0f3'), borderRadius: 18, padding: v3 ? 18 : 20, display: 'flex', flexDirection: 'column', minHeight: 252, boxShadow: featured && !v2 ? (v3 ? '0 8px 22px rgba(20,21,26,0.055)' : '0 0 0 2px rgba(185,236,42,0.16), 0 8px 24px rgba(20,21,26,0.06)') : shadow }}>
         <div style={{ display: 'flex', gap: 13, alignItems: 'flex-start' }}>
           <Logo text={job.logo || job.companyKo.slice(0, 2)} />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 13, fontWeight: v3 ? 560 : 600, color: featured ? ink : darkCard ? 'rgba(255,255,255,0.78)' : ink }}>{job.companyKo}</span><span style={{ marginLeft: 'auto', color: coralDeep, background: coralTint, border: '1px solid ' + coralTintBd, borderRadius: 12, padding: '3px 8px', fontSize: 11.5, fontWeight: 900 }}>{job.deadline}</span></div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 13, fontWeight: v3 ? 560 : 600, color: featured ? ink : darkCard ? 'rgba(255,255,255,0.78)' : ink }}>{job.companyKo}</span><span style={{ marginLeft: 'auto', color: deadlineTone.fg, background: deadlineTone.bg, border: '1px solid ' + deadlineTone.bd, borderRadius: 12, padding: '3px 8px', fontSize: 11.5, fontWeight: 900 }}>{job.deadline}</span></div>
             <div style={{ fontSize: 17, lineHeight: 1.34, fontWeight: 760, letterSpacing: -0.45, marginTop: 6, minHeight: 46, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'keep-all' }}>{job.fullTitle || job.title || '공고명 없음'}</div>
             <div style={{ fontSize: 12.5, color: featured ? 'rgba(20,21,26,0.58)' : darkCard ? 'rgba(255,255,255,0.62)' : muted, marginTop: 7, height: 18, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{job.role || job.title} · {job.level}</div>
           </div>

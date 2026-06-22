@@ -4,7 +4,7 @@ import { JobFlowHome } from './prototype/HomePrototype.jsx';
 import { JobDetail } from './prototype/JobDetailPrototype.jsx';
 import { Onboarding } from './prototype/OnboardingPrototype.jsx';
 import { JobFlowScreens } from './prototype/ScreensPrototype.jsx';
-import { createEmptyJobFlowState, dedupeJobs, isUserFacingJob, loadJobFlowData, mergePrototypeJobIntoState, toPrototypeJob } from './prototype/adapters.js';
+import { createEmptyJobFlowState, dedupeJobs, fetchUserFacingJobs, hydrateUserFacingJobs, isUserFacingJob, loadJobFlowData, mergePrototypeJobIntoState, toPrototypeJob } from './prototype/adapters.js';
 import { setJobflowState } from './prototype/jobflowState.js';
 import { API_BASE_URL, api, authStore, projectStore } from './api/client.js';
 import { clearJobflowActions, setJobflowActions } from './api/jobflowActions.js';
@@ -164,8 +164,8 @@ export default function App() {
       async searchJobs(keyword) {
         const normalizedKeyword = String(keyword || '').trim();
         const rows = normalizedKeyword
-          ? await api.searchJobs(normalizedKeyword, 100)
-          : await api.jobs({ page: 0, size: 100 });
+          ? await hydrateUserFacingJobs(await api.searchJobs(normalizedKeyword, 100), 100)
+          : await fetchUserFacingJobs({}, { hydrate: true, hydrateLimit: 120 });
         const mapped = dedupeJobs(rows.filter(isUserFacingJob)).map(toPrototypeJob);
         const everyJob = mapped.filter((job) => job.companyKo && (job.jobId || job.id));
         setJf((prev) => ({
@@ -180,7 +180,7 @@ export default function App() {
         return mapped;
       },
       async listJobs(filters = {}) {
-        const rows = await api.jobs({ page: 0, size: 100, ...filters });
+        const rows = await fetchUserFacingJobs(filters, { hydrate: true, hydrateLimit: 120 });
         const mapped = dedupeJobs(rows.filter(isUserFacingJob)).map(toPrototypeJob);
         const everyJob = mapped.filter((job) => job.companyKo && (job.jobId || job.id));
         setJf((prev) => ({
