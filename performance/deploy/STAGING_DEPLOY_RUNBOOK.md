@@ -298,24 +298,19 @@ curl http://localhost:9200/_cat/indices?v
 
 `red`면 검색 품질/성능 측정을 진행하지 않는다.
 
-## 13. k6 전 최종 확인
+## 14. k6 전 최종 확인
 
-k6 실행 전 최소 확인:
+k6 실행 전에는 개별 smoke를 직접 조합하지 않고 pre-k6 통합 smoke를 실행한다.
 
 ```bash
 BASE_URL=http://localhost:8081/api \
-bash performance/deploy/staging-readiness-smoke.sh
-
-BASE_URL=http://localhost:8081/api \
-bash performance/job/job-list-filter-smoke.sh
-
-BASE_URL=http://localhost:8081/api \
-bash performance/elasticsearch/search-intent-smoke.sh
-
 BACKEND_URL=http://localhost:8080 \
 GATEWAY_URL=http://localhost:8081 \
-BASE_URL=http://localhost:8081/api \
-bash performance/security/actuator-exposure-smoke.sh
+PROMETHEUS_URL=http://localhost:9090 \
+GRAFANA_URL=http://localhost:3001 \
+ZIPKIN_URL=http://localhost:9411 \
+ELASTICSEARCH_URL=http://localhost:9200 \
+bash performance/deploy/staging-pre-k6-smoke.sh
 ```
 
-세 smoke가 모두 통과한 뒤 k6 Round 1로 넘어간다.
+통합 smoke가 통과한 뒤 k6 Round 1로 넘어간다.
