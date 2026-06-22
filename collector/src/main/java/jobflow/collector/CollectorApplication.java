@@ -2,6 +2,7 @@ package jobflow.collector;
 
 import jobflow.collector.job.backfill.RealJobNormalizationBackfillProperties;
 import jobflow.collector.job.backfill.RawJobDescriptionReplayBackfillProperties;
+import jobflow.collector.job.backfill.RawJobSnapshotBackfillProperties;
 import jobflow.collector.job.collect.CollectorRunnerProperties;
 import jobflow.collector.job.ingest.CrawlerProperties;
 import jobflow.collector.job.ingest.SaraminApiProperties;
@@ -20,6 +21,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 		RawJobSnapshotStorageProperties.class,
 		RealJobNormalizationBackfillProperties.class,
 		RawJobDescriptionReplayBackfillProperties.class,
+		RawJobSnapshotBackfillProperties.class,
 		NormalizationCandidateCollectionProperties.class
 })
 @SpringBootApplication
