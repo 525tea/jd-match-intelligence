@@ -76,6 +76,60 @@ RAW_SNAPSHOT_BACKFILL_BLOCKER = 0 rows
 
 즉, 원본 raw data를 가진 JUMPIT/WANTED row 중 snapshot metadata가 누락된 row는 없다.
 
+## Raw Data Purge 검증
+
+snapshot metadata 검증 후 `PURGE_RAW_DATA_AFTER_SNAPSHOT=true` 옵션으로 DB `jobs.raw_data`를 비웠다.
+
+실행 명령:
+
+```bash
+PURGE_RAW_DATA_AFTER_SNAPSHOT=true \
+SOURCES=JUMPIT,WANTED \
+RAW_SNAPSHOT_STORAGE_ROOT=../build/raw-snapshots \
+bash performance/collector/backfill-raw-job-snapshot.sh
+```
+
+검증 SQL:
+
+```text
+performance/sql/raw-job-snapshot-purge-check.sql
+```
+
+### Source별 purge 결과
+
+| source | job_count | snapshotted_job_count | retained_raw_data_count | purged_raw_data_count | invalid_snapshot_metadata_count |
+|---|---:|---:|---:|---:|---:|
+| JUMPIT | 150 | 150 | 0 | 150 | 0 |
+| WANTED | 155 | 155 | 0 | 155 | 0 |
+
+JUMPIT/WANTED 총 305건 모두 snapshot metadata를 유지한 상태로 `raw_data`가 제거됐다.
+
+### Purge sample
+
+| source | id | external_id | title | raw_snapshot_size_bytes | raw_snapshot_storage_type | raw_data_state |
+|---|---:|---|---|---:|---|---|
+| WANTED | 459 | 366664 | Data Engineer 4~7년 | 6242 | LOCAL_FILE | PURGED |
+| WANTED | 458 | 366667 | 프론트엔드 개발자 (1년~3년이상) | 9225 | LOCAL_FILE | PURGED |
+| WANTED | 457 | 366678 | IT LAB Team Leader (7년 이상) | 6457 | LOCAL_FILE | PURGED |
+| WANTED | 456 | 366680 | CTO Staff (3년 이상) | 6101 | LOCAL_FILE | PURGED |
+| WANTED | 455 | 366681 | Software Engineer / Frontend (5년 이상) | 6399 | LOCAL_FILE | PURGED |
+
+### Purge Blocker Check
+
+다음 조건에 해당하는 row를 blocker로 간주했다.
+
+- snapshot metadata가 누락됨
+- snapshot size가 0 이하임
+- `raw_data`가 아직 DB에 남아 있음
+
+검증 결과:
+
+```text
+RAW_SNAPSHOT_PURGE_BLOCKER = 0 rows
+```
+
+즉, raw snapshot으로 원본을 보존한 뒤 DB `raw_data`를 제거하는 분리 흐름까지 정상 완료됐다.
+
 ## 해석
 
 이번 작업으로 공고 원본 보존 전략이 다음 구조로 분리됐다.
