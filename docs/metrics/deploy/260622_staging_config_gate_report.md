@@ -29,6 +29,7 @@ bash performance/deploy/staging-config-gate.sh
 | Gateway runtime settings | ok | graceful shutdown, Prometheus endpoint |
 | Spring Batch metadata migration | ok | `BATCH_JOB_INSTANCE`, `BATCH_STEP_EXECUTION` |
 | Staging env template | ok | secret placeholders, OAuth redirect, scheduler defaults |
+| Actuator exposure artifacts | ok | smoke, report, runbook linkage |
 | Docker Compose config | ok | memory limits, healthchecks, depends_on conditions, JVM options |
 
 ## Raw Output
@@ -54,6 +55,9 @@ spring_batch_metadata_migration=ok
 ### Env template
 staging_env_template=ok
 
+### Actuator exposure artifacts
+actuator_exposure_artifacts=ok
+
 ### Docker Compose config
 docker_compose_config=ok
 
@@ -64,6 +68,7 @@ collector_runtime_settings=ok
 gateway_runtime_settings=ok
 spring_batch_metadata_migration=ok
 staging_env_template=ok
+actuator_exposure_artifacts=ok
 docker_compose_config=ok
 
 Staging config gate completed.
@@ -92,6 +97,14 @@ Staging config gate completed.
 - shutdown phase timeout
 - `/actuator/prometheus` exposure
 
+### Actuator Exposure
+
+- actuator exposure smoke script exists
+- actuator exposure report exists
+- staging runbook includes actuator exposure smoke
+- smoke verifies `/api/actuator/health` proxy boundary
+- smoke verifies `/api/actuator/prometheus` proxy boundary
+
 ### Docker Compose
 
 - memory limits for MySQL, Redis, Elasticsearch, backend, gateway, Prometheus, Grafana, Zipkin
@@ -115,6 +128,7 @@ Staging/performance 배포 전 설정 gate는 통과했다.
 - MySQL/Redis/Elasticsearch 초기화 전 backend 기동
 - backend 준비 전 gateway/Prometheus 기동
 - OAuth redirect/env 값 누락
+- Gateway API prefix를 통한 backend actuator 외부 노출
 - scheduler가 staging 첫 기동 직후 의도치 않게 실행되는 문제
 
 ## Follow-up
