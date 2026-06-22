@@ -33,10 +33,14 @@ public class RawJobSnapshotBackfillService {
         for (Job job : jobs) {
             if (job.getRawSnapshotKey() != null && !job.getRawSnapshotKey().isBlank()) {
                 skippedAlreadySnapshottedCount++;
+                if (properties.purgeRawDataAfterSnapshot() && hasRawData(job)) {
+                    job.clearRawData();
+                    purgedRawDataCount++;
+                }
                 continue;
             }
 
-            if (job.getRawData() == null || job.getRawData().isBlank()) {
+            if (!hasRawData(job)) {
                 skippedMissingRawDataCount++;
                 continue;
             }
@@ -89,5 +93,9 @@ public class RawJobSnapshotBackfillService {
                 skippedAlreadySnapshottedCount,
                 failedCount
         );
+    }
+
+    private boolean hasRawData(Job job) {
+        return job.getRawData() != null && !job.getRawData().isBlank();
     }
 }

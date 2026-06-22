@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -136,6 +137,40 @@ class RawJobSnapshotBackfillServiceTest {
                 "wanted-1001",
                 job.getRawData()
         );
+    }
+
+    @Test
+    @DisplayName("이미 snapshot metadata가 있어도 purge 옵션이 켜져 있으면 raw_data를 비운다")
+    void purgeRawDataFromAlreadySnapshottedJob() {
+        Job job = createJob("WANTED", "wanted-1002", """
+                {"job":{"position":"Backend Engineer"}}
+                """);
+        job.updateRawSnapshotMetadata(
+                "wanted/wanted-1002/raw.json",
+                "d".repeat(64),
+                512L,
+                "LOCAL_FILE",
+                LocalDateTime.of(2026, 6, 4, 12, 30)
+        );
+        RawJobSnapshotBackfillService service = new RawJobSnapshotBackfillService(
+                jobRepository,
+                rawJobSnapshotStorage,
+                new RawJobSnapshotBackfillProperties(false, List.of("WANTED"), true)
+        );
+
+        given(jobRepository.findBySourceInOrderByIdAsc(List.of("WANTED")))
+                .willReturn(List.of(job));
+
+        RawJobSnapshotBackfillSummary summary = service.backfill(List.of("WANTED"));
+
+        assertThat(summary.processedCount()).isEqualTo(1);
+        assertThat(summary.snapshottedCount()).isZero();
+        assertThat(summary.purgedRawDataCount()).isEqualTo(1);
+        assertThat(summary.skippedAlreadySnapshottedCount()).isEqualTo(1);
+        assertThat(summary.failedCount()).isZero();
+        assertThat(job.getRawSnapshotKey()).isEqualTo("wanted/wanted-1002/raw.json");
+        assertThat(job.getRawData()).isNull();
+        verifyNoInteractions(rawJobSnapshotStorage);
     }
 
     @Test
