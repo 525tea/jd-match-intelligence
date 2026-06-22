@@ -361,6 +361,24 @@ export function JobFlowScreens({ t, go, screen }) {
         setSearchingJobs(false);
       }
     };
+    const removeAppliedFilter = async (id) => {
+      const nextFilter = { ...appliedFilter, [id]: '전체' };
+      const apiParams = buildApiFilterParams(nextFilter);
+      setDraftFilter(nextFilter);
+      setSearchingJobs(true);
+      try {
+        const rows = Object.keys(apiParams).length
+          ? await jobflowActions.listJobs?.(apiParams)
+          : await jobflowActions.listJobs?.({});
+        setAppliedFilter(nextFilter);
+        setJobResultMode(Object.keys(apiParams).length ? '필터 결과' : '전체 공고');
+        notify(`${rows?.length || 0}개 공고를 불러왔어요.`);
+      } catch (error) {
+        notify(error.message || '필터 해제에 실패했어요.');
+      } finally {
+        setSearchingJobs(false);
+      }
+    };
     const filterPanel = (
       <aside style={{ ...tile, position: narrow ? 'static' : 'sticky', top: 86, padding: '18px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -410,7 +428,7 @@ export function JobFlowScreens({ t, go, screen }) {
                 <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}><span style={{ color: greenInk, fontWeight: 800 }}>{jobResultMode}</span> 기준 <span style={{ color: greenInk, fontWeight: 800 }}>{filteredCount.toLocaleString()}개</span> 표시 <span style={{ fontSize: 12.5, color: faint, fontWeight: 600 }}>· 불러온 목록 {JF.listings.length.toLocaleString()}개</span></div>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 7, flexWrap: 'wrap' }}>{['검색순', '인기순', '마감순', '최신순'].map((x) => <button key={x} onClick={() => setSort(x === '검색순' ? '매칭순' : x)} style={{ font: 'inherit', cursor: 'pointer', border: '1px solid ' + ((sort === '매칭순' && x === '검색순') || sort === x ? greenStrong : line), background: (sort === '매칭순' && x === '검색순') || sort === x ? greenStrong : '#fff', color: ink, borderRadius: 20, padding: '7px 13px', fontWeight: (sort === '매칭순' && x === '검색순') || sort === x ? 800 : 600, fontSize: 13 }}>{x}</button>)}</div>
               </div>
-	              {(isV3 || selectedFilters.length > 0) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}><span style={{ color: faint, fontSize: 12, fontWeight: 900 }}>적용 조건</span>{Object.entries(appliedFilter).filter(([, v]) => v && v !== '전체').length ? Object.entries(appliedFilter).filter(([, v]) => v && v !== '전체').map(([id, v]) => <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: greenTint, color: greenInk, border: '1px solid ' + greenTintBd, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>{v}<span onClick={() => { const nextFilter = { ...appliedFilter, [id]: '전체' }; setDraftFilter(nextFilter); setAppliedFilter(nextFilter); }} style={{ cursor: 'pointer', opacity: 0.55 }}>✕</span></span>) : <span style={{ background: soft, color: muted, border: '1px solid ' + line, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>전체</span>}</div>}
+	              {(isV3 || selectedFilters.length > 0) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}><span style={{ color: faint, fontSize: 12, fontWeight: 900 }}>적용 조건</span>{Object.entries(appliedFilter).filter(([, v]) => v && v !== '전체').length ? Object.entries(appliedFilter).filter(([, v]) => v && v !== '전체').map(([id, v]) => <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: greenTint, color: greenInk, border: '1px solid ' + greenTintBd, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>{v}<span onClick={() => removeAppliedFilter(id)} style={{ cursor: searchingJobs ? 'default' : 'pointer', opacity: 0.55 }}>✕</span></span>) : <span style={{ background: soft, color: muted, border: '1px solid ' + line, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>전체</span>}</div>}
             </div>
             {narrow && <div style={{ marginBottom: 14 }}>{filterOpen ? filterPanel : <div style={{ ...tile, padding: 14, display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto' }}><b style={{ whiteSpace: 'nowrap' }}>선택 필터</b>{(selectedFilters.length ? selectedFilters : ['필터 없음']).map((x) => <span key={x} style={{ background: x === '필터 없음' ? soft : greenTint, color: x === '필터 없음' ? muted : greenInk, border: '1px solid ' + (x === '필터 없음' ? line : greenTintBd), borderRadius: 16, padding: '6px 10px', fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap' }}>{x}</span>)}</div>}</div>}
             {filteredListings.length ? <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(2, 1fr)', gap: 14 }}>{filteredListings.map((j) => <JobThumbnail key={(j.jobId || j.id || '') + j.companyKo + j.fullTitle} job={j} locked={!login} scoreLabel="검색 점수" />)}</div> : <div style={{ ...tile, textAlign: 'center', padding: narrow ? 28 : 38 }}>
