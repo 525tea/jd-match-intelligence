@@ -164,8 +164,23 @@ export default function App() {
       async searchJobs(keyword) {
         const normalizedKeyword = String(keyword || '').trim();
         const rows = normalizedKeyword
-          ? await api.searchJobs(normalizedKeyword, 50)
-          : await api.jobs({ page: 0, size: 50 });
+          ? await api.searchJobs(normalizedKeyword, 100)
+          : await api.jobs({ page: 0, size: 100 });
+        const mapped = dedupeJobs(rows.filter(isUserFacingJob)).map(toPrototypeJob);
+        const everyJob = mapped.filter((job) => job.companyKo && (job.jobId || job.id));
+        setJf((prev) => ({
+          ...prev,
+          listings: mapped,
+          popular: mapped.slice(0, 4),
+          closing: mapped.slice().sort((a, b) => Number(String(a.deadline).replace(/\D/g, '') || 999) - Number(String(b.deadline).replace(/\D/g, '') || 999)).slice(0, 3),
+          __jobIdByCompany: { ...(prev.__jobIdByCompany || {}), ...Object.fromEntries(everyJob.map((job) => [job.companyKo, job.jobId || job.id])) },
+          __jobCompanyById: { ...(prev.__jobCompanyById || {}), ...Object.fromEntries(everyJob.map((job) => [String(job.jobId || job.id), job.companyKo])) },
+          __jobByCompany: { ...(prev.__jobByCompany || {}), ...Object.fromEntries(mapped.filter((job) => job.companyKo).map((job) => [job.companyKo, job])) },
+        }));
+        return mapped;
+      },
+      async listJobs(filters = {}) {
+        const rows = await api.jobs({ page: 0, size: 100, ...filters });
         const mapped = dedupeJobs(rows.filter(isUserFacingJob)).map(toPrototypeJob);
         const everyJob = mapped.filter((job) => job.companyKo && (job.jobId || job.id));
         setJf((prev) => ({

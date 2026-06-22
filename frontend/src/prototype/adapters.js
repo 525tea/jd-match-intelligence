@@ -444,7 +444,7 @@ export async function loadJobFlowData(baseJF) {
     RELIABILITY: '안정성',
   };
   const publicResults = await Promise.all([
-    settle('jobs', () => api.searchJobs('백엔드', 40)),
+    settle('jobs', () => api.jobs({ page: 0, size: 100 })),
     settle('trends', () => api.skillTrends({ limit: 8 })),
     settle('market', () => api.market({ role: 'BACKEND', limit: 5 })),
   ]);

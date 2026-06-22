@@ -4,6 +4,17 @@ import { getJobflowState } from './jobflowState.js';
 
 // JobFlow additional screens — final IA: home · jobs · projects · gap · trends.
 // Palette: lime = matching/owned, charcoal = analysis surface, coral = urgent/missing, gray = structure.
+const DEFAULT_JOB_FILTER = {
+  role: '전체',
+  career: '전체',
+  employment: '전체',
+  remote: '전체',
+  region: '전체',
+  skill: '전체',
+  tag: '전체',
+  deadline: '전체',
+};
+
 export function JobFlowScreens({ t, go, screen }) {
   const JF = getJobflowState();
   const isV3 = t.ver === 'v3' && ['gap', 'trends'].includes(screen);
@@ -11,7 +22,9 @@ export function JobFlowScreens({ t, go, screen }) {
   const [query, setQuery] = React.useState('');
   const [searchingJobs, setSearchingJobs] = React.useState(false);
   const [filterOpen, setFilterOpen] = React.useState(false);
-  const [activeFilter, setActiveFilter] = React.useState({ role: '전체', career: '전체', skill: '전체' });
+  const [draftFilter, setDraftFilter] = React.useState(DEFAULT_JOB_FILTER);
+  const [appliedFilter, setAppliedFilter] = React.useState(DEFAULT_JOB_FILTER);
+  const [jobResultMode, setJobResultMode] = React.useState('전체 공고');
   const [previewProject, setPreviewProject] = React.useState(() => getJobflowState()?.projectList?.[0]?.name || '내 프로젝트');
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const [editingProject, setEditingProject] = React.useState(null);
@@ -70,7 +83,20 @@ export function JobFlowScreens({ t, go, screen }) {
   };
   const display = (value) => labelMap[value] || value;
   const options = (values) => ['전체'].concat(values.filter((x) => display(x) !== '전체').map(display));
-  const selectedFilters = Object.values(activeFilter).filter((x) => x && x !== '전체');
+  const findRawByDisplay = (values, displayValue) => {
+    if (!displayValue || displayValue === '전체') return '';
+    return values.find((value) => value === displayValue || display(value) === displayValue) || displayValue;
+  };
+  const regionApiValue = (value) => ({
+    '서울': 'Seoul',
+    '경기': 'Gyeonggi',
+    '인천': 'Incheon',
+    '부산': 'Busan',
+    '대전': 'Daejeon',
+    '대구': 'Daegu',
+    '광주': 'Gwangju',
+  })[value] || value;
+  const selectedFilters = Object.values(appliedFilter).filter((x) => x && x !== '전체');
   const primaryProject = JF.projectList?.[0] || {};
   const currentProjectName = primaryProject.name || previewProject || '내 프로젝트';
   const currentProjectRepo = primaryProject.repo || '연결된 GitHub repository';
@@ -171,13 +197,13 @@ export function JobFlowScreens({ t, go, screen }) {
   const FilterGroup = ({ id, label, items, maxHeight }) => {
     const displayItems = options(items);
     const open = openGroups[id] !== false;
-    const current = activeFilter[id] || '전체';
+    const current = draftFilter[id] || '전체';
     return <div style={{ borderBottom: '1px solid ' + line, padding: open ? '14px 0' : '13px 0' }}>
       <button onClick={() => toggleGroup(id)} style={{ font: 'inherit', cursor: 'pointer', border: 'none', background: 'transparent', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 0 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}><b style={{ fontSize: 14, fontWeight: 800 }}>{label}</b>{!open && current !== '전체' && <span style={{ fontSize: 11.5, fontWeight: 800, color: greenInk, background: greenTint, border: '1px solid ' + greenTintBd, borderRadius: 10, padding: '1px 7px' }}>{current}</span>}</span>
         <span style={{ width: 20, height: 20, borderRadius: 6, border: '1px solid ' + line, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: muted, lineHeight: 1 }}>{open ? '−' : '+'}</span>
       </button>
-      {open && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, maxHeight: maxHeight || 116, overflow: 'auto', paddingRight: 2, marginTop: 11 }}>{displayItems.map((x) => { const on = current === x; return <button key={x} onClick={() => setActiveFilter((prev) => ({ ...prev, [id]: x }))} style={{ font: 'inherit', cursor: 'pointer', border: '1px solid ' + (on ? greenStrong : line), background: on ? greenStrong : '#fff', color: on ? ink : muted, borderRadius: 18, padding: '7px 10px', fontWeight: on ? 900 : 700, fontSize: 12.5, whiteSpace: 'nowrap' }}>{x}</button>; })}</div>}
+      {open && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, maxHeight: maxHeight || 116, overflow: 'auto', paddingRight: 2, marginTop: 11 }}>{displayItems.map((x) => { const on = current === x; return <button key={x} onClick={() => setDraftFilter((prev) => ({ ...prev, [id]: x }))} style={{ font: 'inherit', cursor: 'pointer', border: '1px solid ' + (on ? greenStrong : line), background: on ? greenStrong : '#fff', color: on ? ink : muted, borderRadius: 18, padding: '7px 10px', fontWeight: on ? 900 : 700, fontSize: 12.5, whiteSpace: 'nowrap' }}>{x}</button>; })}</div>}
     </div>;
   };
 
@@ -220,13 +246,42 @@ export function JobFlowScreens({ t, go, screen }) {
   const loadingScreen = () => <Shell title="세션 확인" sub="브라우저의 HttpOnly 쿠키 세션을 확인하고 있습니다."><div style={{ ...tile, minHeight: 360, display: 'grid', placeItems: 'center', textAlign: 'center' }}><div><div style={{ width: 58, height: 58, borderRadius: 20, background: greenTint, color: greenInk, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 1000, marginBottom: 16 }}>…</div><H>로그인 상태를 확인하는 중입니다</H><p style={{ color: muted, fontSize: 14, lineHeight: 1.65, margin: '8px auto 0', maxWidth: 420 }}>JWT는 HttpOnly 쿠키에 저장되어 있어 프론트에서 직접 읽지 않고, 서버의 내 정보 API로 세션을 확인합니다.</p></div></div></Shell>;
 
   const jobsScreen = () => {
-    const resetFilters = () => setActiveFilter({ role: '전체', career: '전체', employment: '전체', remote: '전체', region: '전체', skill: '전체', tag: '전체', deadline: '전체' });
-    const selected = (key) => activeFilter[key] || '전체';
+    const resetFilters = async () => {
+      const emptyFilter = { ...DEFAULT_JOB_FILTER };
+      setDraftFilter(emptyFilter);
+      setAppliedFilter(emptyFilter);
+      setQuery('');
+      setSearchingJobs(true);
+      try {
+        const rows = await jobflowActions.listJobs?.({});
+        setJobResultMode('전체 공고');
+        notify(`전체 공고 ${rows?.length || 0}개를 불러왔어요.`);
+      } catch (error) {
+        notify(error.message || '공고 목록 초기화에 실패했어요.');
+      } finally {
+        setSearchingJobs(false);
+      }
+    };
+    const selected = (key) => appliedFilter[key] || '전체';
+    const selectedDraftFilters = Object.values(draftFilter).filter((x) => x && x !== '전체');
+    const buildApiFilterParams = (filter) => {
+      const params = {};
+      const role = findRawByDisplay(JF.filterOptions.roles, filter.role);
+      const careerLevel = findRawByDisplay(JF.filterOptions.careers, filter.career);
+      const employmentType = findRawByDisplay(JF.filterOptions.employmentTypes, filter.employment);
+      const remoteType = findRawByDisplay(JF.filterOptions.remoteTypes, filter.remote);
+      const locationRegion = filter.region && filter.region !== '전체' ? regionApiValue(filter.region) : '';
+      if (role) params.role = role;
+      if (careerLevel) params.careerLevel = careerLevel;
+      if (employmentType) params.employmentType = employmentType;
+      if (remoteType) params.remoteType = remoteType;
+      if (locationRegion && !['원격', '전국'].includes(locationRegion)) params.locationRegion = locationRegion;
+      return params;
+    };
     const normalizeFilterText = (value) => String(value || '')
       .toLowerCase()
       .replace(/\s+/g, '')
       .replace(/[·/_.-]/g, '');
-    const queryTokens = query.trim().split(/\s+/).map(normalizeFilterText).filter(Boolean);
     const fieldMatches = (raw, value) => {
       if (!value || value === '전체') return true;
       const needle = normalizeFilterText(value);
@@ -258,29 +313,6 @@ export function JobFlowScreens({ t, go, screen }) {
       .filter((job) => {
         const skills = [...new Set([...(job.skills || []), ...(job.matched || []), ...(job.missing || []), ...(job.requiredSkills || []), ...(job.preferredSkills || [])])];
         const tagValues = (job.tags || []).flatMap((tag) => [tag, JF.tagLabel?.[tag]]);
-        const searchText = [
-          job.companyKo,
-          job.companyName,
-          job.fullTitle,
-          job.title,
-          job.role,
-          display(job.role),
-          job.level,
-          job.careerLevel,
-          display(job.level),
-          display(job.careerLevel),
-          job.employmentType,
-          display(job.employmentType),
-          job.remoteType,
-          display(job.remoteType),
-          job.location,
-          job.locationRegion,
-          job.locationCity,
-          ...skills,
-          ...tagValues,
-        ].filter(Boolean).join(' ');
-        const normalizedSearchText = normalizeFilterText(searchText);
-        const queryOk = !queryTokens.length || queryTokens.every((token) => normalizedSearchText.includes(token));
         const roleOk = isRoleMatch(job, selected('role'));
         const careerOk = anyFieldMatches([job.level, job.careerLevel, display(job.level), display(job.careerLevel)], selected('career'));
         const employmentOk = anyFieldMatches([job.employmentType, display(job.employmentType)], selected('employment'));
@@ -289,7 +321,7 @@ export function JobFlowScreens({ t, go, screen }) {
         const skillOk = anyFieldMatches(skills, selected('skill'));
         const tagOk = anyFieldMatches(tagValues, selected('tag'));
         const deadlineOk = isDeadlineMatch(job, selected('deadline'));
-        return queryOk && roleOk && careerOk && employmentOk && remoteOk && regionOk && skillOk && tagOk && deadlineOk;
+        return roleOk && careerOk && employmentOk && remoteOk && regionOk && skillOk && tagOk && deadlineOk;
       })
       .sort((a, b) => {
         if (sort === '인기순') return (b.views || 0) - (a.views || 0);
@@ -301,6 +333,10 @@ export function JobFlowScreens({ t, go, screen }) {
       setSearchingJobs(true);
       try {
         const rows = await jobflowActions.searchJobs?.(query);
+        const emptyFilter = { ...DEFAULT_JOB_FILTER };
+        setDraftFilter(emptyFilter);
+        setAppliedFilter(emptyFilter);
+        setJobResultMode(query.trim() ? '검색 결과' : '전체 공고');
         notify(`${rows?.length || 0}개 공고를 불러왔어요.`);
       } catch (error) {
         notify(error.message || '공고 검색에 실패했어요.');
@@ -308,14 +344,31 @@ export function JobFlowScreens({ t, go, screen }) {
         setSearchingJobs(false);
       }
     };
+    const applyFilters = async () => {
+      const nextFilter = { ...DEFAULT_JOB_FILTER, ...draftFilter };
+      const apiParams = buildApiFilterParams(nextFilter);
+      setSearchingJobs(true);
+      try {
+        const rows = Object.keys(apiParams).length
+          ? await jobflowActions.listJobs?.(apiParams)
+          : await jobflowActions.listJobs?.({});
+        setAppliedFilter(nextFilter);
+        setJobResultMode(Object.keys(apiParams).length ? '필터 결과' : '전체 공고');
+        notify(`${rows?.length || 0}개 공고를 불러왔어요.`);
+      } catch (error) {
+        notify(error.message || '공고 필터 적용에 실패했어요.');
+      } finally {
+        setSearchingJobs(false);
+      }
+    };
     const filterPanel = (
       <aside style={{ ...tile, position: narrow ? 'static' : 'sticky', top: 86, padding: '18px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <b style={{ fontSize: 18 }}>화면 필터</b>
-          <span style={{ color: greenInk, fontWeight: 900 }}>ON</span>
-          <button onClick={resetFilters} style={{ marginLeft: 'auto', border: 'none', background: 'transparent', color: faint, font: 'inherit', fontSize: 12, fontWeight: 800, cursor: 'pointer' }}>초기화</button>
+          <b style={{ fontSize: 18 }}>공고 필터</b>
+          <span style={{ color: greenInk, fontWeight: 900 }}>{selectedDraftFilters.length ? `${selectedDraftFilters.length}개 선택` : '전체'}</span>
+          <button onClick={resetFilters} disabled={searchingJobs} style={{ marginLeft: 'auto', border: 'none', background: 'transparent', color: faint, font: 'inherit', fontSize: 12, fontWeight: 800, cursor: searchingJobs ? 'default' : 'pointer' }}>초기화</button>
         </div>
-        <div style={{ color: muted, fontSize: 12.5, lineHeight: 1.48, marginTop: 7 }}>검색으로 불러온 공고 안에서 조건을 좁힙니다.</div>
+        <div style={{ color: muted, fontSize: 12.5, lineHeight: 1.48, marginTop: 7 }}>조건을 고른 뒤 적용을 누르면 목록 API로 다시 불러옵니다.</div>
         <FilterGroup id="role" label="직무" items={JF.filterOptions.roles} maxHeight={150} />
         <FilterGroup id="career" label="경력" items={JF.filterOptions.careers} />
         <FilterGroup id="employment" label="채용 유형" items={JF.filterOptions.employmentTypes} />
@@ -324,6 +377,7 @@ export function JobFlowScreens({ t, go, screen }) {
         <FilterGroup id="skill" label="기술 스택" items={JF.filterOptions.skills} maxHeight={170} />
         <FilterGroup id="tag" label="경험 태그" items={JF.filterOptions.experienceTags} />
         <FilterGroup id="deadline" label="마감" items={JF.filterOptions.deadlines} />
+        <button onClick={applyFilters} disabled={searchingJobs} style={{ marginTop: 16, width: '100%', font: 'inherit', cursor: searchingJobs ? 'default' : 'pointer', border: 'none', background: searchingJobs ? faint : green, color: ink, borderRadius: 16, padding: '12px 14px', fontWeight: 950 }}>{searchingJobs ? '적용중' : '필터 적용'}</button>
       </aside>
     );
 
@@ -335,7 +389,7 @@ export function JobFlowScreens({ t, go, screen }) {
           <section>
             {!login && <div style={{ background: greenTint, border: '1px solid ' + greenTintBd, borderRadius: 18, padding: '15px 18px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}><div style={{ flex: 1, minWidth: 240 }}><b>프로젝트를 연결하면 공고가 내 스택 기준으로 정렬돼요.</b><div style={{ color: muted, fontSize: 13, marginTop: 3 }}>지금은 전체 공고 기준으로 탐색 중입니다.</div></div><button onClick={() => go('login')} style={{ font: 'inherit', border: 'none', background: ink, color: '#fff', borderRadius: 20, padding: '10px 15px', fontWeight: 850 }}>로그인하고 매칭 보기</button></div>}
             {JF.__apiStatus?.jobs === 'unavailable' && <div style={{ marginBottom: 14 }}><StatePanel type="error" title="공고 목록을 불러오지 못했습니다" desc="서비스 연결 상태를 확인한 뒤 다시 시도해주세요." action="다시 시도" /></div>}
-            {isV3 && <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>{[['전체 공고', JF.market.totalCount.toLocaleString()], ['현재 목록', JF.listings.length.toLocaleString()], ['마감 정보 있음', JF.listings.filter((job) => job.deadline && job.deadline !== '마감 정보 없음').length.toLocaleString()]].map(([l, v]) => <div key={l} style={{ background: '#fff', border: '1px solid ' + line, borderRadius: 16, padding: '12px 14px' }}><b style={{ fontSize: 20, ...num }}>{v}</b><div style={{ fontSize: 12, color: muted, fontWeight: 800, marginTop: 2 }}>{l}</div></div>)}</div>}
+            {isV3 && <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr 1fr' : 'repeat(3, 1fr)', gap: 10, marginBottom: 14 }}>{[['전체 공고', JF.market.totalCount.toLocaleString()], [jobResultMode, JF.listings.length.toLocaleString()], ['마감 정보 있음', JF.listings.filter((job) => job.deadline && job.deadline !== '마감 정보 없음').length.toLocaleString()]].map(([l, v]) => <div key={l} style={{ background: '#fff', border: '1px solid ' + line, borderRadius: 16, padding: '12px 14px' }}><b style={{ fontSize: 20, ...num }}>{v}</b><div style={{ fontSize: 12, color: muted, fontWeight: 800, marginTop: 2 }}>{l}</div></div>)}</div>}
             <div style={{ background: 'linear-gradient(135deg, #ffffff 0%, #fbfcfd 62%, #eef8cf 180%)', border: '1px solid ' + line, borderRadius: 26, padding: narrow ? 18 : 22, marginBottom: 16, display: 'grid', gap: 16, boxShadow: '0 14px 38px rgba(20,21,26,0.07)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 18, flexWrap: 'wrap' }}>
                 <div>
@@ -353,10 +407,10 @@ export function JobFlowScreens({ t, go, screen }) {
                 {narrow && <button onClick={() => setFilterOpen(!filterOpen)} style={{ font: 'inherit', cursor: 'pointer', border: '1px solid ' + line, background: '#fff', color: ink, borderRadius: 16, padding: '0 14px', fontWeight: 900 }}>{filterOpen ? '닫기' : '필터'}</button>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}>현재 불러온 목록에서 <span style={{ color: greenInk, fontWeight: 800 }}>{filteredCount.toLocaleString()}개</span> 표시 <span style={{ fontSize: 12.5, color: faint, fontWeight: 600 }}>· 목록 전체 {JF.listings.length.toLocaleString()}개</span></div>
+                <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: -0.3 }}><span style={{ color: greenInk, fontWeight: 800 }}>{jobResultMode}</span> 기준 <span style={{ color: greenInk, fontWeight: 800 }}>{filteredCount.toLocaleString()}개</span> 표시 <span style={{ fontSize: 12.5, color: faint, fontWeight: 600 }}>· 불러온 목록 {JF.listings.length.toLocaleString()}개</span></div>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 7, flexWrap: 'wrap' }}>{['검색순', '인기순', '마감순', '최신순'].map((x) => <button key={x} onClick={() => setSort(x === '검색순' ? '매칭순' : x)} style={{ font: 'inherit', cursor: 'pointer', border: '1px solid ' + ((sort === '매칭순' && x === '검색순') || sort === x ? greenStrong : line), background: (sort === '매칭순' && x === '검색순') || sort === x ? greenStrong : '#fff', color: ink, borderRadius: 20, padding: '7px 13px', fontWeight: (sort === '매칭순' && x === '검색순') || sort === x ? 800 : 600, fontSize: 13 }}>{x}</button>)}</div>
               </div>
-	              {(isV3 || selectedFilters.length > 0) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}><span style={{ color: faint, fontSize: 12, fontWeight: 900 }}>선택 조건</span>{Object.entries(activeFilter).filter(([, v]) => v && v !== '전체').length ? Object.entries(activeFilter).filter(([, v]) => v && v !== '전체').map(([id, v]) => <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: greenTint, color: greenInk, border: '1px solid ' + greenTintBd, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>{v}<span onClick={() => setActiveFilter((p) => ({ ...p, [id]: '전체' }))} style={{ cursor: 'pointer', opacity: 0.55 }}>✕</span></span>) : <span style={{ background: soft, color: muted, border: '1px solid ' + line, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>전체</span>}</div>}
+	              {(isV3 || selectedFilters.length > 0) && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}><span style={{ color: faint, fontSize: 12, fontWeight: 900 }}>적용 조건</span>{Object.entries(appliedFilter).filter(([, v]) => v && v !== '전체').length ? Object.entries(appliedFilter).filter(([, v]) => v && v !== '전체').map(([id, v]) => <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: greenTint, color: greenInk, border: '1px solid ' + greenTintBd, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>{v}<span onClick={() => { const nextFilter = { ...appliedFilter, [id]: '전체' }; setDraftFilter(nextFilter); setAppliedFilter(nextFilter); }} style={{ cursor: 'pointer', opacity: 0.55 }}>✕</span></span>) : <span style={{ background: soft, color: muted, border: '1px solid ' + line, borderRadius: 14, padding: '4px 10px', fontSize: 12, fontWeight: 800 }}>전체</span>}</div>}
             </div>
             {narrow && <div style={{ marginBottom: 14 }}>{filterOpen ? filterPanel : <div style={{ ...tile, padding: 14, display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto' }}><b style={{ whiteSpace: 'nowrap' }}>선택 필터</b>{(selectedFilters.length ? selectedFilters : ['필터 없음']).map((x) => <span key={x} style={{ background: x === '필터 없음' ? soft : greenTint, color: x === '필터 없음' ? muted : greenInk, border: '1px solid ' + (x === '필터 없음' ? line : greenTintBd), borderRadius: 16, padding: '6px 10px', fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap' }}>{x}</span>)}</div>}</div>}
             {filteredListings.length ? <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(2, 1fr)', gap: 14 }}>{filteredListings.map((j) => <JobThumbnail key={(j.jobId || j.id || '') + j.companyKo + j.fullTitle} job={j} locked={!login} scoreLabel="검색 점수" />)}</div> : <div style={{ ...tile, textAlign: 'center', padding: narrow ? 28 : 38 }}>
