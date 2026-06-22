@@ -568,7 +568,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     </div>
   );
   const RichOriginalText = ({ children }) => {
-    const source = String(children || '');
+    const source = String(children || '').replace(/\*{4,}/gu, '');
     const parts = source.split(/(\*\*[^*]+\*\*)/gu).filter((part) => part !== '');
 
     return (
@@ -583,6 +583,9 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
       </>
     );
   };
+  const stripBracketHeading = (line) => line.replace(/^\[([^\]\n]{2,70})\]$/u, '$1');
+  const isSourceSubheadingLine = (line) => /^\[[^\]\n]{2,70}\]$/u.test(line.trim());
+  const sourceBulletPattern = /^[•・ㆍ]\s*(.+)$/u;
   const OriginalTextBlock = ({ block, bullet }) => block.type === 'subheading'
     ? <OriginalSubheading>{block.value}</OriginalSubheading>
     : bullet
@@ -592,6 +595,11 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     const normalized = String(body || '')
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
+      .replace(/[\u200B-\u200D\uFEFF\u2060]/gu, '')
+      .replace(/\*{4,}/gu, '')
+      .replace(/(?<=\))1(?=\s*[•・ㆍ])/gu, '')
+      .replace(/(?<=\))[\s\u200B-\u200D\uFEFF\u2060]*1[\s\u200B-\u200D\uFEFF\u2060]+(?=[가-힣])/gu, '\n')
+      .replace(/\n{3,}/gu, '\n\n')
       .trim();
     const paragraphs = normalized
       .split(/\n{2,}/gu)
@@ -603,13 +611,13 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
         {paragraphs.map((paragraph, paragraphIndex) => {
           const lines = paragraph.split('\n').map((line) => line.trim()).filter(Boolean);
 
-          if (lines.every((line) => /^[•・]\s*/u.test(line))) {
+          if (lines.every((line) => /^[•・ㆍ]\s*/u.test(line))) {
             return (
               <div key={paragraph + paragraphIndex} className="jf-original-list" style={{ display: 'grid', gap: 5 }}>
                 {lines.map((line, lineIndex) => (
                   <div key={line + lineIndex} className="jf-original-bullet">
                     <span className="jf-original-dot" />
-                    <span><RichOriginalText>{line.replace(/^[•・]\s*/u, '')}</RichOriginalText></span>
+                    <span><RichOriginalText>{line.replace(/^[•・ㆍ]\s*/u, '')}</RichOriginalText></span>
                   </div>
                 ))}
               </div>
@@ -619,16 +627,22 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
           return (
             <div key={paragraph + paragraphIndex} style={{ display: 'grid', gap: 5 }}>
               {lines.map((line, lineIndex) => {
-                const bulletMatch = line.match(/^[•・]\s*(.+)$/u);
+                const bulletMatch = line.match(sourceBulletPattern);
 
-                return bulletMatch
-                  ? (
-                    <div key={line + lineIndex} className="jf-original-bullet">
-                      <span className="jf-original-dot" />
-                      <span><RichOriginalText>{bulletMatch[1]}</RichOriginalText></span>
-                    </div>
-                  )
-                  : <p key={line + lineIndex} style={{ margin: 0 }}><RichOriginalText>{line}</RichOriginalText></p>;
+                if (isSourceSubheadingLine(line)) {
+                  return <OriginalSubheading key={line + lineIndex}>{stripBracketHeading(line)}</OriginalSubheading>;
+                }
+
+                if (bulletMatch) {
+                  return (
+                      <div key={line + lineIndex} className="jf-original-bullet">
+                        <span className="jf-original-dot" />
+                        <span><RichOriginalText>{bulletMatch[1]}</RichOriginalText></span>
+                      </div>
+                  );
+                }
+
+                return <p key={line + lineIndex} style={{ margin: 0, whiteSpace: 'pre-wrap' }}><RichOriginalText>{line}</RichOriginalText></p>;
               })}
             </div>
           );

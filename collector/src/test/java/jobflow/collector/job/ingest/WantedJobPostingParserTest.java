@@ -407,4 +407,37 @@ class WantedJobPostingParserTest {
                 .doesNotContain("CS\\n• 관제")
                 .doesNotContain("CS • 관제");
     }
+
+    @Test
+    @DisplayName("원티드 표시 섹션은 빈 markdown 강조 표식을 제거하고 bracket heading을 보존한다")
+    void cleanWantedDisplaySectionMarkdownNoise() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "366668",
+                "https://www.wanted.co.kr/wd/366668",
+                "https://www.wanted.co.kr/api/v4/jobs/366668",
+                """
+                        {
+                          "job": {
+                            "position": "프론트엔드 개발자",
+                            "company": {"name": "Example Company"},
+                            "detail": {
+                              "intro": "[서비스 소개] **** Example service",
+                              "requirements": "웹 크롤링 운영 경험이 있으신 분 (Scrapy / Playwright / Selenium, anti-bot 우회 포함)1 • 데이터 품질 모니터링 경험이 있으신 분",
+                              "benefits": "[근무 환경] • 장비 지원 • 교육비 지원"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.descriptionSections())
+                .contains("[서비스 소개] Example service")
+                .contains("anti-bot 우회 포함)\\n• 데이터 품질 모니터링 경험")
+                .doesNotContain("포함)1")
+                .contains("[근무 환경]\\n• 장비 지원\\n• 교육비 지원")
+                .doesNotContain("****");
+    }
 }
