@@ -82,6 +82,7 @@ class RawJobDescriptionReplayBackfillServiceTest {
         assertThat(summary.processedCount()).isEqualTo(1);
         assertThat(summary.updatedDescriptionCount()).isEqualTo(1);
         assertThat(summary.unchangedDescriptionCount()).isZero();
+        assertThat(summary.updatedRoleCount()).isZero();
         assertThat(summary.skippedCount()).isZero();
         assertThat(summary.failedCount()).isZero();
         assertThat(summary.normalizedSkillJobCount()).isEqualTo(1);
@@ -114,6 +115,7 @@ class RawJobDescriptionReplayBackfillServiceTest {
                 .contains("Docker");
         assertThat(summary.processedCount()).isEqualTo(1);
         assertThat(summary.updatedDescriptionCount()).isEqualTo(1);
+        assertThat(summary.updatedRoleCount()).isZero();
         assertThat(summary.normalizedSkillJobCount()).isZero();
         assertThat(summary.normalizedExperienceTagJobCount()).isZero();
     }
@@ -137,6 +139,7 @@ class RawJobDescriptionReplayBackfillServiceTest {
         assertThat(job.getDescription()).isEqualTo("Existing description");
         assertThat(summary.processedCount()).isEqualTo(1);
         assertThat(summary.updatedDescriptionCount()).isZero();
+        assertThat(summary.updatedRoleCount()).isZero();
         assertThat(summary.skippedCount()).isEqualTo(1);
         verify(jobSkillNormalizationService, never()).replaceNormalizedSkills(any(), anyString(), anyString(), any());
         verify(jobExperienceTagNormalizationService, never())
@@ -164,7 +167,35 @@ class RawJobDescriptionReplayBackfillServiceTest {
         RawJobDescriptionReplayBackfillSummary summary = service.backfill(List.of("WANTED"));
 
         assertThat(summary.updatedDescriptionCount()).isEqualTo(1);
+        assertThat(summary.updatedRoleCount()).isZero();
         assertThat(job.getDescription()).contains("[주요 업무]\nBuild backend APIs.");
+    }
+
+    @Test
+    @DisplayName("raw replay 결과의 role이 기존 role과 다르면 role을 갱신한다")
+    void updateRoleFromReplayedPosting() {
+        Job job = createJob(
+                "WANTED",
+                "wanted-data-100",
+                "Old frontend description",
+                wantedDataEngineerRawData()
+        );
+        job.updateRole(JobRole.FRONTEND);
+        RawJobDescriptionReplayBackfillService service = createService();
+
+        given(jobRepository.findBySourceInOrderByIdAsc(List.of("WANTED")))
+                .willReturn(List.of(job));
+        given(jobSkillNormalizationService.replaceNormalizedSkills(any(), anyString(), anyString(), any()))
+                .willReturn(List.of());
+        given(jobExperienceTagNormalizationService.replaceNormalizedExperienceTags(any(), anyString(), anyString(), any()))
+                .willReturn(List.of());
+
+        RawJobDescriptionReplayBackfillSummary summary = service.backfill(List.of("WANTED"));
+
+        assertThat(job.getRole()).isEqualTo(JobRole.DATA_ENGINEER);
+        assertThat(job.getDescription()).contains("Python ETL 파이프라인 개발");
+        assertThat(summary.updatedDescriptionCount()).isEqualTo(1);
+        assertThat(summary.updatedRoleCount()).isEqualTo(1);
     }
 
     @Test
@@ -203,6 +234,7 @@ class RawJobDescriptionReplayBackfillServiceTest {
                 .contains("[채용절차 및 기타 지원 유의사항]\nDocument review and technical interview.");
         assertThat(summary.processedCount()).isEqualTo(1);
         assertThat(summary.updatedDescriptionCount()).isEqualTo(1);
+        assertThat(summary.updatedRoleCount()).isZero();
         assertThat(summary.skippedCount()).isZero();
         assertThat(summary.failedCount()).isZero();
     }
@@ -295,6 +327,34 @@ class RawJobDescriptionReplayBackfillServiceTest {
                     ],
                     "address": {
                       "location": "Seoul Gangnam"
+                    }
+                  }
+                }
+                """;
+    }
+
+    private String wantedDataEngineerRawData() {
+        return """
+                {
+                  "job": {
+                    "position": "Data Engineer 4~7년",
+                    "company": {
+                      "name": "Example Company"
+                    },
+                    "detail": {
+                      "main_tasks": "React 기반 admin 화면 협업과 데이터 파이프라인 운영",
+                      "requirements": "Python ETL 파이프라인 개발 경험"
+                    },
+                    "skill_tags": [
+                      {
+                        "title": "Python"
+                      },
+                      {
+                        "title": "Airflow"
+                      }
+                    ],
+                    "address": {
+                      "location": "Seoul"
                     }
                   }
                 }

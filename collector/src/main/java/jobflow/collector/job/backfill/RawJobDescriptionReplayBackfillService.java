@@ -3,6 +3,7 @@ package jobflow.collector.job.backfill;
 import java.util.List;
 import jobflow.collector.job.Job;
 import jobflow.collector.job.JobRepository;
+import jobflow.collector.job.JobRole;
 import jobflow.collector.job.ingest.FetchedJobPosting;
 import jobflow.collector.job.ingest.IngestedJobPosting;
 import jobflow.collector.job.ingest.JobExperienceTagNormalizationService;
@@ -37,6 +38,7 @@ public class RawJobDescriptionReplayBackfillService {
 
         int updatedDescriptionCount = 0;
         int unchangedDescriptionCount = 0;
+        int updatedRoleCount = 0;
         int skippedCount = 0;
         int failedCount = 0;
         int normalizedSkillJobCount = 0;
@@ -62,6 +64,11 @@ public class RawJobDescriptionReplayBackfillService {
             } else {
                 job.updateDescription(replayedDescription);
                 updatedDescriptionCount++;
+            }
+
+            if (replayResult.role() != null && replayResult.role() != job.getRole()) {
+                job.updateRole(replayResult.role());
+                updatedRoleCount++;
             }
 
             int skillCount = jobSkillNormalizationService.replaceNormalizedSkills(
@@ -91,6 +98,7 @@ public class RawJobDescriptionReplayBackfillService {
                 jobs.size(),
                 updatedDescriptionCount,
                 unchangedDescriptionCount,
+                updatedRoleCount,
                 skippedCount,
                 failedCount,
                 normalizedSkillJobCount,
@@ -151,7 +159,7 @@ public class RawJobDescriptionReplayBackfillService {
                 return ReplayResult.failed();
             }
 
-            return ReplayResult.updated(posting.description());
+            return ReplayResult.updated(posting.description(), posting.role());
         } catch (JobPostingParseException | JacksonException exception) {
             log.warn("Raw description replay failed. jobId={}, source={}, externalId={}, error={}",
                     job.getId(),
@@ -243,19 +251,20 @@ public class RawJobDescriptionReplayBackfillService {
 
     private record ReplayResult(
             ReplayStatus status,
-            String description
+            String description,
+            JobRole role
     ) {
 
-        static ReplayResult updated(String description) {
-            return new ReplayResult(ReplayStatus.UPDATED, description);
+        static ReplayResult updated(String description, JobRole role) {
+            return new ReplayResult(ReplayStatus.UPDATED, description, role);
         }
 
         static ReplayResult skipped() {
-            return new ReplayResult(ReplayStatus.SKIPPED, null);
+            return new ReplayResult(ReplayStatus.SKIPPED, null, null);
         }
 
         static ReplayResult failed() {
-            return new ReplayResult(ReplayStatus.FAILED, null);
+            return new ReplayResult(ReplayStatus.FAILED, null, null);
         }
     }
 }

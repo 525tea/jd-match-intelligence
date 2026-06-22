@@ -412,7 +412,16 @@ public class WantedJobPostingParser implements JobPostingParser {
             return "";
         }
 
-        return value.replaceAll("\\s+", " ").trim();
+        return restoreWantedWordBreaks(value)
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String restoreWantedWordBreaks(String value) {
+        return value
+                .replaceAll("(?<=[A-Za-z])\\R(?=[a-z])", "")
+                .replaceAll("(?<=[A-Za-z])\\R(?=[0-9])", "")
+                .replaceAll("(?<=[0-9])\\R(?=[A-Za-z])", "");
     }
 
     private String truncate(String value, int maxLength) {

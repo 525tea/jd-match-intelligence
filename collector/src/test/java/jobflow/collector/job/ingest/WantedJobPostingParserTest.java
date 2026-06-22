@@ -340,4 +340,35 @@ class WantedJobPostingParserTest {
                 .contains("[채용절차 및 기타 지원 유의사항]")
                 .contains("서류 검토 > 직무 인터뷰 > 최종 인터뷰");
     }
+
+    @Test
+    @DisplayName("원티드 단어 내부 줄바꿈을 복구한다")
+    void restoreWantedWordInternalLineBreaks() {
+        FetchedJobPosting fetched = new FetchedJobPosting(
+                JobIngestionSource.WANTED,
+                "367459",
+                "https://www.wanted.co.kr/wd/367459",
+                "https://www.wanted.co.kr/api/v4/jobs/367459",
+                """
+                        {
+                          "job": {
+                            "position": "Data Engineer 4~7년",
+                            "company": {"name": "Example Company"},
+                            "detail": {
+                              "main_tasks": "anti\\nbot 우회 탐지와 AI Agent N\\nlayer 아키텍처 운영",
+                              "requirements": "Python ETL 파이프라인 개발 경험"
+                            }
+                          }
+                        }
+                        """
+        );
+
+        IngestedJobPosting posting = parser.parse(fetched);
+
+        assertThat(posting.description())
+                .contains("antibot 우회 탐지")
+                .contains("AI Agent Nlayer 아키텍처")
+                .doesNotContain("anti bot")
+                .doesNotContain("N layer");
+    }
 }

@@ -221,4 +221,16 @@ class JdJobRoleClassificationServiceTest {
 
         assertThat(role).isEqualTo(JobRole.PM);
     }
+
+    @Test
+    @DisplayName("Data Engineer 제목은 frontend 키워드보다 DATA_ENGINEER를 우선한다")
+    void classifyDataEngineerTitleBeforeFrontendKeywords() {
+        JobRole role = service.classify(
+                "Data Engineer 4~7년",
+                "React 기반 admin 화면과 Frontend 협업 경험",
+                "Python, Airflow, ETL"
+        );
+
+        assertThat(role).isEqualTo(JobRole.DATA_ENGINEER);
+    }
 }
