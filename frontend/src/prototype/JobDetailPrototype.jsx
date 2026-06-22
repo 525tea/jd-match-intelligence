@@ -2,6 +2,7 @@ import React from 'react';
 import { api } from '../api/client.js';
 import { jobflowActions } from '../api/jobflowActions.js';
 import { getJobflowState } from './jobflowState.js';
+import { toPrototypeJob } from './adapters.js';
 
 // JobFlow — 공고 상세. JD + matching report.
 // Palette: lime = owned/match, charcoal = analysis, coral = urgent/missing.
@@ -14,6 +15,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const [hidden, setHidden] = React.useState(false);
   const [canonicalGroup, setCanonicalGroup] = React.useState(null);
   const [canonicalGroupStatus, setCanonicalGroupStatus] = React.useState('idle');
+  const [routeDetailJob, setRouteDetailJob] = React.useState(null);
   const fire = (label) => {
     setToast(label);
     clearTimeout(toastTimerRef.current);
@@ -210,6 +212,23 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     ...((userJobs.ignored) || []),
   ];
   const targetById = jobId ? allJobs.find((x) => String(x.jobId || x.id) === String(jobId)) : null;
+  React.useEffect(() => {
+    setRouteDetailJob(null);
+    if (!jobId) return undefined;
+
+    let alive = true;
+    api.job(jobId)
+      .then((detail) => {
+        if (!alive || !detail) return;
+        setRouteDetailJob(toPrototypeJob(detail));
+      })
+      .catch(() => {
+        if (alive) setRouteDetailJob(null);
+      });
+
+    return () => { alive = false; };
+  }, [jobId]);
+
   const targetCompany = company || targetById?.companyKo;
   const primaryProject = JF.projectList?.[0] || {};
   const currentProjectName = primaryProject.name || '내 프로젝트';
@@ -220,7 +239,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
     ? `${currentProjectName}에서 ${currentProjectSkillSummary} 근거를 확인했고, 부족 스킬은 갭 분석에서 우선순위로 볼 수 있어요.`
     : '프로젝트 분석 결과를 연결하면 보유 스킬과 부족 스킬 기준으로 매칭률을 다시 계산합니다.';
   const userSkills = new Set(userSkillRows.map((s) => s.name));
-  const m = targetById || matches.find((x) => x.companyKo === targetCompany);
+  const m = routeDetailJob || targetById || matches.find((x) => x.companyKo === targetCompany);
   const l = !m && (listings.find((x) => x.companyKo === targetCompany) || popular.find((x) => x.companyKo === targetCompany) || closing.find((x) => x.companyKo === targetCompany));
   const trackingJobId = (targetById && (targetById.jobId || targetById.id)) || (m && (m.jobId || m.id)) || (l && (l.jobId || l.id)) || jobId;
   const trackingCompany = targetCompany || (m && m.companyKo) || (l && l.companyKo);
@@ -402,6 +421,7 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const isOriginalListSection = (title) => /주요|업무|자격|요건|우대|복지|혜택|채용|절차/.test(title);
   const isOriginalParagraphSection = (title) => /포지션 상세|기업\/서비스 소개|기업 소개|회사 소개|서비스 소개|팀 소개|공고 원문/.test(title);
   const isCompactInfoSection = (title) => /포지션 상세|기업\/서비스 소개|기업 소개|회사 소개|서비스 소개|팀 소개/.test(title);
+  const isPositionMetaSection = (title) => /포지션 상세|포지션 경력\/학력\/마감일\/근무지역 정보/.test(title);
   const originalLineStyle = (compact = false) => ({
     margin: 0,
     color: '#2f343d',
@@ -757,8 +777,8 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
   const sectionHasMeaningfulBody = (section) => String(section?.body || '').replace(/\s+/g, ' ').trim().length >= 16;
   const originalSections = apiOriginalSections.length ? apiOriginalSections : rawOriginalSections;
   const mainOriginalSections = sortOriginalSections(originalSections)
-    .filter((section) => !/기술스택|기술 스택|스킬/.test(section.title));
-  const processItems = bullets.process.length ? bullets.process : processItemsFromOriginalSections(originalSections);
+    .filter((section) => !/기술스택|기술 스택|스킬/.test(section.title))
+    .filter((section) => !isPositionMetaSection(section.title));
 
   return (
     <div style={{ minHeight: '100vh', background: '#f7f8fa', fontFamily: font, color: ink }}>
@@ -813,11 +833,6 @@ export function JobDetail({ t, go, company, jobId, loading = false }) {
                   : <p style={{ margin: 0, color: '#30343c', fontSize: narrow ? 15.5 : 16.5, lineHeight: 1.85, letterSpacing: -0.25, whiteSpace: 'pre-wrap', wordBreak: 'keep-all', overflowWrap: 'anywhere' }}>{formatOriginalDescription(job.desc)}</p>}
               </div>
 
-              <TextSection title="채용 절차">
-                {processItems.length
-                  ? <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 8 }}>{processItems.slice(0, 8).map((x, i) => <div key={x + i} style={{ background: soft, border: '1px solid ' + line, borderRadius: 14, padding: '10px 12px', fontSize: 13, fontWeight: 850, lineHeight: 1.45, wordBreak: 'keep-all', overflowWrap: 'anywhere', minWidth: 0 }}><span style={{ color: faint, marginRight: 6, ...num }}>{i + 1}.</span>{cleanItemText(x)}</div>)}</div>
-                  : <div style={{ color: muted, fontSize: 14, lineHeight: 1.65 }}>원문 공고에서 채용 절차 정보가 제공되지 않았습니다. 자세한 전형 안내는 원본 공고에서 확인해주세요.</div>}
-              </TextSection>
             </article>
           </div>
 

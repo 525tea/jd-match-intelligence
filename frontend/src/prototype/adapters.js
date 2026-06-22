@@ -72,7 +72,7 @@ const parseDdayNumber = (value) => {
   return Number.isFinite(n) && n > 0 ? n : 999;
 };
 
-const USER_FACING_JOB_SOURCES = new Set(['WANTED', 'JUMPIT']);
+const USER_FACING_JOB_SOURCES = new Set(['JUMPIT']);
 
 const canonicalApplyUrl = (source, externalId, fallback = '') => {
   const id = String(externalId || '').trim();
@@ -352,7 +352,7 @@ export const dedupeJobs = (jobs = []) => {
 
 export async function fetchUserFacingJobs(params = {}, options = {}) {
   const pageSize = options.size || 100;
-  const maxPages = options.maxPages || 10;
+  const maxPages = options.maxPages || 16;
   const targetCount = options.targetCount || 500;
   const rows = [];
 
@@ -463,7 +463,7 @@ export async function loadJobFlowData(baseJF) {
     RELIABILITY: '안정성',
   };
   const publicResults = await Promise.all([
-    settle('jobs', () => fetchUserFacingJobs({}, { hydrate: true, hydrateLimit: 120 })),
+    settle('jobs', () => fetchUserFacingJobs({}, { hydrate: true, hydrateLimit: 12 })),
     settle('trends', () => api.skillTrends({ limit: 8 })),
     settle('market', () => api.market({ role: 'BACKEND', limit: 5 })),
   ]);
@@ -494,6 +494,10 @@ export async function loadJobFlowData(baseJF) {
     next.market.totalCount = total || next.market.totalCount;
     next.market.avgOpenDays = marketRows[0]?.avgOpenDays || next.market.avgOpenDays || 0;
     next.market.openJobCount = open || undefined;
+  }
+  if (next.listings.length) {
+    next.market.totalCount = next.listings.length;
+    next.market.openJobCount = next.listings.length;
   }
 
   const meResult = await settle('me', () => api.me());
