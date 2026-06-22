@@ -77,7 +77,7 @@ public class JobDescriptionSectionParser {
     private static final Pattern LINE_BREAK_MARKER_PATTERN = Pattern.compile("\\\\n");
     private static final Pattern MULTIPLE_BLANK_LINE_PATTERN = Pattern.compile("\\n{3,}");
     private static final Pattern BULLET_BOUNDARY_PATTERN = Pattern.compile("\\s+(?=(?:[-•]\\s+|\\d+\\.\\s+))");
-    private static final Pattern MIDDLE_DOT_PATTERN = Pattern.compile("\\s*(?:ㆍ|·)\\s*");
+    private static final Pattern LINE_START_DOT_BULLET_PATTERN = Pattern.compile("(?m)^\\s*(?:ㆍ|·|﹒)\\s*");
     private static final Map<String, SectionDefinition> ALIASES_BY_NORMALIZED_TEXT = aliasesByNormalizedText();
     private static final Pattern SECTION_HEADING_PATTERN = sectionHeadingPattern();
 
@@ -163,7 +163,7 @@ public class JobDescriptionSectionParser {
                 .replaceAll("[ \\t]+", " ")
                 .replaceAll("[ \\t]*\\n[ \\t]*", "\n");
         text = BULLET_BOUNDARY_PATTERN.matcher(text).replaceAll("\n");
-        text = MIDDLE_DOT_PATTERN.matcher(text).replaceAll("\n• ");
+        text = LINE_START_DOT_BULLET_PATTERN.matcher(text).replaceAll("• ");
         text = MULTIPLE_BLANK_LINE_PATTERN.matcher(text.trim()).replaceAll("\n\n");
         return text;
     }

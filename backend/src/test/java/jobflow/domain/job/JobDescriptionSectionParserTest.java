@@ -118,4 +118,41 @@ class JobDescriptionSectionParserTest {
         assertThat(sections.get(1).title()).isEqualTo("채용절차 및 기타 지원 유의사항");
         assertThat(sections.get(1).body()).contains("직무 인터뷰");
     }
+
+    @Test
+    @DisplayName("문장 중간 middle dot은 bullet로 분리하지 않는다")
+    void keepInlineMiddleDotText() {
+        String description = """
+                [주요 업무]
+                CS · 관제 · 고객을 잇는 운영 흐름을 어드민 안에서 구현
+                배정/배차 어드민을 개발·운영자가 사용할 수 있게 설계
+                """;
+
+        List<JobDescriptionSectionResponse> sections = parser.parse(description);
+
+        assertThat(sections).hasSize(1);
+        assertThat(sections.get(0).body())
+                .contains("CS · 관제 · 고객을 잇는 운영 흐름")
+                .contains("개발·운영자가 사용할 수 있게 설계")
+                .doesNotContain("• CS");
+    }
+
+    @Test
+    @DisplayName("줄 시작 middle dot만 bullet로 변환한다")
+    void convertLineStartMiddleDotToBullet() {
+        String description = """
+                [주요 업무]
+                · API 설계 및 운영
+                ㆍ 배치 안정화
+                ﹒ 장애 대응
+                """;
+
+        List<JobDescriptionSectionResponse> sections = parser.parse(description);
+
+        assertThat(sections).hasSize(1);
+        assertThat(sections.get(0).body())
+                .contains("• API 설계 및 운영")
+                .contains("• 배치 안정화")
+                .contains("• 장애 대응");
+    }
 }
