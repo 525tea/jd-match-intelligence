@@ -2,6 +2,7 @@ package jobflow.collector.job.ingest;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -12,6 +13,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class JumpitJobPostingParser implements JobPostingParser {
@@ -21,6 +24,9 @@ public class JumpitJobPostingParser implements JobPostingParser {
             Pattern.compile("(20\\d{2})\\.\\s*(\\d{1,2})\\.\\s*(\\d{1,2})\\.");
     private static final Pattern ISO_DATE_PATTERN =
             Pattern.compile("(20\\d{2})-(\\d{1,2})-(\\d{1,2})");
+    private static final Pattern SECTION_LABEL_PATTERN = Pattern.compile(
+            "(?m)^(기술스택|주요업무|자격요건|우대사항|복지 및 혜택|채용절차 및 기타 지원 유의사항|포지션 경력/학력/마감일/근무지역 정보|기업/서비스 소개|팀 소개)$"
+    );
     private static final Pattern CAREER_RANGE_PATTERN =
             Pattern.compile("경력\\s*(\\d+)\\s*[~\\-–]\\s*(\\d+)년");
     private static final Pattern CAREER_MIN_PATTERN =
@@ -37,9 +43,14 @@ public class JumpitJobPostingParser implements JobPostingParser {
     );
 
     private final JdJobRoleClassificationService jdJobRoleClassificationService;
+    private final ObjectMapper objectMapper;
 
-    public JumpitJobPostingParser(JdJobRoleClassificationService jdJobRoleClassificationService) {
+    public JumpitJobPostingParser(
+            JdJobRoleClassificationService jdJobRoleClassificationService,
+            ObjectMapper objectMapper
+    ) {
         this.jdJobRoleClassificationService = jdJobRoleClassificationService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -129,8 +140,79 @@ public class JumpitJobPostingParser implements JobPostingParser {
                 now,
                 null,
                 rawData(fetchedJobPosting, title, companyName),
-                CRAWLER_VERSION
+                CRAWLER_VERSION,
+                buildDescriptionSections(description)
         );
+    }
+
+    private String buildDescriptionSections(String description) {
+        if (description == null || description.isBlank()) {
+            return null;
+        }
+
+        Matcher matcher = SECTION_LABEL_PATTERN.matcher(description);
+        List<SectionMatch> matches = new ArrayList<>();
+
+        while (matcher.find()) {
+            matches.add(new SectionMatch(matcher.group(1), matcher.start(), matcher.end()));
+        }
+
+        if (matches.isEmpty()) {
+            return serializeDescriptionSections(List.of(new DisplayDescriptionSection(
+                    "JOB_DESCRIPTION",
+                    "공고 상세",
+                    description.trim()
+            )));
+        }
+
+        List<DisplayDescriptionSection> sections = new ArrayList<>();
+
+        for (int index = 0; index < matches.size(); index++) {
+            SectionMatch match = matches.get(index);
+            int bodyStart = match.end();
+            int bodyEnd = index + 1 < matches.size()
+                    ? matches.get(index + 1).start()
+                    : description.length();
+            String body = description.substring(bodyStart, bodyEnd).trim();
+
+            if (!body.isBlank()) {
+                sections.add(new DisplayDescriptionSection(
+                        sectionType(match.label()),
+                        match.label(),
+                        body
+                ));
+            }
+        }
+
+        return serializeDescriptionSections(sections);
+    }
+
+    private String serializeDescriptionSections(List<DisplayDescriptionSection> sections) {
+        if (sections == null || sections.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.writeValueAsString(sections);
+        } catch (JacksonException exception) {
+            throw new JobPostingParseException(
+                    "Failed to serialize Jumpit description sections. error=" + exception.getMessage()
+            );
+        }
+    }
+
+    private String sectionType(String label) {
+        return switch (label) {
+            case "기술스택" -> "SKILLS";
+            case "주요업무" -> "RESPONSIBILITIES";
+            case "자격요건" -> "REQUIREMENTS";
+            case "우대사항" -> "PREFERRED";
+            case "복지 및 혜택" -> "BENEFITS";
+            case "채용절차 및 기타 지원 유의사항" -> "PROCESS";
+            case "포지션 경력/학력/마감일/근무지역 정보" -> "JOB_META";
+            case "기업/서비스 소개", "팀 소개" -> "COMPANY_INTRO";
+            default -> "OTHER";
+        };
     }
 
     private String firstValidText(Document document, String... selectors) {
@@ -523,6 +605,20 @@ public class JumpitJobPostingParser implements JobPostingParser {
     private record ExperienceRange(
             Integer min,
             Integer max
+    ) {
+    }
+
+    private record SectionMatch(
+            String label,
+            int start,
+            int end
+    ) {
+    }
+
+    private record DisplayDescriptionSection(
+            String type,
+            String title,
+            String body
     ) {
     }
 }

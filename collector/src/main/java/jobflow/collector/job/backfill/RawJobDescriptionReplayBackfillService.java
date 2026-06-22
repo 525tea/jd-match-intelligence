@@ -38,6 +38,7 @@ public class RawJobDescriptionReplayBackfillService {
 
         int updatedDescriptionCount = 0;
         int unchangedDescriptionCount = 0;
+        int updatedDescriptionSectionsCount = 0;
         int updatedRoleCount = 0;
         int skippedCount = 0;
         int failedCount = 0;
@@ -71,6 +72,11 @@ public class RawJobDescriptionReplayBackfillService {
                 updatedRoleCount++;
             }
 
+            if (!sameDescription(job.getDescriptionSections(), replayResult.descriptionSections())) {
+                job.updateDescriptionSections(replayResult.descriptionSections());
+                updatedDescriptionSectionsCount++;
+            }
+
             int skillCount = jobSkillNormalizationService.replaceNormalizedSkills(
                     job,
                     job.getTitle(),
@@ -98,6 +104,7 @@ public class RawJobDescriptionReplayBackfillService {
                 jobs.size(),
                 updatedDescriptionCount,
                 unchangedDescriptionCount,
+                updatedDescriptionSectionsCount,
                 updatedRoleCount,
                 skippedCount,
                 failedCount,
@@ -159,7 +166,7 @@ public class RawJobDescriptionReplayBackfillService {
                 return ReplayResult.failed();
             }
 
-            return ReplayResult.updated(posting.description(), posting.role());
+            return ReplayResult.updated(posting.description(), posting.role(), posting.descriptionSections());
         } catch (JobPostingParseException | JacksonException exception) {
             log.warn("Raw description replay failed. jobId={}, source={}, externalId={}, error={}",
                     job.getId(),
@@ -252,19 +259,20 @@ public class RawJobDescriptionReplayBackfillService {
     private record ReplayResult(
             ReplayStatus status,
             String description,
-            JobRole role
+            JobRole role,
+            String descriptionSections
     ) {
 
-        static ReplayResult updated(String description, JobRole role) {
-            return new ReplayResult(ReplayStatus.UPDATED, description, role);
+        static ReplayResult updated(String description, JobRole role, String descriptionSections) {
+            return new ReplayResult(ReplayStatus.UPDATED, description, role, descriptionSections);
         }
 
         static ReplayResult skipped() {
-            return new ReplayResult(ReplayStatus.SKIPPED, null, null);
+            return new ReplayResult(ReplayStatus.SKIPPED, null, null, null);
         }
 
         static ReplayResult failed() {
-            return new ReplayResult(ReplayStatus.FAILED, null, null);
+            return new ReplayResult(ReplayStatus.FAILED, null, null, null);
         }
     }
 }

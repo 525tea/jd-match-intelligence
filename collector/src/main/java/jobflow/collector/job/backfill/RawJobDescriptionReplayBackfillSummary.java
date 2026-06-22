@@ -4,6 +4,7 @@ public record RawJobDescriptionReplayBackfillSummary(
         int processedCount,
         int updatedDescriptionCount,
         int unchangedDescriptionCount,
+        int updatedDescriptionSectionsCount,
         int updatedRoleCount,
         int skippedCount,
         int failedCount,

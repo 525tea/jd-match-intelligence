@@ -37,6 +37,9 @@ public class Job extends BaseTimeEntity {
     @Column(nullable = false, columnDefinition = "longtext")
     private String description;
 
+    @Column(columnDefinition = "json")
+    private String descriptionSections;
+
     @Column(length = 500)
     private String url;
 
@@ -246,6 +249,10 @@ public class Job extends BaseTimeEntity {
 
     public void updateDescription(String description) {
         this.description = description;
+    }
+
+    public void updateDescriptionSections(String descriptionSections) {
+        this.descriptionSections = descriptionSections;
     }
 
     public void close() {

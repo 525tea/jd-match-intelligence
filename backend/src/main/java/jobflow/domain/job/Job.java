@@ -47,6 +47,9 @@ public class Job extends BaseTimeEntity {
     @Column(nullable = false, columnDefinition = "longtext")
     private String description;
 
+    @Column(columnDefinition = "json")
+    private String descriptionSections;
+
     @Column(length = 500)
     private String url;
 
@@ -305,6 +308,10 @@ public class Job extends BaseTimeEntity {
         this.rawSnapshotSizeBytes = rawSnapshotSizeBytes;
         this.rawSnapshotStorageType = rawSnapshotStorageType;
         this.rawSnapshotSavedAt = rawSnapshotSavedAt;
+    }
+
+    public void updateDescriptionSections(String descriptionSections) {
+        this.descriptionSections = descriptionSections;
     }
 
     public void expire() {

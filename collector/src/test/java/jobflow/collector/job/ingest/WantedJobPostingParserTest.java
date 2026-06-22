@@ -89,7 +89,10 @@ class WantedJobPostingParserTest {
         assertThat(posting.salaryVisible()).isTrue();
         assertThat(posting.deadlineAt()).isEqualTo(LocalDateTime.of(2026, 6, 22, 23, 59));
         assertThat(posting.rawData()).contains("367044");
-        assertThat(posting.crawlerVersion()).isEqualTo("wanted-parser-0.1");
+        assertThat(posting.crawlerVersion()).isEqualTo("wanted-parser-0.2");
+        assertThat(posting.descriptionSections())
+                .contains("\"title\":\"기업/서비스 소개\"")
+                .contains("\"body\":\"채용 플랫폼을 개발합니다.\"");
         assertThat(posting.collectedAt()).isNotNull();
         assertThat(posting.lastSeenAt()).isNotNull();
     }
