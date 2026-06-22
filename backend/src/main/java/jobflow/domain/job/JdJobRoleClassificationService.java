@@ -306,6 +306,21 @@ public class JdJobRoleClassificationService {
             return JobRole.FULLSTACK;
         }
 
+        if (matchesAny(title, "data engineer", "data engineering", "data platform engineer",
+                "data platform", "data pipeline", "etl", "elt", "데이터 엔지니어", "데이터엔지니어",
+                "데이터 플랫폼", "데이터플랫폼", "데이터 파이프라인")) {
+            return JobRole.DATA_ENGINEER;
+        }
+
+        if (matchesAny(title, "data scientist", "data science", "데이터 사이언티스트", "데이터사이언티스트",
+                "데이터과학")) {
+            return JobRole.DATA_SCIENTIST;
+        }
+
+        if (matchesAny(title, "data analyst", "데이터 분석가", "데이터분석가", "데이터 분석")) {
+            return JobRole.DATA_ANALYST;
+        }
+
         if (matchesAny(title, "frontend", "frontendengineer", "front end", "front-end", "프론트엔드")) {
             return JobRole.FRONTEND;
         }
