@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import jobflow.domain.user.User;
 import jobflow.domain.user.UserRepository;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -41,7 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String token = resolveToken(request);
 
-        if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+        if (token != null && shouldAuthenticateWithJwt()) {
             authenticate(token);
         }
 
@@ -83,5 +84,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         return jwtCookieService.resolveAccessToken(request)
                 .orElse(null);
+    }
+
+    private boolean shouldAuthenticateWithJwt() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal);
     }
 }

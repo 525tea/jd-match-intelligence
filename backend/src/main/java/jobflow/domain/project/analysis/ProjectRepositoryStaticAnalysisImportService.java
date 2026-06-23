@@ -37,7 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 public class ProjectRepositoryStaticAnalysisImportService {
 
-    private static final String MODEL_VERSION = "repository-static-v1";
+    private static final String MODEL_VERSION = "repository-static-v2";
     private static final int MAX_EVIDENCE_LENGTH = 500;
 
     private final UserProjectRepository userProjectRepository;
@@ -80,9 +80,26 @@ public class ProjectRepositoryStaticAnalysisImportService {
             Long userProjectId,
             RepositoryRef repositoryRef
     ) {
+        return importRepositoryStaticAnalysis(
+                userId,
+                userProjectId,
+                repositoryRef,
+                RepositoryAnalysisStats.empty()
+        );
+    }
+
+    public ProjectRepositoryStaticAnalysisImportResult importRepositoryStaticAnalysis(
+            Long userId,
+            Long userProjectId,
+            RepositoryRef repositoryRef,
+            RepositoryAnalysisStats repositoryStats
+    ) {
         if (userId == null || userProjectId == null) {
             throw new EntityNotFoundException(ErrorCode.USER_PROJECT_NOT_FOUND);
         }
+        RepositoryAnalysisStats safeRepositoryStats = repositoryStats == null
+                ? RepositoryAnalysisStats.empty()
+                : repositoryStats;
 
         UserProject userProject = userProjectRepository.findByIdAndUserId(userProjectId, userId)
                 .orElseThrow(() -> new EntityNotFoundException(ErrorCode.USER_PROJECT_NOT_FOUND));
@@ -95,7 +112,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
                 skillCandidatesByName(buildFileAnalysis.skillCandidates());
         Map<String, InfraExperienceTagCandidate> tagCandidatesByCode =
                 tagCandidatesByCode(infraFileAnalysis.experienceTagCandidates(), workflowFileAnalysis.experienceTagCandidates());
-        String sourceHash = sourceHash(buildFileAnalysis, infraFileAnalysis, workflowFileAnalysis);
+        String sourceHash = sourceHash(buildFileAnalysis, infraFileAnalysis, workflowFileAnalysis, safeRepositoryStats);
         UserProjectAnalysis latestAnalysis = latestAnalysis(userId, userProjectId);
         if (latestAnalysis != null && sourceHash.equals(latestAnalysis.getSourceHash())) {
             return ProjectRepositoryStaticAnalysisImportResult.skipped(
@@ -114,7 +131,7 @@ public class ProjectRepositoryStaticAnalysisImportService {
                 sourceHash,
                 repositoryRef.ref(),
                 MODEL_VERSION,
-                rawAnalysis(buildFileAnalysis, infraFileAnalysis, workflowFileAnalysis),
+                rawAnalysis(buildFileAnalysis, infraFileAnalysis, workflowFileAnalysis, safeRepositoryStats),
                 averageConfidence(skillCandidatesByName, tagCandidatesByCode),
                 LocalDateTime.now()
         );
@@ -250,13 +267,19 @@ public class ProjectRepositoryStaticAnalysisImportService {
     private String sourceHash(
             ProjectBuildFileAnalysisResult buildFileAnalysis,
             ProjectInfraFileAnalysisResult infraFileAnalysis,
-            ProjectWorkflowFileAnalysisResult workflowFileAnalysis
+            ProjectWorkflowFileAnalysisResult workflowFileAnalysis,
+            RepositoryAnalysisStats repositoryStats
     ) {
         String source = buildFileAnalysis.repositoryRef().fullName()
                 + ":" + buildFileAnalysis.repositoryRef().ref()
+                + ":model=" + MODEL_VERSION
                 + ":build=" + String.join(",", buildFileAnalysis.analyzedPaths())
                 + ":infra=" + String.join(",", infraFileAnalysis.analyzedPaths())
                 + ":workflow=" + String.join(",", workflowFileAnalysis.analyzedPaths())
+                + ":commits=" + repositoryStats.commitCount()
+                + ":files=" + repositoryStats.fileCount()
+                + ":contributors=" + repositoryStats.contributorCount()
+                + ":directories=" + repositoryStats.directories()
                 + ":skills=" + buildFileAnalysis.skillCandidates()
                 .stream()
                 .sorted(Comparator.comparing(BuildFileSkillCandidate::skillName))
@@ -289,7 +312,8 @@ public class ProjectRepositoryStaticAnalysisImportService {
     private String rawAnalysis(
             ProjectBuildFileAnalysisResult buildFileAnalysis,
             ProjectInfraFileAnalysisResult infraFileAnalysis,
-            ProjectWorkflowFileAnalysisResult workflowFileAnalysis
+            ProjectWorkflowFileAnalysisResult workflowFileAnalysis,
+            RepositoryAnalysisStats repositoryStats
     ) {
         String buildPaths = toJsonStringArray(buildFileAnalysis.analyzedPaths());
         String infraPaths = toJsonStringArray(infraFileAnalysis.analyzedPaths());
@@ -312,10 +336,22 @@ public class ProjectRepositoryStaticAnalysisImportService {
                         + "\",\"confidence\":" + candidate.confidence()
                         + ",\"evidence\":\"" + escape(candidate.evidence()) + "\"}")
                 .collect(Collectors.joining(","));
+        String directories = repositoryStats.directories()
+                .stream()
+                .map(directory -> "{\"path\":\"" + escape(directory.path())
+                        + "\",\"fileCount\":" + directory.fileCount()
+                        + ",\"share\":" + directory.share() + "}")
+                .collect(Collectors.joining(","));
 
         return "{"
                 + "\"repository\":\"" + escape(buildFileAnalysis.repositoryRef().fullName()) + "\","
                 + "\"ref\":\"" + escape(buildFileAnalysis.repositoryRef().ref()) + "\","
+                + "\"repositoryStats\":{"
+                + "\"commitCount\":" + nullableNumber(repositoryStats.commitCount()) + ","
+                + "\"fileCount\":" + nullableNumber(repositoryStats.fileCount()) + ","
+                + "\"contributorCount\":" + nullableNumber(repositoryStats.contributorCount()) + ","
+                + "\"directories\":[" + directories + "]"
+                + "},"
                 + "\"buildFileAnalysis\":{"
                 + "\"requestedFileCount\":" + buildFileAnalysis.requestedFileCount() + ","
                 + "\"foundFileCount\":" + buildFileAnalysis.foundFileCount() + ","
@@ -335,6 +371,10 @@ public class ProjectRepositoryStaticAnalysisImportService {
                 + "\"experienceTagCandidates\":[" + workflowTags + "]"
                 + "}"
                 + "}";
+    }
+
+    private String nullableNumber(Integer value) {
+        return value == null ? "null" : value.toString();
     }
 
     private String toJsonStringArray(List<String> values) {

@@ -20,9 +20,9 @@ const isTemporaryGatewayError = (error) => {
   return error?.status === 502 || error?.status === 503 || code === 'GATEWAY_BACKEND_UNAVAILABLE';
 };
 
-const isConsumableOAuthCodeError = (error) => {
+const isConsumedOAuthCodeError = (error) => {
   const code = error?.payload?.error?.code || error?.payload?.code;
-  return code === 'AUTH_OAUTH2_CODE_INVALID' || code === 'COMMON_UNAUTHORIZED';
+  return error?.status === 401 && code === 'AUTH_OAUTH2_CODE_INVALID';
 };
 
 async function retryTemporaryGatewayError(action, onRetry) {
@@ -156,32 +156,21 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
     let active = true;
     const code = new URLSearchParams(window.location.search).get('code');
 
-    const completeLogin = async (session = null) => {
-      if (session?.accessToken) {
-        authStore.setToken(session.accessToken);
-      } else {
-        authStore.setToken();
+    const completeLogin = async (session) => {
+      if (!session?.accessToken) {
+        throw new Error('로그인 토큰을 발급받지 못했습니다. 다시 로그인해주세요.');
       }
+      authStore.clearAccessToken();
+      authStore.setToken(session.accessToken);
       const user = await retryTemporaryGatewayError(
-        () => api.me(),
+        () => api.me(session.accessToken),
         () => active && setMessage('로그인 세션을 확인하는 중입니다. 잠시만 기다려주세요.')
-      ).catch((error) => {
-        if (session?.accessToken) {
-          return {
-            id: 'oauth-session',
-            name: 'GitHub 사용자',
-            email: '',
-            role: 'USER',
-          };
-        }
-
-        throw error;
-      });
+      );
       if (!user?.id) throw new Error('로그인 세션을 확인할 수 없습니다.');
       if (session?.userProjectId) {
         projectStore.setProjectId(String(session.userProjectId));
       }
-      await onAuthenticated?.({ user, userProjectId: session?.userProjectId || projectStore.getProjectId(), github: true });
+      onAuthenticated?.({ user, userProjectId: session?.userProjectId || projectStore.getProjectId(), github: true }).catch(() => null);
       if (!active) return;
       setStatus('success');
       setMessage('로그인 완료! 홈으로 이동합니다.');
@@ -201,9 +190,7 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
         () => api.oauthToken({ code }),
         () => active && setMessage('백엔드 연결이 회복되는 중입니다. 잠시 후 다시 확인합니다.')
       ).catch((error) => {
-        if (!isConsumableOAuthCodeError(error)) {
-          oauthCodeExchanges.delete(code);
-        }
+        oauthCodeExchanges.delete(code);
         throw error;
       });
       oauthCodeExchanges.set(code, exchangeOAuthCode);
@@ -212,11 +199,13 @@ export function ConnectedOAuth({ go, onAuthenticated }) {
     exchangeOAuthCode
       .then(completeLogin)
       .catch(async (e) => {
-        if (!isConsumableOAuthCodeError(e)) throw e;
-        setMessage('이미 처리된 로그인 세션을 확인합니다.');
-        await completeLogin();
-      })
-      .catch((e) => {
+        if (isConsumedOAuthCodeError(e)) {
+          if (authStore.getAccessToken()) {
+            active && setMessage('이미 처리된 로그인 세션을 확인합니다.');
+            await completeLogin({ accessToken: authStore.getAccessToken(), userProjectId: projectStore.getProjectId() || null });
+            return;
+          }
+        }
         if (!active) return;
         setStatus('error');
         setMessage(e.message || 'GitHub 로그인이 완료되지 않았습니다.');

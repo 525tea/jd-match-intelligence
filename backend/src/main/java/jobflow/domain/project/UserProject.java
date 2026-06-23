@@ -46,4 +46,31 @@ public class UserProject extends BaseTimeEntity {
 
     @Column(length = 1000)
     private String description;
+
+    public static UserProject github(
+            User user,
+            String externalId,
+            String name,
+            String repositoryUrl,
+            String description
+    ) {
+        UserProject userProject = new UserProject();
+        userProject.user = user;
+        userProject.sourceType = ProjectSourceType.GITHUB;
+        userProject.externalId = externalId;
+        userProject.name = name;
+        userProject.repositoryUrl = repositoryUrl;
+        userProject.description = description;
+        return userProject;
+    }
+
+    public void updateGithubRepository(
+            String name,
+            String repositoryUrl,
+            String description
+    ) {
+        this.name = name;
+        this.repositoryUrl = repositoryUrl;
+        this.description = description;
+    }
 }

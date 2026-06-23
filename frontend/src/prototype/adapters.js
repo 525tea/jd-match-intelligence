@@ -5,6 +5,10 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const asList = unwrapList;
 
 const initials = (text = '') => String(text).replace(/[^A-Za-z0-9가-힣]/g, ' ').trim().split(/\s+/).map((x) => x[0]).join('').slice(0, 2).toUpperCase() || 'JF';
+const repositoryInitials = (text = '') => {
+  const repositoryName = String(text || '').split('/').filter(Boolean).pop() || text;
+  return initials(repositoryName);
+};
 
 const dday = (deadlineAt) => {
   if (!deadlineAt) return '상시';
@@ -217,10 +221,19 @@ const toUserJobCard = (item, index = 0) => {
   }, index);
 };
 
-const buildAnalyzedProject = (baseProject = {}, userProjectId, skills, tags, matches) => {
+const buildAnalyzedProject = (baseProject = {}, userProjectId, skills, tags, matches, projectMeta = {}, projectSummary = {}) => {
   const topSkills = skills.map((skill) => skill.name).filter(Boolean);
   const topTags = tags.map((tag) => tag.label).filter(Boolean);
-  const projectName = userProjectId ? `분석 프로젝트 ${userProjectId}` : baseProject.name || '내 프로젝트';
+  const repositoryFullName = projectSummary.repositoryFullName
+    || projectSummary.externalId
+    || projectMeta.repositoryFullName
+    || projectMeta.name
+    || '';
+  const projectName = repositoryFullName || projectSummary.name || baseProject.name || '내 프로젝트';
+  const repositoryLabel = projectSummary.repositoryUrl
+    || projectMeta.htmlUrl
+    || repositoryFullName
+    || '연결된 GitHub repository';
   const baseStats = baseProject.stats || {};
   const baseSkillTotal = baseProject.skillsTotal || 0;
   const baseTagTotal = baseProject.tagsTotal || 0;
@@ -229,10 +242,12 @@ const buildAnalyzedProject = (baseProject = {}, userProjectId, skills, tags, mat
   const baseDetailTags = baseProject.detailTags || [];
   return {
     ...baseProject,
+    id: userProjectId ? String(userProjectId) : baseProject.id,
     name: projectName,
-    repo: userProjectId ? `프로젝트 ID ${userProjectId}` : '연결된 프로젝트',
+    logo: repositoryInitials(projectName),
+    repo: repositoryLabel,
     connected: true,
-    analyzedAt: '최근 분석',
+    analyzedAt: projectSummary.ref || projectMeta.ref ? `최근 분석 · ${projectSummary.ref || projectMeta.ref}` : '최근 분석',
     skillsTotal: skills.length || baseSkillTotal,
     tagsTotal: tags.length || baseTagTotal,
     matchedJobs: matches.length || baseMatchedJobs,
@@ -247,16 +262,21 @@ const buildAnalyzedProject = (baseProject = {}, userProjectId, skills, tags, mat
       topTags.length ? `경험 태그는 ${topTags.slice(0, 4).join(', ')} 신호가 확인됩니다.` : '',
     ].filter(Boolean).join(' '),
     domain: topTags.slice(0, 3).length ? topTags.slice(0, 3) : baseProject.domain || [],
-    architecture: topTags.length ? '코드 기반 스킬 분석' : baseProject.architecture || '스킬 분석',
+    architecture: topTags.length ? '코드 기반 스킬 분석' : baseProject.architecture || (topSkills.length ? '빌드 파일 기반 분석' : '정적 분석'),
     stackGroups: [
       { label: '감지된 스킬', items: topSkills.slice(0, 8).map((name, index) => ({ n: name, pct: Math.max(52, 96 - index * 6) })) },
       ...(baseProject.stackGroups || []).slice(1),
     ],
     stats: {
       ...baseStats,
-      files: Math.max(baseStats.files || 0, skills.length),
-      tests: Math.max(baseStats.tests || 0, Math.round((tags.length / Math.max(1, skills.length)) * 100)),
+      commits: projectSummary.commitCount ?? baseStats.commits ?? '-',
+      files: projectSummary.fileCount ?? baseStats.files ?? '-',
+      contributors: projectSummary.contributorCount ?? baseStats.contributors ?? '-',
+      tests: baseStats.tests || Math.max(0, Math.round((tags.length / Math.max(1, skills.length)) * 100)),
     },
+    dirs: Array.isArray(projectSummary.directories) && projectSummary.directories.length
+      ? projectSummary.directories
+      : baseProject.dirs || [],
     detailTags: tags.length ? tags.map((tag) => ({
       code: tag.code,
       label: tag.label,
@@ -455,6 +475,7 @@ export function mergePrototypeJobIntoState(state, job) {
 export async function loadJobFlowData(baseJF) {
   const next = createEmptyJobFlowState(baseJF);
   let userProjectId = projectStore.getProjectId();
+  const projectMeta = projectStore.getProjectMeta();
   next.tagLabel = {
     ...(next.tagLabel || {}),
     CLOUD_INFRA: '클라우드/인프라',
@@ -508,10 +529,9 @@ export async function loadJobFlowData(baseJF) {
     return attachLookup(next);
   }
 
-  authStore.setToken();
   next.__authenticated = true;
 
-  if (!userProjectId && meResult.data?.userProjectId) {
+  if (meResult.data?.userProjectId && !userProjectId) {
     userProjectId = String(meResult.data.userProjectId);
     projectStore.setProjectId(userProjectId);
   }
@@ -523,10 +543,12 @@ export async function loadJobFlowData(baseJF) {
     settle('saved', () => api.savedJobs()),
     settle('viewed', () => api.viewedJobs()),
     settle('ignored', () => api.ignoredJobs()),
+    settle('userProjects', () => api.userProjects()),
   ];
 
   if (hasUserProjectId) {
     authLoaders.push(
+      settle('projectSummary', () => api.projectSummary(userProjectId)),
       settle('recommendations', () => api.recommendations(userProjectId, { targetRoles: ['BACKEND', 'FULLSTACK'], limit: 12 })),
       settle('matches', () => api.projectJobMatches(userProjectId, { targetRoles: ['BACKEND', 'FULLSTACK'], targetCareerLevel: 'MID', limit: 12 })),
       settle('skills', () => api.projectSkills(userProjectId)),
@@ -565,6 +587,21 @@ export async function loadJobFlowData(baseJF) {
 
   next.__userProjectId = userProjectId || null;
 
+  const projectSummaryResult = authResults.find((x) => x.key === 'projectSummary');
+  const projectSummary = projectSummaryResult?.ok && projectSummaryResult.data ? projectSummaryResult.data : {};
+  if (projectSummary.repositoryFullName || projectSummary.externalId || projectSummary.repositoryUrl) {
+    projectStore.setProjectMeta({
+      repositoryFullName: projectSummary.repositoryFullName || projectSummary.externalId,
+      htmlUrl: projectSummary.repositoryUrl,
+      ref: projectSummary.ref,
+      name: projectSummary.name,
+    });
+  }
+
+  if (projectSummaryResult?.ok && projectSummary.userProjectId) {
+    next.__userProjectId = String(projectSummary.userProjectId);
+  }
+
   const skillsResult = authResults.find((x) => x.key === 'skills');
   const skillRows = asList(skillsResult?.data);
   if (skillsResult?.ok && skillRows.length) {
@@ -591,6 +628,21 @@ export async function loadJobFlowData(baseJF) {
     next.matches = matchSource.map(toPrototypeJob).slice(0, 8);
   }
 
+  const userProjectsResult = authResults.find((x) => x.key === 'userProjects');
+  const userProjectRows = asList(userProjectsResult?.data);
+  if (userProjectsResult?.ok && userProjectRows.length > 1) {
+    // Build projectList from all user projects; the current active one gets full detail
+    const otherProjects = userProjectRows
+      .filter((p) => String(p.userProjectId) !== String(userProjectId))
+      .map((p) => buildAnalyzedProject({}, p.userProjectId, [], [], [], {
+        repositoryFullName: p.repositoryFullName || p.externalId,
+        htmlUrl: p.repositoryUrl,
+        ref: p.ref,
+        name: p.name,
+      }, p));
+    next.projectList = [...next.projectList, ...otherProjects];
+  }
+
   if ((skillsResult?.ok && skillRows.length) || (tagsResult?.ok && tagRows.length) || matchSource) {
     const analyzed = buildAnalyzedProject(
       next.projectList[0],
@@ -598,11 +650,15 @@ export async function loadJobFlowData(baseJF) {
       next.skills,
       next.expTags,
       next.matches || [],
+      projectMeta,
+      projectSummary,
     );
-    next.projectList = [analyzed, ...next.projectList.slice(1)];
+    next.projectList = [analyzed, ...next.projectList.filter(
+      (p) => String(p.id) !== String(userProjectId)
+    )];
     next.projects = {
       ...next.projects,
-      analyzed: Math.max(next.projects?.analyzed || 0, 1),
+      analyzed: Math.max(next.projects?.analyzed || 0, next.projectList.length),
       skillsTotal: analyzed.skillsTotal,
       tagsTotal: analyzed.tagsTotal,
     };

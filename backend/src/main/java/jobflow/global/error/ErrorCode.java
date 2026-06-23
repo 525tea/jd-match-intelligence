@@ -25,6 +25,8 @@ public enum ErrorCode {
 
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다."),
     USER_PROJECT_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_PROJECT_NOT_FOUND", "사용자 프로젝트를 찾을 수 없습니다."),
+    PROJECT_REPOSITORY_ACCESS_FAILED(HttpStatus.BAD_GATEWAY, "PROJECT_REPOSITORY_ACCESS_FAILED", "GitHub 저장소 정보를 불러오지 못했습니다."),
+    PROJECT_REPOSITORY_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "PROJECT_REPOSITORY_RATE_LIMITED", "GitHub API rate limit이 초과되었습니다."),
     USER_JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_JOB_NOT_FOUND", "사용자 공고 상태를 찾을 수 없습니다."),
     JOB_NOT_FOUND(HttpStatus.NOT_FOUND, "JOB_NOT_FOUND", "공고를 찾을 수 없습니다."),
     JOB_STATUS_CONFLICT(HttpStatus.CONFLICT, "JOB_STATUS_CONFLICT", "공고 상태를 변경할 수 없습니다."),

@@ -2,6 +2,7 @@ package jobflow.domain.project;
 
 import java.util.List;
 import jobflow.domain.project.dto.ProjectExperienceTagInventoryResponse;
+import jobflow.domain.project.dto.ProjectSummaryResponse;
 import jobflow.domain.project.dto.ProjectSkillInventoryResponse;
 import jobflow.global.cache.CacheNames;
 import jobflow.global.error.ErrorCode;
@@ -37,6 +38,28 @@ public class ProjectInventoryService {
                 .orElseGet(List::of);
     }
 
+    public List<ProjectSummaryResponse> getUserProjects(Long userId) {
+        return userProjectRepository.findAllByUserIdOrderByUpdatedAtDescIdDesc(userId)
+                .stream()
+                .map(userProject -> {
+                    UserProjectAnalysis latestAnalysis = userProjectAnalysisRepository
+                            .findFirstByUserProjectIdAndUserProjectUserIdOrderByAnalyzedAtDescIdDesc(
+                                    userProject.getId(), userId)
+                            .orElse(null);
+                    return ProjectSummaryResponse.from(userProject, latestAnalysis);
+                })
+                .toList();
+    }
+
+    public ProjectSummaryResponse getProjectSummary(Long userId, Long userProjectId) {
+        UserProject userProject = validateOwnedProject(userId, userProjectId);
+        UserProjectAnalysis latestAnalysis = userProjectAnalysisRepository
+                .findFirstByUserProjectIdAndUserProjectUserIdOrderByAnalyzedAtDescIdDesc(userProjectId, userId)
+                .orElse(null);
+
+        return ProjectSummaryResponse.from(userProject, latestAnalysis);
+    }
+
     @Cacheable(
             cacheNames = CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY,
             key = "T(jobflow.domain.project.ProjectInventoryService).projectInventoryCacheKey(#userId, #userProjectId)"
@@ -63,7 +86,7 @@ public class ProjectInventoryService {
         return "userId=" + userId + ":projectId=" + userProjectId;
     }
 
-    private void validateOwnedProject(Long userId, Long userProjectId) {
+    private UserProject validateOwnedProject(Long userId, Long userProjectId) {
         if (userId == null || userProjectId == null) {
             throw new BusinessException(
                     ErrorCode.COMMON_INVALID_INPUT,
@@ -71,11 +94,10 @@ public class ProjectInventoryService {
             );
         }
 
-        if (!userProjectRepository.existsByIdAndUserId(userProjectId, userId)) {
-            throw new BusinessException(
-                    ErrorCode.USER_PROJECT_NOT_FOUND,
-                    "사용자 프로젝트를 찾을 수 없습니다."
-            );
-        }
+        return userProjectRepository.findByIdAndUserId(userProjectId, userId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.USER_PROJECT_NOT_FOUND,
+                        "사용자 프로젝트를 찾을 수 없습니다."
+                ));
     }
 }
