@@ -160,8 +160,10 @@ assert_contains "${PRE_K6_SMOKE}" "staging-readiness-smoke.sh" \
   "pre-k6 smoke should run staging readiness smoke"
 assert_contains "${PRE_K6_SMOKE}" "job-list-filter-smoke.sh" \
   "pre-k6 smoke should run job list filter smoke"
-assert_contains "${PRE_K6_SMOKE}" "search-intent-smoke.sh" \
-  "pre-k6 smoke should run search intent smoke"
+assert_contains "${PRE_K6_SMOKE}" "RUN_SEARCH_INTENT_SMOKE" \
+  "pre-k6 smoke should make real-data search intent smoke opt-in"
+assert_contains "${PRE_K6_SMOKE}" "performance-profile-smoke.sh" \
+  "pre-k6 smoke should verify performance profile search readiness"
 assert_contains "${PRE_K6_SMOKE}" "actuator-exposure-smoke.sh" \
   "pre-k6 smoke should run actuator exposure smoke"
 assert_contains "${RUNBOOK}" "staging-pre-k6-smoke.sh" \
