@@ -78,11 +78,10 @@ WITH RECURSIVE seq AS (
     WHERE n < @target_job_count
 )
 SELECT
-    CASE MOD(n, 4)
+    CASE MOD(n, 3)
         WHEN 0 THEN 'JUMPIT'
         WHEN 1 THEN 'WANTED'
-        WHEN 2 THEN 'SEARCH_BASELINE'
-        ELSE 'PERFORMANCE_SYNTHETIC'
+        ELSE 'SEARCH_BASELINE'
         END AS source,
     CONCAT('perf-job-', LPAD(n, 7, '0')) AS external_id,
     SHA2(CONCAT('perf-job-', n), 256) AS canonical_fingerprint,

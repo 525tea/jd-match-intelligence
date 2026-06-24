@@ -52,12 +52,25 @@ CALL assert_perf_condition(
     CONCAT('Expected at least ', @minimum_job_count, ' performance job experience tag links, actual=', @tag_link_count)
 );
 
+SET @unexpected_source_count = (
+    SELECT COUNT(*)
+    FROM jobs
+    WHERE external_id LIKE 'perf-job-%'
+      AND source NOT IN ('JUMPIT', 'WANTED', 'SEARCH_BASELINE')
+);
+
+CALL assert_perf_condition(
+    @unexpected_source_count = 0,
+    CONCAT('Performance dataset contains unexpected source values, count=', @unexpected_source_count)
+);
+
 SELECT
     'PERFORMANCE_DATASET_SUMMARY' AS check_name,
     DATABASE() AS database_name,
     @perf_job_count AS perf_job_count,
     @skill_link_count AS skill_link_count,
     @tag_link_count AS tag_link_count,
+    @unexpected_source_count AS unexpected_source_count,
     COUNT(DISTINCT source) AS source_count,
     COUNT(DISTINCT role) AS role_count,
     SUM(status = 'OPEN') AS open_job_count,
