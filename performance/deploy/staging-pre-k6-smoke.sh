@@ -9,6 +9,7 @@ PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9090}"
 GRAFANA_URL="${GRAFANA_URL:-http://localhost:3001}"
 ZIPKIN_URL="${ZIPKIN_URL:-http://localhost:9411}"
 ELASTICSEARCH_URL="${ELASTICSEARCH_URL:-http://localhost:9200}"
+EXPECTED_MIN_RESULT_COUNT="${EXPECTED_MIN_RESULT_COUNT:-1}"
 
 echo "BASE_URL=${BASE_URL}"
 echo "BACKEND_URL=${BACKEND_URL}"
@@ -17,6 +18,7 @@ echo "PROMETHEUS_URL=${PROMETHEUS_URL}"
 echo "GRAFANA_URL=${GRAFANA_URL}"
 echo "ZIPKIN_URL=${ZIPKIN_URL}"
 echo "ELASTICSEARCH_URL=${ELASTICSEARCH_URL}"
+echo "EXPECTED_MIN_RESULT_COUNT=${EXPECTED_MIN_RESULT_COUNT}"
 echo
 
 run_step() {
@@ -61,12 +63,19 @@ run_step "Actuator exposure smoke" \
     BASE_URL="${BASE_URL}" \
     bash performance/security/actuator-exposure-smoke.sh
 
+run_step "Performance profile smoke" \
+  env \
+    BASE_URL="${BASE_URL}" \
+    EXPECTED_MIN_RESULT_COUNT="${EXPECTED_MIN_RESULT_COUNT}" \
+    bash performance/dataset/performance-profile-smoke.sh
+
 echo "### Staging Pre-k6 Smoke Summary"
 echo "staging_config_gate=ok"
 echo "staging_readiness_smoke=ok"
 echo "job_list_filter_smoke=ok"
 echo "search_intent_smoke=ok"
 echo "actuator_exposure_smoke=ok"
+echo "performance_profile_smoke=ok"
 
 echo
 echo "Staging pre-k6 smoke completed."

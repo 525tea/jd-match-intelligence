@@ -83,6 +83,97 @@ docker compose ps
 - `grafana`: running
 - `zipkin`: running
 
+## 4-1. Performance DB 준비
+
+k6 baseline은 실제 수집/운영 DB가 아니라 performance 전용 DB를 사용한다.
+
+서버에서 `.env` 값을 채운 뒤 성능 DB를 준비한다.
+
+```bash
+bash performance/dataset/prepare-performance-database.sh
+```
+
+기대 결과:
+
+```text
+Performance database preparation completed.
+Performance dataset gate completed.
+```
+
+주의:
+
+- `PERF_DB_NAME`은 `jobflow_perf`처럼 운영 DB와 분리된 database를 사용한다.
+- `PERF_DB_NAME=jobflow`처럼 실제 앱 DB를 지정하면 안 된다.
+- `RESET_PERF_DB=true`는 성능 DB를 의도적으로 재생성할 때만 사용한다.
+
+## 4-2. Performance profile 기동
+
+staging/performance 서버에서 k6 측정 전에는 기본 compose에 performance override를 함께 적용한다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml build backend gateway elasticsearch
+docker compose -f docker-compose.yml -f docker-compose.performance.yml up -d
+```
+
+기대 설정:
+
+```text
+SPRING_PROFILES_ACTIVE=local,performance
+backend datasource=jobflow_perf
+Elasticsearch alias=jobflow-jobs-performance
+Elasticsearch index=jobflow-jobs-performance-v1
+startup reindex=true
+```
+
+기동 상태 확인:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml ps
+```
+
+backend/gateway가 healthy가 될 때까지 기다린다.
+
+## 4-3. Performance reindex 확인
+
+performance profile로 backend가 기동되면 `jobflow_perf`의 fixture가 Elasticsearch performance index로 reindex되어야 한다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml logs --tail=200 backend \
+  | grep -Ei 'reindex|indexedCount|Application run failed|alias'
+```
+
+기대 결과:
+
+```text
+Job search reindex batch completed. indexedCount=500
+Job search reindex batch completed. indexedCount=1000
+Job search reindex completed. indexedCount=1000
+```
+
+alias 오류가 보이면 performance profile 또는 ES alias 설정이 잘못된 것이다.
+
+대표 오류:
+
+```text
+alias [jobflow-jobs] has more than one write index
+```
+
+이 경우 확인할 값:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml config \
+  | grep -E 'SPRING_PROFILES_ACTIVE|ELASTICSEARCH_JOBS_ALIAS|ELASTICSEARCH_JOBS_INDEX|SPRING_DATASOURCE_URL'
+```
+
+기대값:
+
+```text
+SPRING_PROFILES_ACTIVE: local,performance
+ELASTICSEARCH_JOBS_ALIAS: jobflow-jobs-performance
+ELASTICSEARCH_JOBS_INDEX: jobflow-jobs-performance-v1
+SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/jobflow_perf...
+```
+
 ## 5. Pre-k6 integrated smoke
 
 k6를 실행하기 직전에는 개별 smoke를 직접 조합하지 않고 통합 preflight smoke를 먼저 실행한다.
@@ -111,6 +202,7 @@ Staging pre-k6 smoke completed.
 - job list filter smoke
 - search intent smoke
 - actuator exposure smoke
+- performance profile smoke
 
 ## 6. Staging readiness smoke
 
