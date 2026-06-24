@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ENV_FILE="${ENV_FILE:-.env}"
+
+if [[ -f "${ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+  set +a
+fi
+
+COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)
+BASE_URL="${BASE_URL:-http://localhost:8081/api}"
+BACKEND_URL="${BACKEND_URL:-http://localhost:8080}"
+GATEWAY_URL="${GATEWAY_URL:-http://localhost:8081}"
+PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9090}"
+GRAFANA_URL="${GRAFANA_URL:-http://localhost:3001}"
+ZIPKIN_URL="${ZIPKIN_URL:-http://localhost:9411}"
+ELASTICSEARCH_URL="${ELASTICSEARCH_URL:-http://localhost:9200}"
+EXPECTED_MIN_RESULT_COUNT="${EXPECTED_MIN_RESULT_COUNT:-1}"
+HEALTH_WAIT_TIMEOUT_SECONDS="${HEALTH_WAIT_TIMEOUT_SECONDS:-240}"
+HEALTH_WAIT_INTERVAL_SECONDS="${HEALTH_WAIT_INTERVAL_SECONDS:-5}"
+REINDEX_LOG_TIMEOUT_SECONDS="${REINDEX_LOG_TIMEOUT_SECONDS:-240}"
+BUILD_SERVICES="${BUILD_SERVICES:-backend gateway elasticsearch}"
+UP_SERVICES="${UP_SERVICES:-}"
+
+echo "ENV_FILE=${ENV_FILE}"
+echo "BASE_URL=${BASE_URL}"
+echo "BACKEND_URL=${BACKEND_URL}"
+echo "GATEWAY_URL=${GATEWAY_URL}"
+echo "PROMETHEUS_URL=${PROMETHEUS_URL}"
+echo "GRAFANA_URL=${GRAFANA_URL}"
+echo "ZIPKIN_URL=${ZIPKIN_URL}"
+echo "ELASTICSEARCH_URL=${ELASTICSEARCH_URL}"
+echo "EXPECTED_MIN_RESULT_COUNT=${EXPECTED_MIN_RESULT_COUNT}"
+echo "HEALTH_WAIT_TIMEOUT_SECONDS=${HEALTH_WAIT_TIMEOUT_SECONDS}"
+echo "BUILD_SERVICES=${BUILD_SERVICES}"
+echo "UP_SERVICES=${UP_SERVICES:-all}"
+echo
+
+fail() {
+  echo "Assertion failed: $*" >&2
+  exit 1
+}
+
+run_step() {
+  local step_name="$1"
+  shift
+
+  echo "================================================================================"
+  echo "### ${step_name}"
+  echo "================================================================================"
+  "$@"
+  echo
+}
+
+require_env_file() {
+  [[ -f "${ENV_FILE}" ]] || fail "${ENV_FILE} does not exist. Copy performance/deploy/staging.env.example to ${ENV_FILE} and fill server values."
+  echo "env_file=ok"
+}
+
+compose() {
+  docker compose "${COMPOSE_FILES[@]}" "$@"
+}
+
+compose_health() {
+  local service_name="$1"
+
+  compose ps --format json "${service_name}" \
+    | jq -r 'if type == "array" then .[0].Health else .Health end // "unknown"'
+}
+
+compose_state() {
+  local service_name="$1"
+
+  compose ps --format json "${service_name}" \
+    | jq -r 'if type == "array" then .[0].State else .State end // "unknown"'
+}
+
+wait_for_healthy() {
+  local service_name="$1"
+  local elapsed=0
+
+  while (( elapsed <= HEALTH_WAIT_TIMEOUT_SECONDS )); do
+    local health
+    local state
+    health="$(compose_health "${service_name}")"
+    state="$(compose_state "${service_name}")"
+
+    echo "${service_name}_state=${state} ${service_name}_health=${health} elapsed=${elapsed}s"
+
+    if [[ "${health}" == "healthy" ]]; then
+      return
+    fi
+
+    sleep "${HEALTH_WAIT_INTERVAL_SECONDS}"
+    elapsed=$((elapsed + HEALTH_WAIT_INTERVAL_SECONDS))
+  done
+
+  compose ps
+  compose logs --tail=120 "${service_name}" || true
+  fail "${service_name} did not become healthy within ${HEALTH_WAIT_TIMEOUT_SECONDS}s"
+}
+
+wait_for_reindex() {
+  local elapsed=0
+
+  while (( elapsed <= REINDEX_LOG_TIMEOUT_SECONDS )); do
+    if compose logs --tail=240 backend | grep -q 'Job search reindex completed'; then
+      compose logs --tail=240 backend | grep -Ei 'reindex|indexedCount' || true
+      return
+    fi
+
+    if compose logs --tail=120 backend | grep -q 'Application run failed'; then
+      compose logs --tail=160 backend
+      fail "backend application failed during startup"
+    fi
+
+    echo "reindex_wait_elapsed=${elapsed}s"
+    sleep "${HEALTH_WAIT_INTERVAL_SECONDS}"
+    elapsed=$((elapsed + HEALTH_WAIT_INTERVAL_SECONDS))
+  done
+
+  compose logs --tail=240 backend | grep -Ei 'reindex|indexedCount|Application run failed|alias' || true
+  fail "backend reindex completion log was not found within ${REINDEX_LOG_TIMEOUT_SECONDS}s"
+}
+
+run_step "Env file check" \
+  require_env_file
+
+run_step "Server bootstrap check" \
+  bash performance/deploy/server-bootstrap-check.sh
+
+run_step "Performance database preparation" \
+  bash performance/dataset/prepare-performance-database.sh
+
+run_step "Performance compose config" \
+  compose config
+
+if [[ -n "${BUILD_SERVICES}" ]]; then
+  # shellcheck disable=SC2086
+  run_step "Build performance services" \
+    compose build ${BUILD_SERVICES}
+fi
+
+if [[ -n "${UP_SERVICES}" ]]; then
+  # shellcheck disable=SC2086
+  run_step "Start performance stack" \
+    compose up -d ${UP_SERVICES}
+else
+  run_step "Start performance stack" \
+    compose up -d
+fi
+
+run_step "Compose service status" \
+  compose ps
+
+run_step "Wait for backend health" \
+  wait_for_healthy backend
+
+run_step "Wait for gateway health" \
+  wait_for_healthy gateway
+
+run_step "Wait for performance reindex" \
+  wait_for_reindex
+
+run_step "Performance profile smoke" \
+  env \
+    BASE_URL="${BASE_URL}" \
+    EXPECTED_MIN_RESULT_COUNT="${EXPECTED_MIN_RESULT_COUNT}" \
+    bash performance/dataset/performance-profile-smoke.sh
+
+echo "### Staging Performance Up Summary"
+echo "env_file=ok"
+echo "server_bootstrap_check=ok"
+echo "performance_database_preparation=ok"
+echo "compose_config=ok"
+echo "performance_stack=up"
+echo "backend_health=healthy"
+echo "gateway_health=healthy"
+echo "performance_reindex=ok"
+echo "performance_profile_smoke=ok"
+echo
+echo "Staging performance stack is ready for pre-k6 smoke."

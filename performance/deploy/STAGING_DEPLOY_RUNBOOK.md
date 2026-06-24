@@ -99,6 +99,47 @@ GitHub OAuth 관련 값 구분:
 
 ## 4. 이미지 빌드 및 기동
 
+staging/performance 배포는 우선 통합 스크립트로 실행한다.
+
+```bash
+bash performance/deploy/staging-performance-up.sh
+```
+
+성공 기준:
+
+```text
+Staging performance stack is ready for pre-k6 smoke.
+```
+
+이 스크립트는 다음 순서로 실행된다.
+
+1. `.env` 존재 확인
+2. 서버 bootstrap check
+3. performance DB 준비와 dataset gate
+4. `docker-compose.yml` + `docker-compose.performance.yml` config 검증
+5. backend/gateway/elasticsearch image build
+6. performance stack 기동
+7. backend/gateway health 대기
+8. performance reindex 완료 로그 확인
+9. performance profile smoke
+
+서버에서 이미 image를 build했거나 특정 service만 올리고 싶으면 환경변수로 조정할 수 있다.
+
+```bash
+BUILD_SERVICES="" \
+UP_SERVICES="backend gateway" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+로컬에서 이미 포트가 점유된 상태로 스크립트 동작만 확인하려면 bootstrap check의 포트 검사를 건너뛸 수 있다. 실제 staging 신규 서버에서는 포트 체크를 건너뛰지 않는다.
+
+```bash
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+수동으로 실행해야 하는 경우에는 아래 절차를 따른다.
+
 로컬/staging 서버에서 image를 직접 빌드하는 경우:
 
 ```bash
