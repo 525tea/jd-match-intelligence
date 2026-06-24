@@ -138,37 +138,6 @@ REQUIRED_PORTS="" \
 bash performance/deploy/staging-performance-up.sh
 ```
 
-## 4-2. Pre-k6 smoke
-
-staging/performance stack이 k6 측정에 들어갈 수 있는 상태인지 한 번에 확인한다.
-
-```bash
-BASE_URL=http://localhost:8081/api \
-BACKEND_URL=http://localhost:8080 \
-GATEWAY_URL=http://localhost:8081 \
-PROMETHEUS_URL=http://localhost:9090 \
-GRAFANA_URL=http://localhost:3001 \
-ZIPKIN_URL=http://localhost:9411 \
-ELASTICSEARCH_URL=http://localhost:9200 \
-bash performance/deploy/staging-pre-k6-smoke.sh
-```
-
-성공 기준:
-
-```text
-Staging pre-k6 smoke completed.
-```
-
-기본 pre-k6 smoke는 성능 fixture와 성능 Elasticsearch alias가 정상 연결됐는지 검증한다. 실데이터 검색 품질을 검증하는 `search-intent-smoke.sh`는 `backend junior seoul`처럼 실제 수집 데이터 분포를 전제로 하므로, 성능 fixture 서버에서는 기본으로 건너뛴다.
-
-실데이터 DB를 대상으로 검색 의도 품질까지 함께 확인해야 할 때만 아래처럼 켠다.
-
-```bash
-RUN_SEARCH_INTENT_SMOKE=true \
-BASE_URL=http://localhost:8081/api \
-bash performance/deploy/staging-pre-k6-smoke.sh
-```
-
 수동으로 실행해야 하는 경우에는 아래 절차를 따른다.
 
 로컬/staging 서버에서 image를 직접 빌드하는 경우:
@@ -312,9 +281,19 @@ Staging pre-k6 smoke completed.
 - staging configuration gate
 - staging readiness smoke
 - job list filter smoke
-- search intent smoke
+- search intent smoke (performance fixture 서버에서는 기본 skip)
 - actuator exposure smoke
 - performance profile smoke
+
+기본 pre-k6 smoke는 성능 fixture와 성능 Elasticsearch alias가 정상 연결됐는지 검증한다. 실데이터 검색 품질을 검증하는 `search-intent-smoke.sh`는 `backend junior seoul`처럼 실제 수집 데이터 분포를 전제로 하므로, 성능 fixture 서버에서는 기본으로 건너뛴다.
+
+실데이터 DB를 대상으로 검색 의도 품질까지 함께 확인해야 할 때만 아래처럼 켠다.
+
+```bash
+RUN_SEARCH_INTENT_SMOKE=true \
+BASE_URL=http://localhost:8081/api \
+bash performance/deploy/staging-pre-k6-smoke.sh
+```
 
 ## 6. Staging readiness smoke
 
