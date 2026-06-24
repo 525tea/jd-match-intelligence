@@ -27,7 +27,7 @@ app:
   search:
     elasticsearch:
       url: ${ELASTICSEARCH_URL:http://localhost:9200}
-      index-name: jobflow-jobs
+      index-name: ${ELASTICSEARCH_JOBS_ALIAS:jobflow-jobs}
       physical-index-name: ${ELASTICSEARCH_JOBS_INDEX:jobflow-jobs-v1}
       initialize-on-startup: false
       query-expansion-enabled: ${ELASTICSEARCH_QUERY_EXPANSION_ENABLED:true}

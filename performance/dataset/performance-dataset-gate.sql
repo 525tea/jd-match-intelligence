@@ -64,6 +64,79 @@ CALL assert_perf_condition(
     CONCAT('Performance dataset contains unexpected source values, count=', @unexpected_source_count)
 );
 
+SET @unexpected_role_count = (
+    SELECT COUNT(*)
+    FROM jobs
+    WHERE external_id LIKE 'perf-job-%'
+      AND role NOT IN (
+          'BACKEND',
+          'FRONTEND',
+          'FULLSTACK',
+          'ANDROID',
+          'IOS',
+          'DEVOPS',
+          'SRE',
+          'DBA',
+          'SECURITY',
+          'DATA_ENGINEER',
+          'ML_ENGINEER',
+          'AI_ENGINEER',
+          'QA',
+          'PM',
+          'CROSS_PLATFORM',
+          'SYSTEM_NETWORK',
+          'SYSTEM_SOFTWARE',
+          'SOFTWARE_ENGINEER',
+          'EMBEDDED_SOFTWARE',
+          'ROBOT_SOFTWARE',
+          'IOT',
+          'APPLICATION_SOFTWARE',
+          'BLOCKCHAIN',
+          'WEB_PUBLISHING',
+          'VR_AR_3D',
+          'ERP_SAP',
+          'GRAPHICS',
+          'HARDWARE_ENGINEER',
+          'IT_ETC',
+          'DATA_ANALYST',
+          'DATA_SCIENTIST',
+          'MULTIMODAL_ENGINEER',
+          'GENERATIVE_AI',
+          'VISION_AUDIO_AI',
+          'AUTONOMOUS_DRIVING',
+          'COMPUTER_VISION',
+          'AI_BUSINESS',
+          'AI_SERVICE_PLANNING',
+          'AI_RESEARCHER',
+          'NLP',
+          'LLM',
+          'MLOPS',
+          'RAG',
+          'AI_DATA_ETC',
+          'GAME_PM',
+          'GAME_OPERATION',
+          'GAME_QA',
+          'GAME_CLIENT',
+          'GAME_SERVER',
+          'GAME_MOBILE',
+          'TECHNICAL_ARTIST',
+          'GAME_ART',
+          'GAME_3D_MODELING',
+          'GAME_ANIMATION',
+          'GAME_EFFECT',
+          'GAME_INTERFACE',
+          'GAME_DIRECTING_VIDEO',
+          'GAME_SOUND',
+          'GAME_ETC',
+          'ETC'
+      )
+);
+
+CALL assert_perf_condition(
+    @unexpected_role_count = 0,
+    CONCAT('Performance dataset contains unexpected role values, count=', @unexpected_role_count)
+);
+
 SELECT
     'PERFORMANCE_DATASET_SUMMARY' AS check_name,
     DATABASE() AS database_name,
@@ -71,6 +144,7 @@ SELECT
     @skill_link_count AS skill_link_count,
     @tag_link_count AS tag_link_count,
     @unexpected_source_count AS unexpected_source_count,
+    @unexpected_role_count AS unexpected_role_count,
     COUNT(DISTINCT source) AS source_count,
     COUNT(DISTINCT role) AS role_count,
     SUM(status = 'OPEN') AS open_job_count,
