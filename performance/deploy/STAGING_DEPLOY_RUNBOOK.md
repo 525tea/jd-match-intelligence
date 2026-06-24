@@ -13,7 +13,47 @@
 
 ## 2. 서버 준비
 
-필수 도구:
+서버 접속 후 먼저 bootstrap check를 실행한다.
+
+```bash
+bash performance/deploy/server-bootstrap-check.sh
+```
+
+성공 기준:
+
+```text
+Server bootstrap check completed.
+```
+
+기본 확인 기준:
+
+- Docker Engine 실행 가능
+- Docker Compose v2 사용 가능
+- `curl`, `jq`, `git` 사용 가능
+- 최소 메모리 3.5GB 이상
+- 현재 작업 디렉터리 기준 가용 디스크 20GB 이상
+- 8080, 8081, 3001, 9090, 9200, 9411 포트가 비어 있음
+- `docker-compose.yml` + `docker-compose.performance.yml` config 검증 통과
+
+필요하면 기준값을 환경변수로 조정할 수 있다.
+
+```bash
+MIN_MEMORY_MB=3000 \
+MIN_DISK_AVAILABLE_MB=15000 \
+REQUIRED_PORTS="8080 8081 3001 9090 9200 9411" \
+bash performance/deploy/server-bootstrap-check.sh
+```
+
+로컬에서 이미 backend/gateway/observability stack이 떠 있어 포트 점유가 예상되는 경우에는 포트 체크만 건너뛸 수 있다. 실제 staging 신규 서버에서는 포트 체크를 건너뛰지 않는다.
+
+```bash
+MIN_MEMORY_MB=1 \
+MIN_DISK_AVAILABLE_MB=1 \
+REQUIRED_PORTS="" \
+bash performance/deploy/server-bootstrap-check.sh
+```
+
+수동으로 확인해야 할 필수 도구:
 
 ```bash
 docker --version
