@@ -13,7 +13,47 @@
 
 ## 2. 서버 준비
 
-필수 도구:
+서버 접속 후 먼저 bootstrap check를 실행한다.
+
+```bash
+bash performance/deploy/server-bootstrap-check.sh
+```
+
+성공 기준:
+
+```text
+Server bootstrap check completed.
+```
+
+기본 확인 기준:
+
+- Docker Engine 실행 가능
+- Docker Compose v2 사용 가능
+- `curl`, `jq`, `git` 사용 가능
+- 최소 메모리 3.5GB 이상
+- 현재 작업 디렉터리 기준 가용 디스크 20GB 이상
+- 8080, 8081, 3001, 9090, 9200, 9411 포트가 비어 있음
+- `docker-compose.yml` + `docker-compose.performance.yml` config 검증 통과
+
+필요하면 기준값을 환경변수로 조정할 수 있다.
+
+```bash
+MIN_MEMORY_MB=3000 \
+MIN_DISK_AVAILABLE_MB=15000 \
+REQUIRED_PORTS="8080 8081 3001 9090 9200 9411" \
+bash performance/deploy/server-bootstrap-check.sh
+```
+
+로컬에서 이미 backend/gateway/observability stack이 떠 있어 포트 점유가 예상되는 경우에는 포트 체크만 건너뛸 수 있다. 실제 staging 신규 서버에서는 포트 체크를 건너뛰지 않는다.
+
+```bash
+MIN_MEMORY_MB=1 \
+MIN_DISK_AVAILABLE_MB=1 \
+REQUIRED_PORTS="" \
+bash performance/deploy/server-bootstrap-check.sh
+```
+
+수동으로 확인해야 할 필수 도구:
 
 ```bash
 docker --version
@@ -59,6 +99,47 @@ GitHub OAuth 관련 값 구분:
 
 ## 4. 이미지 빌드 및 기동
 
+staging/performance 배포는 우선 통합 스크립트로 실행한다.
+
+```bash
+bash performance/deploy/staging-performance-up.sh
+```
+
+성공 기준:
+
+```text
+Staging performance stack is ready for pre-k6 smoke.
+```
+
+이 스크립트는 다음 순서로 실행된다.
+
+1. `.env` 존재 확인
+2. 서버 bootstrap check
+3. performance DB 준비와 dataset gate
+4. `docker-compose.yml` + `docker-compose.performance.yml` config 검증
+5. backend/gateway/elasticsearch image build
+6. performance stack 기동
+7. backend/gateway health 대기
+8. performance reindex 완료 로그 확인
+9. performance profile smoke
+
+서버에서 이미 image를 build했거나 특정 service만 올리고 싶으면 환경변수로 조정할 수 있다.
+
+```bash
+BUILD_SERVICES="" \
+UP_SERVICES="backend gateway" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+로컬에서 이미 포트가 점유된 상태로 스크립트 동작만 확인하려면 bootstrap check의 포트 검사를 건너뛸 수 있다. 실제 staging 신규 서버에서는 포트 체크를 건너뛰지 않는다.
+
+```bash
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+수동으로 실행해야 하는 경우에는 아래 절차를 따른다.
+
 로컬/staging 서버에서 image를 직접 빌드하는 경우:
 
 ```bash
@@ -82,6 +163,97 @@ docker compose ps
 - `prometheus`: running
 - `grafana`: running
 - `zipkin`: running
+
+## 4-1. Performance DB 준비
+
+k6 baseline은 실제 수집/운영 DB가 아니라 performance 전용 DB를 사용한다.
+
+서버에서 `.env` 값을 채운 뒤 성능 DB를 준비한다.
+
+```bash
+bash performance/dataset/prepare-performance-database.sh
+```
+
+기대 결과:
+
+```text
+Performance database preparation completed.
+Performance dataset gate completed.
+```
+
+주의:
+
+- `PERF_DB_NAME`은 `jobflow_perf`처럼 운영 DB와 분리된 database를 사용한다.
+- `PERF_DB_NAME=jobflow`처럼 실제 앱 DB를 지정하면 안 된다.
+- `RESET_PERF_DB=true`는 성능 DB를 의도적으로 재생성할 때만 사용한다.
+
+## 4-2. Performance profile 기동
+
+staging/performance 서버에서 k6 측정 전에는 기본 compose에 performance override를 함께 적용한다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml build backend gateway elasticsearch
+docker compose -f docker-compose.yml -f docker-compose.performance.yml up -d
+```
+
+기대 설정:
+
+```text
+SPRING_PROFILES_ACTIVE=local,performance
+backend datasource=jobflow_perf
+Elasticsearch alias=jobflow-jobs-performance
+Elasticsearch index=jobflow-jobs-performance-v1
+startup reindex=true
+```
+
+기동 상태 확인:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml ps
+```
+
+backend/gateway가 healthy가 될 때까지 기다린다.
+
+## 4-3. Performance reindex 확인
+
+performance profile로 backend가 기동되면 `jobflow_perf`의 fixture가 Elasticsearch performance index로 reindex되어야 한다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml logs --tail=200 backend \
+  | grep -Ei 'reindex|indexedCount|Application run failed|alias'
+```
+
+기대 결과:
+
+```text
+Job search reindex batch completed. indexedCount=500
+Job search reindex batch completed. indexedCount=1000
+Job search reindex completed. indexedCount=1000
+```
+
+alias 오류가 보이면 performance profile 또는 ES alias 설정이 잘못된 것이다.
+
+대표 오류:
+
+```text
+alias [jobflow-jobs] has more than one write index
+```
+
+이 경우 확인할 값:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml config \
+  | grep -E 'SPRING_PROFILES_ACTIVE|ELASTICSEARCH_JOBS_ALIAS|ELASTICSEARCH_JOBS_INDEX|SPRING_DATASOURCE_URL'
+```
+
+기대값:
+
+```text
+SPRING_PROFILES_ACTIVE: local,performance
+ELASTICSEARCH_JOBS_ALIAS: jobflow-jobs-performance
+ELASTICSEARCH_JOBS_INDEX: jobflow-jobs-performance-v1
+SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/jobflow_perf...
+```
 
 ## 5. Pre-k6 integrated smoke
 
@@ -109,8 +281,19 @@ Staging pre-k6 smoke completed.
 - staging configuration gate
 - staging readiness smoke
 - job list filter smoke
-- search intent smoke
+- search intent smoke (performance fixture 서버에서는 기본 skip)
 - actuator exposure smoke
+- performance profile smoke
+
+기본 pre-k6 smoke는 성능 fixture와 성능 Elasticsearch alias가 정상 연결됐는지 검증한다. 실데이터 검색 품질을 검증하는 `search-intent-smoke.sh`는 `backend junior seoul`처럼 실제 수집 데이터 분포를 전제로 하므로, 성능 fixture 서버에서는 기본으로 건너뛴다.
+
+실데이터 DB를 대상으로 검색 의도 품질까지 함께 확인해야 할 때만 아래처럼 켠다.
+
+```bash
+RUN_SEARCH_INTENT_SMOKE=true \
+BASE_URL=http://localhost:8081/api \
+bash performance/deploy/staging-pre-k6-smoke.sh
+```
 
 ## 6. Staging readiness smoke
 
