@@ -19,6 +19,7 @@ PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9090}"
 GRAFANA_URL="${GRAFANA_URL:-http://localhost:3001}"
 ZIPKIN_URL="${ZIPKIN_URL:-http://localhost:9411}"
 ELASTICSEARCH_URL="${ELASTICSEARCH_URL:-http://localhost:9200}"
+KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}"
 EXPECTED_MIN_RESULT_COUNT="${EXPECTED_MIN_RESULT_COUNT:-1}"
 HEALTH_WAIT_TIMEOUT_SECONDS="${HEALTH_WAIT_TIMEOUT_SECONDS:-240}"
 HEALTH_WAIT_INTERVAL_SECONDS="${HEALTH_WAIT_INTERVAL_SECONDS:-5}"
@@ -34,6 +35,7 @@ echo "PROMETHEUS_URL=${PROMETHEUS_URL}"
 echo "GRAFANA_URL=${GRAFANA_URL}"
 echo "ZIPKIN_URL=${ZIPKIN_URL}"
 echo "ELASTICSEARCH_URL=${ELASTICSEARCH_URL}"
+echo "KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}"
 echo "EXPECTED_MIN_RESULT_COUNT=${EXPECTED_MIN_RESULT_COUNT}"
 echo "HEALTH_WAIT_TIMEOUT_SECONDS=${HEALTH_WAIT_TIMEOUT_SECONDS}"
 echo "BUILD_SERVICES=${BUILD_SERVICES}"
@@ -137,10 +139,19 @@ run_step "Performance compose config" \
   compose config
 
 run_step "Start performance database dependencies" \
-  compose up -d mysql redis elasticsearch
+  compose up -d mysql redis elasticsearch zookeeper kafka
 
 run_step "Wait for mysql health" \
   wait_for_healthy mysql
+
+run_step "Wait for kafka health" \
+  wait_for_healthy kafka
+
+run_step "Ensure Kafka topics" \
+  bash performance/events/ensure-kafka-topics.sh
+
+run_step "Kafka topic smoke" \
+  bash performance/events/kafka-topic-smoke.sh
 
 run_step "Performance database preparation" \
   bash performance/dataset/prepare-performance-database.sh
@@ -188,5 +199,7 @@ echo "backend_health=healthy"
 echo "gateway_health=healthy"
 echo "performance_reindex=ok"
 echo "performance_profile_smoke=ok"
+echo "kafka=healthy"
+echo "kafka_topics=ok"
 echo
 echo "Staging performance stack is ready for pre-k6 smoke."
