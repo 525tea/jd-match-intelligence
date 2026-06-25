@@ -56,6 +56,60 @@ services:
       timeout: 10s
       retries: 20
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.7.1
+    container_name: jobflow-zookeeper
+    mem_limit: ${ZOOKEEPER_MEMORY_LIMIT:-512m}
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: jobflow-kafka
+    mem_limit: ${KAFKA_MEMORY_LIMIT:-1g}
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: jobflow-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    command:
+      - bash
+      - -lc
+      - |
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic job.created --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic email.send --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic es.index --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+        kafka-topics --bootstrap-server kafka:29092 --list
+
   backend:
     build:
       context: ./backend
@@ -69,6 +123,7 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
       ELASTICSEARCH_URL: http://elasticsearch:9200
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       TRACING_SAMPLING_PROBABILITY: "1.0"
       JWT_SECRET: jobflow-local-development-secret-key-must-be-at-least-32-bytes
@@ -97,6 +152,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
       zipkin:
         condition: service_started
     healthcheck:
@@ -183,4 +240,7 @@ volumes:
   mysql-data:
   redis-data:
   es-data:
+  zookeeper-data:
+  zookeeper-log:
+  kafka-data:
   grafana-data:

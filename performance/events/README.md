@@ -56,6 +56,37 @@ bash performance/events/event-processing-baseline-check.sh
 
 이 결과는 Kafka/Debezium 전환 전 상태를 기록하는 기준선으로 사용한다. 이후 Kafka 기반 처리 구조를 도입하면 API 지연 시간, 재시도 회복, backlog 처리 상태를 이 결과와 비교한다.
 
+## Kafka topic smoke
+
+`kafka-topic-smoke.sh`는 메시징 스택이 뜬 뒤 필수 Kafka topic이 생성됐는지 확인한다.
+
+현재 기본 topic은 다음 3개다.
+
+- `job.created`: 공고 생성/변경 이벤트 계열
+- `email.send`: 이메일 발송 요청 이벤트
+- `es.index`: Elasticsearch 색인 요청 이벤트
+
+```bash
+bash performance/events/kafka-topic-smoke.sh
+```
+
+기본 기대값:
+
+- topic: `job.created`, `email.send`, `es.index`
+- partition: `3`
+- replication factor: `1`
+
+필요하면 환경변수로 바꿀 수 있다.
+
+```bash
+KAFKA_EXPECTED_TOPICS="job.created email.send es.index" \
+KAFKA_EXPECTED_PARTITIONS=3 \
+KAFKA_EXPECTED_REPLICATION_FACTOR=1 \
+bash performance/events/kafka-topic-smoke.sh
+```
+
+`staging-performance-up.sh`는 Kafka health check 후 이 smoke를 자동 실행한다.
+
 ## 시나리오 A: 알림 배치 on/off 비교
 
 `run-deadline-reminder-contention-scenario.sh`는 마감 알림 배치가 꺼진 상태와 켜진 상태를 같은 k6 조건으로 비교하기 위한 실행 스크립트다.
