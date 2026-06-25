@@ -55,3 +55,55 @@ bash performance/events/event-processing-baseline-check.sh
 - `retry_exhausted_count`: 최대 시도 횟수에 도달한 알림 수
 
 이 결과는 Kafka/Debezium 전환 전 상태를 기록하는 기준선으로 사용한다. 이후 Kafka 기반 처리 구조를 도입하면 API 지연 시간, 재시도 회복, backlog 처리 상태를 이 결과와 비교한다.
+
+## 시나리오 A: 알림 배치 on/off 비교
+
+`run-deadline-reminder-contention-scenario.sh`는 마감 알림 배치가 꺼진 상태와 켜진 상태를 같은 k6 조건으로 비교하기 위한 실행 스크립트다.
+
+이 시나리오의 목적은 “API가 반드시 느려진다”를 단정하는 것이 아니다. 같은 서버, 같은 DB, 같은 k6 조건에서 알림 배치가 애플리케이션 런타임과 MySQL을 함께 사용할 때 지연 시간, 실패율, 알림 처리 backlog가 어떻게 달라지는지 기록하는 것이다.
+
+### 1. 배치 off 기준선
+
+```bash
+SCENARIO=scheduler-off \
+BASE_URL=http://localhost:8081/api \
+LOGIN_EMAIL='frontend-demo@example.com' \
+LOGIN_PASSWORD='password123' \
+VUS=20 \
+DURATION=5m \
+K6_SUMMARY_EXPORT=/tmp/jobflow-k6-deadline-reminder-scheduler-off.json \
+bash performance/events/run-deadline-reminder-contention-scenario.sh
+```
+
+기대 결과:
+
+- `checks` threshold 통과
+- `http_req_failed` 0%에 가깝게 유지
+- `OUTBOX_RELAY_BACKLOG_SUMMARY`, `NOTIFICATION_RETRY_BACKLOG_SUMMARY` 출력
+
+### 2. 배치 on 비교군
+
+```bash
+SCENARIO=scheduler-on \
+BASE_URL=http://localhost:8081/api \
+LOGIN_EMAIL='frontend-demo@example.com' \
+LOGIN_PASSWORD='password123' \
+VUS=20 \
+DURATION=5m \
+K6_SUMMARY_EXPORT=/tmp/jobflow-k6-deadline-reminder-scheduler-on.json \
+bash performance/events/run-deadline-reminder-contention-scenario.sh
+```
+
+기대 결과:
+
+- 마감 알림 fixture가 준비된다.
+- backend/gateway가 `DEADLINE_REMINDER_SCHEDULER_ENABLED=true` 상태로 재기동된다.
+- k6 실행 전후로 알림 처리 상태가 출력된다.
+- 배치 off 결과와 `p95`, `p99`, `http_req_failed`, 알림 처리량을 비교할 수 있다.
+
+### 실행 시 주의
+
+- 이 시나리오는 `jobflow_perf` 같은 성능 전용 DB에서만 실행해야 한다.
+- 알림 fixture는 `NOTIFICATION_MOCK_LOAD` source와 `example.com` 계정만 사용한다.
+- 실제 Mailgun 발송을 하지 않도록 performance compose에서 mock email sender를 사용한다.
+- 알림 fixture가 `/jobs` 결과 순서에 섞일 수 있으므로 이 runner는 기본적으로 `EXPECT_PERF_FIXTURE=false`로 k6를 실행한다.
