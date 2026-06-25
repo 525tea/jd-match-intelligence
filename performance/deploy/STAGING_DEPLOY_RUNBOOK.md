@@ -181,6 +181,7 @@ bash performance/events/kafka-topic-smoke.sh
 
 ```text
 ### Kafka topics
+application.events
 email.send
 es.index
 job.created

@@ -62,9 +62,10 @@ bash performance/events/event-processing-baseline-check.sh
 
 `kafka-topic-smoke.sh`는 필수 Kafka topic이 생성됐는지 확인한다.
 
-현재 기본 topic은 다음 3개다.
+현재 기본 topic은 다음 4개다.
 
 - `job.created`: 공고 생성/변경 이벤트 계열
+- `application.events`: 지원 생성/상태 변경 이벤트 계열
 - `email.send`: 이메일 발송 요청 이벤트
 - `es.index`: Elasticsearch 색인 요청 이벤트
 
@@ -75,14 +76,14 @@ bash performance/events/kafka-topic-smoke.sh
 
 기본 기대값:
 
-- topic: `job.created`, `email.send`, `es.index`
+- topic: `job.created`, `application.events`, `email.send`, `es.index`
 - partition: `3`
 - replication factor: `1`
 
 필요하면 환경변수로 바꿀 수 있다.
 
 ```bash
-KAFKA_EXPECTED_TOPICS="job.created email.send es.index" \
+KAFKA_EXPECTED_TOPICS="job.created application.events email.send es.index" \
 KAFKA_EXPECTED_PARTITIONS=3 \
 KAFKA_EXPECTED_REPLICATION_FACTOR=1 \
 bash performance/events/kafka-topic-smoke.sh
@@ -146,7 +147,7 @@ bash performance/events/run-deadline-reminder-contention-scenario.sh
 
 `run-deadline-reminder-provider-failure-scenario.sh`는 mock email provider를 실패 모드로 켠 뒤 마감 알림 배치를 실행한다.
 
-이 시나리오의 목적은 downstream 장애 상황에서 알림 이벤트가 어떻게 남는지 확인하는 것이다. 현재 outbox relay는 실제 외부 broker나 ES publisher가 아니라 `NoopOutboxEventHandler`로 성공 처리된다. 따라서 outbox를 ES 장애 재현 대상으로 쓰지 않고, 실제 실패/재시도 상태가 존재하는 알림 발송 경로를 사용한다.
+이 시나리오의 목적은 downstream 장애 상황에서 알림 이벤트가 어떻게 남는지 확인하는 것이다. Kafka topic 발행 자체는 topic smoke와 relay publish 검증에서 확인하고, 이 시나리오는 실제 실패/재시도 상태가 존재하는 알림 발송 경로를 사용해 retry backlog를 기록한다.
 
 ```bash
 BASE_URL=http://localhost:8081/api \

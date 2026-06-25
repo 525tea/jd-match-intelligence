@@ -1,5 +1,6 @@
 package jobflow.domain.job;
 
+import jobflow.domain.outbox.OutboxEvent;
 import jobflow.domain.outbox.OutboxEventService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,7 +67,7 @@ class JobExpirationServiceTest {
                 eq(1L),
                 eq("JOB_EXPIRED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
     }
 
