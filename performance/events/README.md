@@ -91,6 +91,51 @@ bash performance/events/kafka-topic-smoke.sh
 
 `staging-performance-up.sh`는 Kafka health check 후 이 smoke를 자동 실행한다.
 
+## Outbox Relay Kafka publish smoke
+
+`outbox-kafka-publish-smoke.sh`는 `outbox_events`에 테스트용 `PENDING` 이벤트를 1건 넣고, backend Outbox Relay가 해당 이벤트를 Kafka topic까지 발행하는지 확인한다.
+
+이 smoke는 topic 존재 여부만 확인하는 `kafka-topic-smoke.sh`보다 한 단계 더 실제 애플리케이션 경로에 가깝다.
+
+- MySQL `outbox_events` insert
+- backend Outbox Relay polling
+- Kafka publisher 발행
+- MySQL status `PUBLISHED` 전환
+- Kafka topic에서 해당 `eventId` 메시지 확인
+
+```bash
+bash performance/events/outbox-kafka-publish-smoke.sh
+```
+
+기대 결과:
+
+```text
+Outbox Kafka publish smoke completed.
+```
+
+기본 실행 대상:
+
+- MySQL service: `mysql`
+- Kafka service: `kafka`
+- Database: `jobflow_perf`
+- Topic: `job.created`
+
+필요하면 환경변수로 바꿀 수 있다.
+
+```bash
+OUTBOX_SMOKE_TOPIC=job.created \
+OUTBOX_SMOKE_WAIT_SECONDS=30 \
+KAFKA_CONSUMER_TIMEOUT_MS=10000 \
+bash performance/events/outbox-kafka-publish-smoke.sh
+```
+
+주의:
+
+- 이 smoke는 `PERF_DB_NAME=jobflow`일 때 실행을 거부한다.
+- payload에는 테스트용 `Sample Company`, `Sample backend engineer`만 사용한다.
+- 실제 공고, 실제 사용자, 실제 이메일, 실제 외부 식별자는 사용하지 않는다.
+- `staging-performance-up.sh`는 backend/gateway health 확인 후 이 smoke를 자동 실행한다.
+
 ## 시나리오 A: 알림 배치 on/off 비교
 
 `run-deadline-reminder-contention-scenario.sh`는 마감 알림 배치가 꺼진 상태와 켜진 상태를 같은 k6 조건으로 비교하기 위한 실행 스크립트다.
