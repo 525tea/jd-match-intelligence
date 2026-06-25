@@ -133,11 +133,17 @@ run_step "Env file check" \
 run_step "Server bootstrap check" \
   bash performance/deploy/server-bootstrap-check.sh
 
-run_step "Performance database preparation" \
-  bash performance/dataset/prepare-performance-database.sh
-
 run_step "Performance compose config" \
   compose config
+
+run_step "Start performance database dependencies" \
+  compose up -d mysql redis elasticsearch
+
+run_step "Wait for mysql health" \
+  wait_for_healthy mysql
+
+run_step "Performance database preparation" \
+  bash performance/dataset/prepare-performance-database.sh
 
 if [[ -n "${BUILD_SERVICES}" ]]; then
   # shellcheck disable=SC2086
