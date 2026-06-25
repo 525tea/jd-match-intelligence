@@ -83,9 +83,8 @@ echo
 echo "### Make pending reminder retries immediately due"
 retry_ready_attempt=1
 while true; do
-  if docker compose exec -T "${MYSQL_SERVICE}" mysql \
+  if docker compose exec -T -e MYSQL_PWD="${PERF_DB_PASSWORD}" "${MYSQL_SERVICE}" mysql \
     -u"${PERF_DB_USER}" \
-    -p"${PERF_DB_PASSWORD}" \
     --default-character-set=utf8mb4 \
     "${PERF_DB_NAME}" < "${RETRY_READY_SQL}"; then
     break
