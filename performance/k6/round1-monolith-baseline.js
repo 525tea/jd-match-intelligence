@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check, fail, sleep } from 'k6';
+import { Counter } from 'k6/metrics';
 
 const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8081/api').replace(/\/$/, '');
 const KEYWORDS = (__ENV.KEYWORDS || 'performance,backend,data,devops,security')
@@ -14,6 +15,11 @@ const GAP_LIMIT = Number(__ENV.GAP_LIMIT || 10);
 const SLEEP_SECONDS = Number(__ENV.SLEEP_SECONDS || 1);
 const EXPECT_PERF_FIXTURE = (__ENV.EXPECT_PERF_FIXTURE || 'true') !== 'false';
 const REQUIRE_AUTH_ENDPOINTS = (__ENV.REQUIRE_AUTH_ENDPOINTS || 'true') !== 'false';
+const FAILURE_SAMPLE_BODY_LIMIT = Number(__ENV.FAILURE_SAMPLE_BODY_LIMIT || 500);
+
+const httpStatusCodes = new Counter('jobflow_http_status_codes');
+const failedResponses = new Counter('jobflow_failed_responses');
+const loggedFailureSamples = {};
 
 export const options = {
     vus: Number(__ENV.VUS || 20),
@@ -39,6 +45,47 @@ function authorizationHeaders(token) {
     };
 }
 
+function truncateBody(body) {
+    const value = String(body || '');
+    if (value.length <= FAILURE_SAMPLE_BODY_LIMIT) {
+        return value;
+    }
+
+    return `${value.slice(0, FAILURE_SAMPLE_BODY_LIMIT)}...<truncated>`;
+}
+
+function recordResponse(endpoint, response) {
+    const tags = {
+        endpoint,
+        status: String(response.status),
+    };
+
+    httpStatusCodes.add(1, tags);
+
+    if (response.status >= 400 || response.status === 0) {
+        failedResponses.add(1, tags);
+    }
+}
+
+function logFailureSample(endpoint, response) {
+    if (__VU !== 1 || response.status < 400) {
+        return;
+    }
+
+    const key = `${endpoint}:${response.status}`;
+    if (loggedFailureSamples[key]) {
+        return;
+    }
+
+    loggedFailureSamples[key] = true;
+    console.error(`[failure-sample] endpoint=${endpoint} status=${response.status} body=${truncateBody(response.body)}`);
+}
+
+function observeResponse(endpoint, response) {
+    recordResponse(endpoint, response);
+    logFailureSample(endpoint, response);
+}
+
 function login() {
     if (!__ENV.LOGIN_EMAIL || !__ENV.LOGIN_PASSWORD) {
         return '';
@@ -59,6 +106,7 @@ function login() {
             },
         },
     );
+    observeResponse('auth_login', response);
 
     const ok = check(response, {
         'auth login status is 200': (res) => res.status === 200,
@@ -87,6 +135,7 @@ function resolveUserProjectId(token) {
             endpoint: 'auth_me',
         },
     });
+    observeResponse('auth_me', response);
 
     const ok = check(response, {
         'auth me status is 200': (res) => res.status === 200,
@@ -149,6 +198,7 @@ export default function (context) {
             endpoint: 'jobs_list',
         },
     });
+    observeResponse('jobs_list', listResponse);
 
     check(listResponse, {
         'jobs list status is 200': (res) => res.status === 200,
@@ -171,6 +221,7 @@ export default function (context) {
             },
         },
     );
+    observeResponse('jobs_search', searchResponse);
 
     check(searchResponse, {
         'jobs search status is 200': (res) => res.status === 200,
@@ -195,6 +246,7 @@ export default function (context) {
                 },
             },
         );
+        observeResponse('recommendations_jobs', recommendationResponse);
 
         check(recommendationResponse, {
             'recommendations jobs status is 200': (res) => res.status === 200,
@@ -210,6 +262,7 @@ export default function (context) {
                 },
             },
         );
+        observeResponse('gap_analysis', gapAnalysisResponse);
 
         check(gapAnalysisResponse, {
             'gap analysis status is 200': (res) => res.status === 200,
