@@ -58,6 +58,18 @@ bash performance/k6/run-round1-baseline.sh
 
 기본 summary export 경로는 `/tmp/jobflow-k6-round1-baseline-summary.json`이다. raw summary JSON은 커밋하지 않고, 해석 결과만 `docs/metrics/performance/`에 정리한다.
 
+서버에서 실행한 k6 summary JSON을 로컬 artifact 폴더로 가져오려면 로컬 터미널에서 다음을 실행한다. `SSH_HOST`는 현재 EC2 public IP로 바꾼다.
+
+```bash
+SSH_HOST=ubuntu@3.38.220.29 \
+VUS=20 \
+DURATION=10m \
+ARTIFACT_NAME=k6_round1_20vu_10m_summary_passed.json \
+bash performance/k6/collect-round1-artifact.sh
+```
+
+기본 로컬 저장 위치는 `/Users/iyejin/dev/jobflow-server-env/artifacts/260625_k6_round1/`이다. 이 폴더는 로컬 보관용이며 Git에 커밋하지 않는다.
+
 ## MySQL FULLTEXT Search Baseline
 
 Backend local profile을 실행한 상태에서 공고 검색 API의 MySQL FULLTEXT 기준선을 측정한다.
