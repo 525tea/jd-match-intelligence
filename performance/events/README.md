@@ -107,3 +107,52 @@ bash performance/events/run-deadline-reminder-contention-scenario.sh
 - 알림 fixture는 `NOTIFICATION_MOCK_LOAD` source와 `example.com` 계정만 사용한다.
 - 실제 Mailgun 발송을 하지 않도록 performance compose에서 mock email sender를 사용한다.
 - 알림 fixture가 `/jobs` 결과 순서에 섞일 수 있으므로 이 runner는 기본적으로 `EXPECT_PERF_FIXTURE=false`로 k6를 실행한다.
+
+## 시나리오 B: 알림 provider 실패와 retry backlog
+
+`run-deadline-reminder-provider-failure-scenario.sh`는 mock email provider를 실패 모드로 켠 뒤 마감 알림 배치를 실행한다.
+
+이 시나리오의 목적은 downstream 장애 상황에서 알림 이벤트가 어떻게 남는지 확인하는 것이다. 현재 outbox relay는 실제 외부 broker나 ES publisher가 아니라 `NoopOutboxEventHandler`로 성공 처리된다. 따라서 outbox를 ES 장애 재현 대상으로 쓰지 않고, 실제 실패/재시도 상태가 존재하는 알림 발송 경로를 사용한다.
+
+```bash
+BASE_URL=http://localhost:8081/api \
+LOGIN_EMAIL='frontend-demo@example.com' \
+LOGIN_PASSWORD='password123' \
+VUS=20 \
+DURATION=5m \
+K6_SUMMARY_EXPORT=/tmp/jobflow-k6-deadline-reminder-provider-failure.json \
+bash performance/events/run-deadline-reminder-provider-failure-scenario.sh
+```
+
+기대 결과:
+
+- backend/gateway가 mock email 실패 모드로 재기동된다.
+- `notification_attempts`에는 `FAILED` attempt가 쌓인다.
+- `notification_logs`에는 `PENDING` 및 미래 `next_retry_at`이 남는다.
+- k6는 API 지연 시간과 실패율을 기록하고, 이벤트 진단 SQL은 retry backlog 상태를 출력한다.
+
+## 시나리오 C: 재시작 후 retry recovery
+
+`run-deadline-reminder-retry-recovery-scenario.sh`는 실패한 알림 backlog를 즉시 재시도 가능 상태로 바꾼 뒤 backend/gateway를 정상 mock email provider로 재기동한다.
+
+현재 outbox에는 `PROCESSING` 상태가 없다. 상태는 `PENDING`, `PUBLISHED`, `FAILED`만 존재한다. 그래서 이 시나리오는 “PROCESSING stuck”이 아니라, 서버 재시작 후 pending retry 이벤트가 정상적으로 다시 처리되는지를 검증한다.
+
+```bash
+OBSERVE_SECONDS=30 \
+bash performance/events/run-deadline-reminder-retry-recovery-scenario.sh
+```
+
+기대 결과:
+
+- 실패 backlog가 없으면 먼저 provider failure 시나리오를 짧게 실행해 실패 데이터를 만든다.
+- `deadline-reminder-retry-ready.sql`이 pending 알림의 `next_retry_at`을 현재 시각으로 당긴다.
+- backend/gateway가 정상 mock email provider로 재기동된다.
+- 재기동 후 `retry_ready_count`가 줄고 `sent_count`가 늘어나는지 확인한다.
+
+복구 결과를 별도로 보고 싶으면 실패 backlog를 먼저 만든 뒤 아래처럼 recovery만 실행할 수 있다.
+
+```bash
+PREPARE_FAILURE_BACKLOG=false \
+OBSERVE_SECONDS=30 \
+bash performance/events/run-deadline-reminder-retry-recovery-scenario.sh
+```
