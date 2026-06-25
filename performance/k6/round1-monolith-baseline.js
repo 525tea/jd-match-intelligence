@@ -68,7 +68,7 @@ function recordResponse(endpoint, response) {
 }
 
 function logFailureSample(endpoint, response) {
-    if (__VU !== 1 || response.status < 400) {
+    if (response.status < 400) {
         return;
     }
 
@@ -78,7 +78,7 @@ function logFailureSample(endpoint, response) {
     }
 
     loggedFailureSamples[key] = true;
-    console.error(`[failure-sample] endpoint=${endpoint} status=${response.status} body=${truncateBody(response.body)}`);
+    console.error(`[failure-sample] vu=${__VU} iter=${__ITER} endpoint=${endpoint} status=${response.status} body=${truncateBody(response.body)}`);
 }
 
 function observeResponse(endpoint, response) {
