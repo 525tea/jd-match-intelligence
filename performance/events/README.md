@@ -56,9 +56,11 @@ bash performance/events/event-processing-baseline-check.sh
 
 이 결과는 Kafka/Debezium 전환 전 상태를 기록하는 기준선으로 사용한다. 이후 Kafka 기반 처리 구조를 도입하면 API 지연 시간, 재시도 회복, backlog 처리 상태를 이 결과와 비교한다.
 
-## Kafka topic smoke
+## Kafka topic ensure / smoke
 
-`kafka-topic-smoke.sh`는 메시징 스택이 뜬 뒤 필수 Kafka topic이 생성됐는지 확인한다.
+`ensure-kafka-topics.sh`는 메시징 스택이 뜬 뒤 필수 Kafka topic을 idempotent하게 생성한다. 이미 존재하는 topic은 그대로 둔다.
+
+`kafka-topic-smoke.sh`는 필수 Kafka topic이 생성됐는지 확인한다.
 
 현재 기본 topic은 다음 3개다.
 
@@ -67,6 +69,7 @@ bash performance/events/event-processing-baseline-check.sh
 - `es.index`: Elasticsearch 색인 요청 이벤트
 
 ```bash
+bash performance/events/ensure-kafka-topics.sh
 bash performance/events/kafka-topic-smoke.sh
 ```
 

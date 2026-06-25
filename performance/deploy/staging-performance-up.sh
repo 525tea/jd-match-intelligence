@@ -139,13 +139,16 @@ run_step "Performance compose config" \
   compose config
 
 run_step "Start performance database dependencies" \
-  compose up -d mysql redis elasticsearch zookeeper kafka kafka-init
+  compose up -d mysql redis elasticsearch zookeeper kafka
 
 run_step "Wait for mysql health" \
   wait_for_healthy mysql
 
 run_step "Wait for kafka health" \
   wait_for_healthy kafka
+
+run_step "Ensure Kafka topics" \
+  bash performance/events/ensure-kafka-topics.sh
 
 run_step "Kafka topic smoke" \
   bash performance/events/kafka-topic-smoke.sh

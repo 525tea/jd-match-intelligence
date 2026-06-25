@@ -118,12 +118,13 @@ Staging performance stack is ready for pre-k6 smoke.
 3. performance DB 준비와 dataset gate
 4. `docker-compose.yml` + `docker-compose.performance.yml` config 검증
 5. backend/gateway/elasticsearch image build
-6. mysql/redis/elasticsearch/zookeeper/kafka/kafka-init 선기동
+6. mysql/redis/elasticsearch/zookeeper/kafka 선기동
 7. performance stack 기동
 8. backend/gateway health 대기
-9. Kafka topic smoke
-10. performance reindex 완료 로그 확인
-11. performance profile smoke
+9. Kafka topic ensure
+10. Kafka topic smoke
+11. performance reindex 완료 로그 확인
+12. performance profile smoke
 
 서버에서 이미 image를 build했거나 특정 service만 올리고 싶으면 환경변수로 조정할 수 있다.
 
@@ -169,9 +170,10 @@ docker compose ps
 - `grafana`: running
 - `zipkin`: running
 
-Kafka topic 확인:
+Kafka topic 생성/확인:
 
 ```bash
+bash performance/events/ensure-kafka-topics.sh
 bash performance/events/kafka-topic-smoke.sh
 ```
 
