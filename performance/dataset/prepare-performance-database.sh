@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="${ROOT_DIR}/performance/dataset/performance.env"
+COMPOSE_FILES=(-f "${ROOT_DIR}/docker-compose.yml" -f "${ROOT_DIR}/docker-compose.performance.yml")
 
 if [[ -f "${ENV_FILE}" ]]; then
   # shellcheck disable=SC1090
@@ -29,15 +30,19 @@ echo "PERF_DB_NAME=${PERF_DB_NAME}"
 echo "PERF_JOB_COUNT=${PERF_JOB_COUNT}"
 echo "RESET_PERF_DB=${RESET_PERF_DB}"
 
+compose() {
+  docker compose "${COMPOSE_FILES[@]}" "$@"
+}
+
 if [[ "${RESET_PERF_DB}" == "true" ]]; then
   echo "Resetting performance database: ${PERF_DB_NAME}"
-  docker compose exec -T mysql mysql \
+  compose exec -T mysql mysql \
     -u"${MYSQL_ROOT_USER}" \
     -p"${MYSQL_ROOT_PASSWORD}" \
     -e "DROP DATABASE IF EXISTS \`${PERF_DB_NAME}\`;"
 fi
 
-docker compose exec -T mysql mysql \
+compose exec -T mysql mysql \
   -u"${MYSQL_ROOT_USER}" \
   -p"${MYSQL_ROOT_PASSWORD}" <<SQL
 CREATE DATABASE IF NOT EXISTS \`${PERF_DB_NAME}\`
@@ -49,7 +54,7 @@ FLUSH PRIVILEGES;
 SQL
 
 TABLE_COUNT="$(
-  docker compose exec -T mysql mysql \
+  compose exec -T mysql mysql \
     -N -B \
     -u"${MYSQL_ROOT_USER}" \
     -p"${MYSQL_ROOT_PASSWORD}" \
@@ -60,7 +65,7 @@ if [[ "${TABLE_COUNT}" == "0" ]]; then
   echo "Applying backend migrations to ${PERF_DB_NAME}"
   while IFS= read -r migration; do
     echo "Applying $(basename "${migration}")"
-    docker compose exec -T mysql mysql \
+    compose exec -T mysql mysql \
       -u"${PERF_DB_USER}" \
       -p"${PERF_DB_PASSWORD}" \
       --default-character-set=utf8mb4 \
@@ -76,12 +81,19 @@ sed \
   "${ROOT_DIR}/performance/dataset/seed-performance-jobs.sql" > "${TMP_SQL}"
 
 echo "Seeding synthetic performance jobs"
-docker compose exec -T mysql mysql \
+compose exec -T mysql mysql \
   -u"${PERF_DB_USER}" \
   -p"${PERF_DB_PASSWORD}" \
   --default-character-set=utf8mb4 \
   "${PERF_DB_NAME}" < "${TMP_SQL}"
 
 rm -f "${TMP_SQL}"
+
+echo "Seeding performance auth and project fixture"
+compose exec -T mysql mysql \
+  -u"${PERF_DB_USER}" \
+  -p"${PERF_DB_PASSWORD}" \
+  --default-character-set=utf8mb4 \
+  "${PERF_DB_NAME}" < "${ROOT_DIR}/performance/dataset/seed-performance-auth-fixture.sql"
 
 echo "Performance database preparation completed."

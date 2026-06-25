@@ -1,5 +1,75 @@
 # k6 Performance Scripts
 
+## Round 1 Monolith Baseline
+
+Staging/performance stack이 준비된 상태에서 공고 목록, 검색, 추천, 갭 분석 API를 함께 측정한다.
+
+Round 1 baseline은 애플리케이션 처리 성능을 보기 위한 측정이므로 Gateway의 운영용 fixed-window rate limit을 측정 대상에서 제외한다. `docker-compose.performance.yml`은 기본적으로 `PERF_GATEWAY_RATE_LIMIT_ENABLED=false`를 적용한다. rate limit 자체를 검증할 때는 `performance/gateway/gateway-smoke.sh`를 별도로 사용한다.
+
+사전 준비:
+
+```bash
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+Round 1은 인증이 필요한 추천/갭 분석 API까지 포함하므로 `ACCESS_TOKEN`과 `USER_PROJECT_ID`를 넘기는 방식을 기본으로 한다.
+
+```bash
+BASE_URL=http://localhost:8081/api \
+ACCESS_TOKEN='...' \
+USER_PROJECT_ID='...' \
+VUS=20 \
+DURATION=10m \
+bash performance/k6/run-round1-baseline.sh
+```
+
+토큰 대신 로그인 환경변수를 넘겨 k6 setup 단계에서 토큰과 최신 프로젝트 id를 가져올 수도 있다. 실제 계정 값은 로컬/서버 환경에서만 주입하고 문서나 PR에 기록하지 않는다.
+
+```bash
+BASE_URL=http://localhost:8081/api \
+LOGIN_EMAIL='user@example.com' \
+LOGIN_PASSWORD='password' \
+VUS=20 \
+DURATION=10m \
+bash performance/k6/run-round1-baseline.sh
+```
+
+로컬 smoke처럼 인증 API를 제외하고 목록/검색만 빠르게 확인하려면 다음처럼 실행한다.
+
+```bash
+BASE_URL=http://localhost:8081/api \
+REQUIRE_AUTH_ENDPOINTS=false \
+VUS=1 \
+DURATION=30s \
+bash performance/k6/run-round1-baseline.sh
+```
+
+확인할 지표:
+
+- `http_req_duration{endpoint:jobs_list} p(95), p(99)`
+- `http_req_duration{endpoint:jobs_search} p(95), p(99)`
+- `http_req_duration{endpoint:recommendations_jobs} p(95), p(99)`
+- `http_req_duration{endpoint:gap_analysis} p(95), p(99)`
+- `http_req_failed`
+- `checks`
+- `jobs list uses performance fixture`
+- `jobs search uses performance fixture`
+
+기본 summary export 경로는 `/tmp/jobflow-k6-round1-baseline-summary.json`이다. raw summary JSON은 커밋하지 않고, 해석 결과만 `docs/metrics/performance/`에 정리한다.
+
+서버에서 실행한 k6 summary JSON을 로컬 artifact 폴더로 가져오려면 로컬 터미널에서 다음을 실행한다. `SSH_HOST`는 현재 EC2 public IP로 바꾼다.
+
+```bash
+SSH_HOST=ubuntu@3.38.220.29 \
+VUS=20 \
+DURATION=10m \
+ARTIFACT_NAME=k6_round1_20vu_10m_summary_passed.json \
+bash performance/k6/collect-round1-artifact.sh
+```
+
+기본 로컬 저장 위치는 `/Users/iyejin/dev/jobflow-server-env/artifacts/260625_k6_round1/`이다. 이 폴더는 로컬 보관용이며 Git에 커밋하지 않는다.
+
 ## MySQL FULLTEXT Search Baseline
 
 Backend local profile을 실행한 상태에서 공고 검색 API의 MySQL FULLTEXT 기준선을 측정한다.

@@ -28,29 +28,33 @@ public class FixedWindowRateLimitFilter implements GatewayFilter {
 
     private final ReactiveStringRedisTemplate redisTemplate;
     private final Clock clock;
+    private final boolean enabled;
     private final int requestsPerMinute;
 
     @Autowired
     public FixedWindowRateLimitFilter(
             ReactiveStringRedisTemplate redisTemplate,
+            @Value("${gateway.rate-limit.enabled:true}") boolean enabled,
             @Value("${gateway.rate-limit.requests-per-minute:100}") int requestsPerMinute
     ) {
-        this(redisTemplate, Clock.systemUTC(), requestsPerMinute);
+        this(redisTemplate, Clock.systemUTC(), enabled, requestsPerMinute);
     }
 
     FixedWindowRateLimitFilter(
             ReactiveStringRedisTemplate redisTemplate,
             Clock clock,
+            boolean enabled,
             int requestsPerMinute
     ) {
         this.redisTemplate = redisTemplate;
         this.clock = clock;
+        this.enabled = enabled;
         this.requestsPerMinute = requestsPerMinute;
     }
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        if (shouldSkipRateLimit(exchange)) {
+        if (!enabled || shouldSkipRateLimit(exchange)) {
             return chain.filter(exchange);
         }
 

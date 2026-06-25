@@ -127,7 +127,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"jobflow-backend\", status=~\"4..|5..\"}[1m])) / sum(rate(http_server_requests_seconds_count{application=\"jobflow-backend\"}[1m]))",
+          "expr": "(sum(rate(http_server_requests_seconds_count{application=\"jobflow-backend\", status=~\"4..|5..\"}[1m])) or vector(0)) / clamp_min((sum(rate(http_server_requests_seconds_count{application=\"jobflow-backend\"}[1m])) or vector(0)), 0.001)",
           "legendFormat": "error rate"
         }
       ],
@@ -187,7 +187,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\"}[1m])) / (sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\"}[1m])) + sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"miss\"}[1m])))",
+          "expr": "(sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\"}[1m])) or vector(0)) / clamp_min((sum(rate(cache_gets_total{application=\"jobflow-backend\"}[1m])) or vector(0)), 0.001)",
           "legendFormat": "cache hit rate"
         }
       ],

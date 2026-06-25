@@ -5,6 +5,7 @@ server:
 gateway:
   backend-url: ${BACKEND_URL:http://localhost:8080}
   rate-limit:
+    enabled: ${GATEWAY_RATE_LIMIT_ENABLED:true}
     requests-per-minute: ${GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE:100}
 
 spring:
