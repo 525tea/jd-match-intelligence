@@ -118,10 +118,12 @@ Staging performance stack is ready for pre-k6 smoke.
 3. performance DB 준비와 dataset gate
 4. `docker-compose.yml` + `docker-compose.performance.yml` config 검증
 5. backend/gateway/elasticsearch image build
-6. performance stack 기동
-7. backend/gateway health 대기
-8. performance reindex 완료 로그 확인
-9. performance profile smoke
+6. mysql/redis/elasticsearch/zookeeper/kafka/kafka-init 선기동
+7. performance stack 기동
+8. backend/gateway health 대기
+9. Kafka topic smoke
+10. performance reindex 완료 로그 확인
+11. performance profile smoke
 
 서버에서 이미 image를 build했거나 특정 service만 올리고 싶으면 환경변수로 조정할 수 있다.
 
@@ -158,11 +160,33 @@ docker compose ps
 - `mysql`: healthy
 - `redis`: healthy
 - `elasticsearch`: healthy
+- `zookeeper`: running
+- `kafka`: healthy
+- `kafka-init`: completed
 - `backend`: healthy
 - `gateway`: healthy
 - `prometheus`: running
 - `grafana`: running
 - `zipkin`: running
+
+Kafka topic 확인:
+
+```bash
+bash performance/events/kafka-topic-smoke.sh
+```
+
+기대 결과:
+
+```text
+### Kafka topics
+email.send
+es.index
+job.created
+
+Kafka topic smoke completed.
+```
+
+현재 단일 서버 staging/performance 환경은 replication factor `1`, partition `3`을 기준으로 한다. 이 값은 성능 측정과 Kafka 전환 전후 비교를 위한 로컬 단일 broker 기준이다. 운영 multi-broker 구성이 아니므로 replication factor를 `3`으로 올리지 않는다.
 
 ## 4-1. Performance DB 준비
 
