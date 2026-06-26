@@ -239,6 +239,9 @@ services:
       XPACK_SECURITY_ENABLED: "false"
       SERVER_NAME: jobflow-kibana
       SERVER_HOST: 0.0.0.0
+      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: "jobflow-kibana-encryption-key-32chars!!"
+      XPACK_SECURITY_ENCRYPTIONKEY: "jobflow-kibana-security-key-32chars!!!!"
+      XPACK_REPORTING_ENCRYPTIONKEY: "jobflow-kibana-reporting-key-32chars!!!"
     ports:
       - "5601:5601"
     depends_on:
