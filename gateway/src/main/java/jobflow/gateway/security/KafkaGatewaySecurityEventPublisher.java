@@ -1,7 +1,7 @@
 package jobflow.gateway.security;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +51,7 @@ public class KafkaGatewaySecurityEventPublisher implements GatewaySecurityEventP
                             );
                         }
                     });
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             log.warn(
                     "Gateway security event serialization failed. eventType={}, requestId={}",
                     event.eventType(),
