@@ -24,6 +24,7 @@ EXPECTED_MIN_RESULT_COUNT="${EXPECTED_MIN_RESULT_COUNT:-1}"
 HEALTH_WAIT_TIMEOUT_SECONDS="${HEALTH_WAIT_TIMEOUT_SECONDS:-240}"
 HEALTH_WAIT_INTERVAL_SECONDS="${HEALTH_WAIT_INTERVAL_SECONDS:-5}"
 REINDEX_LOG_TIMEOUT_SECONDS="${REINDEX_LOG_TIMEOUT_SECONDS:-240}"
+REINDEX_LOG_TAIL_LINES="${REINDEX_LOG_TAIL_LINES:-2000}"
 BUILD_SERVICES="${BUILD_SERVICES:-backend gateway elasticsearch}"
 UP_SERVICES="${UP_SERVICES:-}"
 
@@ -38,6 +39,8 @@ echo "ELASTICSEARCH_URL=${ELASTICSEARCH_URL}"
 echo "KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}"
 echo "EXPECTED_MIN_RESULT_COUNT=${EXPECTED_MIN_RESULT_COUNT}"
 echo "HEALTH_WAIT_TIMEOUT_SECONDS=${HEALTH_WAIT_TIMEOUT_SECONDS}"
+echo "REINDEX_LOG_TIMEOUT_SECONDS=${REINDEX_LOG_TIMEOUT_SECONDS}"
+echo "REINDEX_LOG_TAIL_LINES=${REINDEX_LOG_TAIL_LINES}"
 echo "BUILD_SERVICES=${BUILD_SERVICES}"
 echo "UP_SERVICES=${UP_SERVICES:-all}"
 echo
@@ -110,8 +113,8 @@ wait_for_reindex() {
   local elapsed=0
 
   while (( elapsed <= REINDEX_LOG_TIMEOUT_SECONDS )); do
-    if compose logs --tail=240 backend | grep -q 'Job search reindex completed'; then
-      compose logs --tail=240 backend | grep -Ei 'reindex|indexedCount' || true
+    if compose logs --tail="${REINDEX_LOG_TAIL_LINES}" backend | grep -q 'Job search reindex completed'; then
+      compose logs --tail="${REINDEX_LOG_TAIL_LINES}" backend | grep -Ei 'reindex|indexedCount' || true
       return
     fi
 
@@ -125,7 +128,7 @@ wait_for_reindex() {
     elapsed=$((elapsed + HEALTH_WAIT_INTERVAL_SECONDS))
   done
 
-  compose logs --tail=240 backend | grep -Ei 'reindex|indexedCount|Application run failed|alias' || true
+  compose logs --tail="${REINDEX_LOG_TAIL_LINES}" backend | grep -Ei 'reindex|indexedCount|Application run failed|alias' || true
   fail "backend reindex completion log was not found within ${REINDEX_LOG_TIMEOUT_SECONDS}s"
 }
 
