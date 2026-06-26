@@ -13,7 +13,12 @@ KIBANA_SERVICE="${KIBANA_SERVICE:-kibana}"
 SMOKE_WAIT_SECONDS="${SMOKE_WAIT_SECONDS:-60}"
 LOGSTASH_READY_WAIT_SECONDS="${LOGSTASH_READY_WAIT_SECONDS:-60}"
 SMOKE_REQUEST_PATH="${SMOKE_REQUEST_PATH:-/api/.env}"
+EXPECTED_EVENT_PATH="${EXPECTED_EVENT_PATH:-${SMOKE_REQUEST_PATH#/api}}"
 SMOKE_REQUEST_ID="${SMOKE_REQUEST_ID:-security-event-smoke-$(date +%Y%m%d%H%M%S)}"
+
+if [[ -z "${EXPECTED_EVENT_PATH}" ]]; then
+  EXPECTED_EVENT_PATH="/"
+fi
 
 cd "${ROOT_DIR}"
 
@@ -26,6 +31,7 @@ echo "KIBANA_SERVICE=${KIBANA_SERVICE}"
 echo "SMOKE_WAIT_SECONDS=${SMOKE_WAIT_SECONDS}"
 echo "LOGSTASH_READY_WAIT_SECONDS=${LOGSTASH_READY_WAIT_SECONDS}"
 echo "SMOKE_REQUEST_PATH=${SMOKE_REQUEST_PATH}"
+echo "EXPECTED_EVENT_PATH=${EXPECTED_EVENT_PATH}"
 echo "SMOKE_REQUEST_ID=${SMOKE_REQUEST_ID}"
 echo
 
@@ -88,7 +94,7 @@ cat > "${query_payload}" <<JSON
       "filter": [
         { "term": { "requestId.keyword": "${SMOKE_REQUEST_ID}" } },
         { "term": { "eventType.keyword": "ABNORMAL_REQUEST" } },
-        { "term": { "path.keyword": "${SMOKE_REQUEST_PATH}" } }
+        { "term": { "path.keyword": "${EXPECTED_EVENT_PATH}" } }
       ]
     }
   },
