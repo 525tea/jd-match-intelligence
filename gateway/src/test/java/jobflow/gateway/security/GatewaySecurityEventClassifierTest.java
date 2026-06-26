@@ -16,6 +16,13 @@ class GatewaySecurityEventClassifierTest {
     }
 
     @Test
+    void doesNotClassifyBackendPropagatedTooManyRequestsAsGatewayRateLimit() {
+        SecurityEventType eventType = classifier.classify("/api/jobs", 429, false);
+
+        assertThat(eventType).isEqualTo(SecurityEventType.ACCESS);
+    }
+
+    @Test
     void classifiesUnauthorizedAsAuthFailure() {
         SecurityEventType eventType = classifier.classify("/api/jobs", 401, false);
 

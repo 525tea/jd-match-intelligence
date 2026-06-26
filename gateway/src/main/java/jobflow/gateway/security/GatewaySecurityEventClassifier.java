@@ -18,7 +18,7 @@ public class GatewaySecurityEventClassifier {
     );
 
     public SecurityEventType classify(String path, int status, boolean rateLimitHit) {
-        if (rateLimitHit || status == 429) {
+        if (rateLimitHit) {
             return SecurityEventType.RATE_LIMIT_HIT;
         }
         if (isAbnormalRequest(path, status)) {
