@@ -183,6 +183,9 @@ run_step "Wait for gateway health" \
 run_step "Outbox Kafka publish smoke" \
   bash performance/events/outbox-kafka-publish-smoke.sh
 
+run_step "Kafka consumer smoke" \
+  bash performance/events/kafka-consumer-smoke.sh
+
 run_step "Wait for performance reindex" \
   wait_for_reindex
 
@@ -205,5 +208,6 @@ echo "performance_profile_smoke=ok"
 echo "kafka=healthy"
 echo "kafka_topics=ok"
 echo "outbox_kafka_publish=ok"
+echo "kafka_consumers=ok"
 echo
 echo "Staging performance stack is ready for pre-k6 smoke."
