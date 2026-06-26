@@ -62,12 +62,13 @@ bash performance/events/event-processing-baseline-check.sh
 
 `kafka-topic-smoke.sh`는 필수 Kafka topic이 생성됐는지 확인한다.
 
-현재 기본 topic은 다음 4개다.
+현재 기본 topic은 다음 5개다.
 
 - `job.created`: 공고 생성/변경 이벤트 계열
 - `application.events`: 지원 생성/상태 변경 이벤트 계열
 - `email.send`: 이메일 발송 요청 이벤트
 - `es.index`: Elasticsearch 색인 요청 이벤트
+- `security.events`: Gateway 보안/접근 이벤트
 
 ```bash
 bash performance/events/ensure-kafka-topics.sh
@@ -76,14 +77,14 @@ bash performance/events/kafka-topic-smoke.sh
 
 기본 기대값:
 
-- topic: `job.created`, `application.events`, `email.send`, `es.index`
+- topic: `job.created`, `application.events`, `email.send`, `es.index`, `security.events`
 - partition: `3`
 - replication factor: `1`
 
 필요하면 환경변수로 바꿀 수 있다.
 
 ```bash
-KAFKA_EXPECTED_TOPICS="job.created application.events email.send es.index" \
+KAFKA_EXPECTED_TOPICS="job.created application.events email.send es.index security.events" \
 KAFKA_EXPECTED_PARTITIONS=3 \
 KAFKA_EXPECTED_REPLICATION_FACTOR=1 \
 bash performance/events/kafka-topic-smoke.sh

@@ -109,6 +109,7 @@ services:
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic application.events --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic email.send --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic es.index --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic security.events --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
         kafka-topics --bootstrap-server kafka:29092 --list
 
   backend:
@@ -183,8 +184,12 @@ services:
       BACKEND_URL: http://backend:8080
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
       GATEWAY_RATE_LIMIT_ENABLED: ${GATEWAY_RATE_LIMIT_ENABLED:-true}
       GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE: ${GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE:-100}
+      GATEWAY_SECURITY_EVENTS_ENABLED: ${GATEWAY_SECURITY_EVENTS_ENABLED:-true}
+      GATEWAY_SECURITY_EVENTS_TOPIC: ${GATEWAY_SECURITY_EVENTS_TOPIC:-security.events}
+      GATEWAY_SECURITY_EVENTS_ENVIRONMENT: ${GATEWAY_SECURITY_EVENTS_ENVIRONMENT:-local}
       ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
       TRACING_SAMPLING_PROBABILITY: "1.0"
       SHUTDOWN_PHASE_TIMEOUT: ${SHUTDOWN_PHASE_TIMEOUT:-30s}

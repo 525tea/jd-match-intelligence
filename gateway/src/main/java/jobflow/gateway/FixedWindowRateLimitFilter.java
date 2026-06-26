@@ -21,6 +21,9 @@ import java.time.format.DateTimeFormatter;
 @Component
 public class FixedWindowRateLimitFilter implements GatewayFilter {
 
+    public static final String RATE_LIMIT_HIT_ATTRIBUTE = "jobflow.gateway.rate-limit.hit";
+    public static final String RATE_LIMIT_KEY_ATTRIBUTE = "jobflow.gateway.rate-limit.key";
+
     private static final DateTimeFormatter WINDOW_FORMATTER = DateTimeFormatter
             .ofPattern("yyyyMMddHHmm")
             .withZone(ZoneOffset.UTC);
@@ -59,6 +62,7 @@ public class FixedWindowRateLimitFilter implements GatewayFilter {
         }
 
         String key = rateLimitKey(exchange);
+        exchange.getAttributes().put(RATE_LIMIT_KEY_ATTRIBUTE, rateLimitEventKey(exchange));
 
         return redisTemplate.opsForValue()
                 .increment(key)
@@ -70,6 +74,7 @@ public class FixedWindowRateLimitFilter implements GatewayFilter {
                     exchange.getResponse().getHeaders().add("X-RateLimit-Remaining", String.valueOf(Math.max(0, requestsPerMinute - count)));
 
                     if (count > requestsPerMinute) {
+                        exchange.getAttributes().put(RATE_LIMIT_HIT_ATTRIBUTE, true);
                         exchange.getResponse().setStatusCode(HttpStatus.TOO_MANY_REQUESTS);
                         return exchange.getResponse().setComplete();
                     }
@@ -100,6 +105,10 @@ public class FixedWindowRateLimitFilter implements GatewayFilter {
         String window = WINDOW_FORMATTER.format(Instant.now(clock));
 
         return "gateway:rate-limit:" + clientKey + ":" + window;
+    }
+
+    private String rateLimitEventKey(ServerWebExchange exchange) {
+        return "ip:" + clientKey(exchange);
     }
 
     private String clientKey(ServerWebExchange exchange) {
