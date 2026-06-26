@@ -10,7 +10,7 @@ gateway:
   security-events:
     enabled: ${GATEWAY_SECURITY_EVENTS_ENABLED:false}
     topic: ${GATEWAY_SECURITY_EVENTS_TOPIC:security.events}
-    service: ${GATEWAY_SECURITY_EVENTS_SERVICE:gateway}
+    service: ${GATEWAY_SECURITY_EVENTS_SERVICE:${spring.application.name}}
     environment: ${GATEWAY_SECURITY_EVENTS_ENVIRONMENT:${spring.profiles.active:local}}
 
 spring:

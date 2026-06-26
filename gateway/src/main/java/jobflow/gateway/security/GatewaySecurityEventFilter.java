@@ -13,6 +13,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import java.net.InetSocketAddress;
+import java.security.Principal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -29,7 +30,7 @@ public class GatewaySecurityEventFilter implements GlobalFilter, Ordered {
     public GatewaySecurityEventFilter(
             GatewaySecurityEventPublisher publisher,
             GatewaySecurityEventClassifier classifier,
-            @Value("${gateway.security-events.service:gateway}") String service,
+            @Value("${gateway.security-events.service:${spring.application.name:jobflow-gateway}}") String service,
             @Value("${gateway.security-events.environment:${spring.profiles.active:local}}") String environment
     ) {
         this.publisher = publisher;
@@ -43,14 +44,15 @@ public class GatewaySecurityEventFilter implements GlobalFilter, Ordered {
         long startedAtNanos = System.nanoTime();
         String requestId = requestId(exchange);
 
-        return chain.filter(exchange)
-                .doOnError(error -> publish(exchange, requestId, startedAtNanos, 500))
-                .doFinally(signalType -> {
-                    if (exchange.getAttributeOrDefault("jobflow.security-event.published-on-error", false)) {
-                        return;
-                    }
-                    publish(exchange, requestId, startedAtNanos, responseStatus(exchange));
-                });
+        return principal(exchange)
+                .flatMap(principal -> chain.filter(exchange)
+                        .doOnError(error -> publish(exchange, requestId, startedAtNanos, 500, principal))
+                        .doFinally(signalType -> {
+                            if (exchange.getAttributeOrDefault("jobflow.security-event.published-on-error", false)) {
+                                return;
+                            }
+                            publish(exchange, requestId, startedAtNanos, responseStatus(exchange), principal);
+                        }));
     }
 
     @Override
@@ -58,7 +60,13 @@ public class GatewaySecurityEventFilter implements GlobalFilter, Ordered {
         return Ordered.LOWEST_PRECEDENCE;
     }
 
-    private void publish(ServerWebExchange exchange, String requestId, long startedAtNanos, int status) {
+    private void publish(
+            ServerWebExchange exchange,
+            String requestId,
+            long startedAtNanos,
+            int status,
+            String principal
+    ) {
         if (exchange.getAttributeOrDefault("jobflow.security-event.published", false)) {
             return;
         }
@@ -84,7 +92,7 @@ public class GatewaySecurityEventFilter implements GlobalFilter, Ordered {
                 latencyMs,
                 userAgent(exchange),
                 classifier.classify(path, status, rateLimitHit),
-                principal(exchange),
+                principal,
                 rateLimitKey,
                 status < 400 ? "SUCCESS" : "FAILURE"
         );
@@ -108,11 +116,6 @@ public class GatewaySecurityEventFilter implements GlobalFilter, Ordered {
     }
 
     private String clientIp(ServerWebExchange exchange) {
-        String forwardedFor = exchange.getRequest().getHeaders().getFirst("X-Forwarded-For");
-        if (StringUtils.hasText(forwardedFor)) {
-            return sanitize(forwardedFor.split(",")[0].trim(), 128);
-        }
-
         InetSocketAddress remoteAddress = exchange.getRequest().getRemoteAddress();
         if (remoteAddress == null || remoteAddress.getAddress() == null) {
             return "unknown";
@@ -128,12 +131,13 @@ public class GatewaySecurityEventFilter implements GlobalFilter, Ordered {
         return sanitize(userAgent, MAX_USER_AGENT_LENGTH);
     }
 
-    private String principal(ServerWebExchange exchange) {
-        String authorization = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
-        if (StringUtils.hasText(authorization)) {
-            return "token-present";
-        }
-        return "anonymous";
+    private Mono<String> principal(ServerWebExchange exchange) {
+        return exchange.getPrincipal()
+                .map(Principal::getName)
+                .filter(StringUtils::hasText)
+                .map(name -> sanitize(name, 128))
+                .defaultIfEmpty("anonymous")
+                .onErrorReturn("anonymous");
     }
 
     private String sanitize(String value, int maxLength) {

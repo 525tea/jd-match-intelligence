@@ -69,8 +69,9 @@ for ((i = 1; i <= LOGSTASH_READY_WAIT_SECONDS; i++)); do
 done
 
 echo "### Trigger abnormal gateway request"
+response_body="$(mktemp)"
 http_status="$(
-  curl -s -o /tmp/jobflow-security-event-smoke-response.txt -w "%{http_code}" \
+  curl -s -o "${response_body}" -w "%{http_code}" \
     -H "X-Request-Id: ${SMOKE_REQUEST_ID}" \
     -H "User-Agent: jobflow-security-event-smoke" \
     "${GATEWAY_URL}${SMOKE_REQUEST_PATH}" || true
@@ -81,10 +82,12 @@ case "${http_status}" in
   400|401|403|404|405|429|500|502|503)
     ;;
   *)
-    cat /tmp/jobflow-security-event-smoke-response.txt || true
+    cat "${response_body}" || true
+    rm -f "${response_body}"
     fail "unexpected smoke request status ${http_status}"
     ;;
 esac
+rm -f "${response_body}"
 
 query_payload="$(mktemp)"
 cat > "${query_payload}" <<JSON
