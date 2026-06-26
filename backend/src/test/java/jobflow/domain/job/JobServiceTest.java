@@ -11,6 +11,7 @@ import jobflow.domain.job.dto.JobSummaryResponse;
 import jobflow.domain.job.dto.JobUpdateRequest;
 import jobflow.domain.job.search.JobSearchResult;
 import jobflow.domain.job.search.JobSearchService;
+import jobflow.domain.outbox.OutboxEvent;
 import jobflow.domain.outbox.OutboxEventService;
 import jobflow.domain.skill.ExperienceTagCode;
 import jobflow.domain.skill.ExperienceTagCodeRepository;
@@ -128,7 +129,7 @@ class JobServiceTest {
                 eq(1L),
                 eq("JOB_CREATED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
     }
 
@@ -498,7 +499,7 @@ class JobServiceTest {
                 eq(jobId),
                 eq("JOB_UPDATED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
     }
 
@@ -543,7 +544,7 @@ class JobServiceTest {
                 eq(jobId),
                 eq("JOB_CLOSED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
     }
 
@@ -567,7 +568,7 @@ class JobServiceTest {
                 eq(jobId),
                 eq("JOB_EXPIRED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
     }
 

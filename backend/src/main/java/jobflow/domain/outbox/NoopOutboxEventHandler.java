@@ -1,10 +1,12 @@
 package jobflow.domain.outbox;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "jobflow.outbox.relay.publisher", havingValue = "noop", matchIfMissing = true)
 public class NoopOutboxEventHandler implements OutboxEventHandler {
 
     @Override

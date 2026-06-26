@@ -24,6 +24,10 @@ app:
       reindex-batch-size: ${ELASTICSEARCH_REINDEX_BATCH_SIZE:500}
 
 jobflow:
+  outbox:
+    relay:
+      publisher: ${OUTBOX_RELAY_PUBLISHER:kafka}
+
   notification:
     deadline-reminder:
       scheduler:

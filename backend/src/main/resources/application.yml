@@ -28,6 +28,13 @@ spring:
   elasticsearch:
     uris: ${ELASTICSEARCH_URL:http://localhost:9200}
 
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+
 management:
   endpoints:
     web:
@@ -97,6 +104,12 @@ app:
       from: ${MAILGUN_FROM:no-reply@localhost}
 
 jobflow:
+  outbox:
+    relay:
+      publisher: ${OUTBOX_RELAY_PUBLISHER:noop}
+      kafka:
+        send-timeout-millis: ${OUTBOX_RELAY_KAFKA_SEND_TIMEOUT_MILLIS:3000}
+
   notification:
     deadline-reminder:
       scheduler:

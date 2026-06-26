@@ -123,8 +123,9 @@ Staging performance stack is ready for pre-k6 smoke.
 8. backend/gateway health 대기
 9. Kafka topic ensure
 10. Kafka topic smoke
-11. performance reindex 완료 로그 확인
-12. performance profile smoke
+11. Outbox Relay Kafka publish smoke
+12. performance reindex 완료 로그 확인
+13. performance profile smoke
 
 서버에서 이미 image를 build했거나 특정 service만 올리고 싶으면 환경변수로 조정할 수 있다.
 
@@ -175,17 +176,20 @@ Kafka topic 생성/확인:
 ```bash
 bash performance/events/ensure-kafka-topics.sh
 bash performance/events/kafka-topic-smoke.sh
+bash performance/events/outbox-kafka-publish-smoke.sh
 ```
 
 기대 결과:
 
 ```text
 ### Kafka topics
+application.events
 email.send
 es.index
 job.created
 
 Kafka topic smoke completed.
+Outbox Kafka publish smoke completed.
 ```
 
 현재 단일 서버 staging/performance 환경은 replication factor `1`, partition `3`을 기준으로 한다. 이 값은 성능 측정과 Kafka 전환 전후 비교를 위한 로컬 단일 broker 기준이다. 운영 multi-broker 구성이 아니므로 replication factor를 `3`으로 올리지 않는다.

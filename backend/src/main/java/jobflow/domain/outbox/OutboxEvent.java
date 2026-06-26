@@ -21,7 +21,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class OutboxEvent {
 
-    public static final String TOPIC_JOB_EVENTS = "job.events";
+    public static final String TOPIC_JOB_EVENTS = "job.created";
     public static final String TOPIC_APPLICATION_EVENTS = "application.events";
 
     @Id

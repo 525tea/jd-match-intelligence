@@ -1,5 +1,6 @@
 package jobflow.domain.job;
 
+import jobflow.domain.outbox.OutboxEvent;
 import jobflow.domain.outbox.OutboxEventService;
 import jobflow.global.config.JpaAuditingConfig;
 import org.junit.jupiter.api.DisplayName;
@@ -75,21 +76,21 @@ class JobExpirationServiceFlowTest {
                 eq(overdueOpenJob.getId()),
                 eq("JOB_EXPIRED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
         verify(outboxEventService, never()).save(
                 eq("JOB"),
                 eq(futureOpenJob.getId()),
                 eq("JOB_EXPIRED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
         verify(outboxEventService, never()).save(
                 eq("JOB"),
                 eq(overdueClosedJob.getId()),
                 eq("JOB_EXPIRED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
     }
 
@@ -120,14 +121,14 @@ class JobExpirationServiceFlowTest {
                 eq(wantedJobWithoutDeadline.getId()),
                 eq("JOB_EXPIRED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
         verify(outboxEventService).save(
                 eq("JOB"),
                 eq(overdueJumpitJob.getId()),
                 eq("JOB_EXPIRED"),
                 any(),
-                eq("job.events")
+                eq(OutboxEvent.TOPIC_JOB_EVENTS)
         );
     }
 
