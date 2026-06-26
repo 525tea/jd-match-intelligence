@@ -108,7 +108,7 @@ jobflow:
     consumer:
       enabled: ${JOBFLOW_KAFKA_CONSUMER_ENABLED:false}
       group-id: ${JOBFLOW_KAFKA_CONSUMER_GROUP_ID:jobflow-backend}
-      auto-offset-reset: ${JOBFLOW_KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+      auto-offset-reset: ${JOBFLOW_KAFKA_CONSUMER_AUTO_OFFSET_RESET:latest}
       search:
         refresh-after-index: ${JOBFLOW_KAFKA_CONSUMER_SEARCH_REFRESH_AFTER_INDEX:false}
       topics:

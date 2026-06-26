@@ -5,7 +5,6 @@ import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,11 +19,10 @@ import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 public class KafkaConsumerConfig {
 
     @Bean
-    @ConditionalOnMissingBean
     public ConsumerFactory<String, String> kafkaConsumerFactory(
             @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers,
             @Value("${jobflow.kafka.consumer.group-id:jobflow-backend}") String groupId,
-            @Value("${jobflow.kafka.consumer.auto-offset-reset:earliest}") String autoOffsetReset
+            @Value("${jobflow.kafka.consumer.auto-offset-reset:latest}") String autoOffsetReset
     ) {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
@@ -36,7 +34,6 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    @ConditionalOnMissingBean(name = "kafkaListenerContainerFactory")
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
             ConsumerFactory<String, String> kafkaConsumerFactory
     ) {

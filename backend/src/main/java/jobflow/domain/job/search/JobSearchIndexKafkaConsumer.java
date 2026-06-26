@@ -73,7 +73,10 @@ public class JobSearchIndexKafkaConsumer {
     private Long resolveJobId(OutboxKafkaEnvelope envelope) {
         JsonNode jobId = envelope.payload().path("jobId");
         if (!jobId.isMissingNode() && !jobId.isNull()) {
-            return jobId.asLong();
+            if (!jobId.canConvertToLong()) {
+                throw new IllegalArgumentException("Kafka job event contains invalid job id");
+            }
+            return jobId.longValue();
         }
         return envelope.aggregateId();
     }

@@ -53,11 +53,14 @@ publish_message() {
 }
 
 wait_for_log() {
-  local pattern="$1"
-  local description="$2"
+  local description="$1"
+  local message_pattern="$2"
+  local run_pattern="$3"
 
   for ((i = 1; i <= KAFKA_CONSUMER_SMOKE_WAIT_SECONDS; i++)); do
-    if docker compose logs --since=2m backend | grep -Fq "${pattern}"; then
+    local logs
+    logs="$(docker compose logs --since=2m backend)"
+    if printf '%s\n' "${logs}" | grep -F "${message_pattern}" | grep -Fq "${run_pattern}"; then
       echo "${description}=ok"
       return
     fi
@@ -154,9 +157,14 @@ publish_message "${EMAIL_SEND_TOPIC}" "EMAIL:${KAFKA_CONSUMER_SMOKE_RUN_ID}" "${
 
 echo
 echo "### Wait for backend consumer handling"
-wait_for_log "Kafka job search index event handled" "job_search_index_consumer"
-wait_for_log "Kafka email send event handled" "email_send_consumer"
-wait_for_log "kafka_consumer_smoke_run_id=${KAFKA_CONSUMER_SMOKE_RUN_ID}" "smoke_run_id_log"
+wait_for_log \
+  "job_search_index_consumer" \
+  "Kafka job search index event handled" \
+  "kafka_consumer_smoke_run_id=${KAFKA_CONSUMER_SMOKE_RUN_ID}"
+wait_for_log \
+  "email_send_consumer" \
+  "Kafka email send event handled" \
+  "kafka_consumer_smoke_run_id=${KAFKA_CONSUMER_SMOKE_RUN_ID}"
 
 echo
 echo "### Kafka Consumer Smoke Summary"

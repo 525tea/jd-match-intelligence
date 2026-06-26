@@ -51,7 +51,10 @@ public class OutboxKafkaMessageParser {
         if (value.isMissingNode() || value.isNull()) {
             return null;
         }
-        return value.asLong();
+        if (!value.canConvertToLong()) {
+            throw new IllegalArgumentException("Kafka message field '%s' must be a long".formatted(fieldName));
+        }
+        return value.longValue();
     }
 
     private String textOrNull(JsonNode node, String fieldName) {
@@ -59,6 +62,9 @@ public class OutboxKafkaMessageParser {
         if (value.isMissingNode() || value.isNull()) {
             return null;
         }
-        return value.asText();
+        if (!value.isTextual()) {
+            throw new IllegalArgumentException("Kafka message field '%s' must be a string".formatted(fieldName));
+        }
+        return value.textValue();
     }
 }

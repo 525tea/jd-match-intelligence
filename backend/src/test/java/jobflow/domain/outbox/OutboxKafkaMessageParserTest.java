@@ -63,4 +63,42 @@ class OutboxKafkaMessageParserTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Kafka message is not valid JSON");
     }
+
+    @Test
+    @DisplayName("Envelope 숫자 필드가 숫자가 아니면 실패한다")
+    void failWhenLongFieldIsInvalid() {
+        assertThatThrownBy(() -> parser.parseEnvelope("""
+                {
+                  "eventId": "oops",
+                  "aggregateType": "JOB",
+                  "aggregateId": 20,
+                  "eventType": "JOB_CREATED",
+                  "topic": "job.created",
+                  "payload": {
+                    "jobId": 20
+                  }
+                }
+                """))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Kafka message field 'eventId' must be a long");
+    }
+
+    @Test
+    @DisplayName("Envelope 문자열 필드가 문자열이 아니면 실패한다")
+    void failWhenTextFieldIsInvalid() {
+        assertThatThrownBy(() -> parser.parseEnvelope("""
+                {
+                  "eventId": 10,
+                  "aggregateType": ["JOB"],
+                  "aggregateId": 20,
+                  "eventType": "JOB_CREATED",
+                  "topic": "job.created",
+                  "payload": {
+                    "jobId": 20
+                  }
+                }
+                """))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Kafka message field 'aggregateType' must be a string");
+    }
 }

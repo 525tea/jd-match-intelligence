@@ -38,10 +38,9 @@ public class EmailSendKafkaConsumer {
         }
 
         log.info(
-                "Kafka email send event handled. provider={}, providerMessageId={}, subject={}, kafka_consumer_smoke_run_id={}",
+                "Kafka email send event handled. provider={}, providerMessageId={}, kafka_consumer_smoke_run_id={}",
                 result.provider(),
                 result.providerMessageId(),
-                request.subject(),
                 optionalText(payload, "smokeRunId")
         );
     }

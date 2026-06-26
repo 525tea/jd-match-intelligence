@@ -114,6 +114,32 @@ class JobSearchIndexKafkaConsumerTest {
                 .hasMessage("Kafka job event does not contain job id");
     }
 
+    @Test
+    @DisplayName("색인 대상 이벤트의 jobId가 숫자가 아니면 실패한다")
+    void failWithInvalidJobId() {
+        JobSearchIndexKafkaConsumer consumer = new JobSearchIndexKafkaConsumer(
+                messageParser,
+                jobRepository,
+                jobSearchIndexingService
+        );
+
+        assertThatThrownBy(() -> consumer.consume("""
+                {
+                  "eventId": 4,
+                  "aggregateType": "JOB",
+                  "aggregateId": 100,
+                  "eventType": "JOB_CREATED",
+                  "topic": "job.created",
+                  "payload": {
+                    "jobId": "oops",
+                    "smokeRunId": "sample-consumer-smoke"
+                  }
+                }
+                """))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Kafka job event contains invalid job id");
+    }
+
     private Job sampleJob() {
         return Job.create(
                 "SAMPLE_SOURCE",
