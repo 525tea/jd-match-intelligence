@@ -19,6 +19,7 @@ PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9090}"
 GRAFANA_URL="${GRAFANA_URL:-http://localhost:3001}"
 ZIPKIN_URL="${ZIPKIN_URL:-http://localhost:9411}"
 ELASTICSEARCH_URL="${ELASTICSEARCH_URL:-http://localhost:9200}"
+HOST_ELASTICSEARCH_URL="${HOST_ELASTICSEARCH_URL:-http://localhost:9200}"
 KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}"
 EXPECTED_MIN_RESULT_COUNT="${EXPECTED_MIN_RESULT_COUNT:-1}"
 HEALTH_WAIT_TIMEOUT_SECONDS="${HEALTH_WAIT_TIMEOUT_SECONDS:-240}"
@@ -36,6 +37,7 @@ echo "PROMETHEUS_URL=${PROMETHEUS_URL}"
 echo "GRAFANA_URL=${GRAFANA_URL}"
 echo "ZIPKIN_URL=${ZIPKIN_URL}"
 echo "ELASTICSEARCH_URL=${ELASTICSEARCH_URL}"
+echo "HOST_ELASTICSEARCH_URL=${HOST_ELASTICSEARCH_URL}"
 echo "KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS}"
 echo "EXPECTED_MIN_RESULT_COUNT=${EXPECTED_MIN_RESULT_COUNT}"
 echo "HEALTH_WAIT_TIMEOUT_SECONDS=${HEALTH_WAIT_TIMEOUT_SECONDS}"
@@ -184,7 +186,10 @@ run_step "Wait for gateway health" \
   wait_for_healthy gateway
 
 run_step "Security event pipeline smoke" \
-  bash performance/security/security-event-pipeline-smoke.sh
+  env \
+    GATEWAY_URL="${GATEWAY_URL}" \
+    ELASTICSEARCH_URL="${SECURITY_SMOKE_ELASTICSEARCH_URL:-${HOST_ELASTICSEARCH_URL}}" \
+    bash performance/security/security-event-pipeline-smoke.sh
 
 run_step "Wait for performance reindex" \
   wait_for_reindex
