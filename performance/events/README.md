@@ -136,6 +136,40 @@ bash performance/events/outbox-kafka-publish-smoke.sh
 - 실제 공고, 실제 사용자, 실제 이메일, 실제 외부 식별자는 사용하지 않는다.
 - `staging-performance-up.sh`는 backend/gateway health 확인 후 이 smoke를 자동 실행한다.
 
+## Kafka consumer smoke
+
+`kafka-consumer-smoke.sh`는 Kafka topic에 메시지를 직접 발행한 뒤 backend consumer가 실제로 처리했는지 로그로 확인한다.
+
+검증 경로는 두 가지다.
+
+- `job.created` topic -> `JobSearchIndexKafkaConsumer` -> Elasticsearch 색인 요청
+- `email.send` topic -> `EmailSendKafkaConsumer` -> mock email sender 호출
+
+```bash
+bash performance/events/kafka-consumer-smoke.sh
+```
+
+기대 결과:
+
+```text
+Kafka consumer smoke completed.
+```
+
+기본 실행 대상:
+
+- Kafka service: `kafka`
+- Backend service: `backend`
+- MySQL service: `mysql`
+- Database: `jobflow_perf`
+- Topic: `job.created`, `email.send`
+
+주의:
+
+- 이 smoke는 `PERF_DB_NAME=jobflow`일 때 실행을 거부한다.
+- `email.send` 메시지는 `user@example.com`과 smoke run id가 포함된 테스트 제목만 사용한다.
+- 실제 사용자 이메일, 실제 공고, 실제 외부 식별자는 사용하지 않는다.
+- `staging-performance-up.sh`는 Outbox Kafka publish smoke 이후 이 smoke를 자동 실행한다.
+
 ## 시나리오 A: 알림 배치 on/off 비교
 
 `run-deadline-reminder-contention-scenario.sh`는 마감 알림 배치가 꺼진 상태와 켜진 상태를 같은 k6 조건으로 비교하기 위한 실행 스크립트다.

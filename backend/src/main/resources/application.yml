@@ -104,6 +104,17 @@ app:
       from: ${MAILGUN_FROM:no-reply@localhost}
 
 jobflow:
+  kafka:
+    consumer:
+      enabled: ${JOBFLOW_KAFKA_CONSUMER_ENABLED:false}
+      group-id: ${JOBFLOW_KAFKA_CONSUMER_GROUP_ID:jobflow-backend}
+      auto-offset-reset: ${JOBFLOW_KAFKA_CONSUMER_AUTO_OFFSET_RESET:latest}
+      search:
+        refresh-after-index: ${JOBFLOW_KAFKA_CONSUMER_SEARCH_REFRESH_AFTER_INDEX:false}
+      topics:
+        job-events: ${JOBFLOW_KAFKA_TOPIC_JOB_EVENTS:job.created}
+        email-send: ${JOBFLOW_KAFKA_TOPIC_EMAIL_SEND:email.send}
+
   outbox:
     relay:
       publisher: ${OUTBOX_RELAY_PUBLISHER:noop}

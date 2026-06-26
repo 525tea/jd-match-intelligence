@@ -24,6 +24,14 @@ app:
       reindex-batch-size: ${ELASTICSEARCH_REINDEX_BATCH_SIZE:500}
 
 jobflow:
+  kafka:
+    consumer:
+      enabled: ${JOBFLOW_KAFKA_CONSUMER_ENABLED:true}
+      group-id: ${JOBFLOW_KAFKA_CONSUMER_GROUP_ID:jobflow-backend-performance}
+      auto-offset-reset: ${JOBFLOW_KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+      search:
+        refresh-after-index: ${JOBFLOW_KAFKA_CONSUMER_SEARCH_REFRESH_AFTER_INDEX:true}
+
   outbox:
     relay:
       publisher: ${OUTBOX_RELAY_PUBLISHER:kafka}
