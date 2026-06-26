@@ -73,7 +73,7 @@ public class GatewaySecurityEventFilter implements GlobalFilter, Ordered {
         long latencyMs = (System.nanoTime() - startedAtNanos) / 1_000_000L;
 
         GatewaySecurityEvent event = new GatewaySecurityEvent(
-                Instant.now(),
+                Instant.now().toString(),
                 service,
                 environment,
                 requestId,
