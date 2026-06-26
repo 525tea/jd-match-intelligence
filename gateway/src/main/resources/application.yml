@@ -7,6 +7,11 @@ gateway:
   rate-limit:
     enabled: ${GATEWAY_RATE_LIMIT_ENABLED:true}
     requests-per-minute: ${GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE:100}
+  security-events:
+    enabled: ${GATEWAY_SECURITY_EVENTS_ENABLED:false}
+    topic: ${GATEWAY_SECURITY_EVENTS_TOPIC:security.events}
+    service: ${GATEWAY_SECURITY_EVENTS_SERVICE:gateway}
+    environment: ${GATEWAY_SECURITY_EVENTS_ENVIRONMENT:${spring.profiles.active:local}}
 
 spring:
   application:
@@ -19,6 +24,12 @@ spring:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
       port: ${SPRING_DATA_REDIS_PORT:6379}
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
 
   cloud:
     gateway:

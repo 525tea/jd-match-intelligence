@@ -62,12 +62,13 @@ bash performance/events/event-processing-baseline-check.sh
 
 `kafka-topic-smoke.sh`는 필수 Kafka topic이 생성됐는지 확인한다.
 
-현재 기본 topic은 다음 4개다.
+현재 기본 topic은 다음 5개다.
 
 - `job.created`: 공고 생성/변경 이벤트 계열
 - `application.events`: 지원 생성/상태 변경 이벤트 계열
 - `email.send`: 이메일 발송 요청 이벤트
 - `es.index`: Elasticsearch 색인 요청 이벤트
+- `security.events`: Gateway 보안/접근 이벤트
 
 ```bash
 bash performance/events/ensure-kafka-topics.sh
@@ -76,14 +77,14 @@ bash performance/events/kafka-topic-smoke.sh
 
 기본 기대값:
 
-- topic: `job.created`, `application.events`, `email.send`, `es.index`
+- topic: `job.created`, `application.events`, `email.send`, `es.index`, `security.events`
 - partition: `3`
 - replication factor: `1`
 
 필요하면 환경변수로 바꿀 수 있다.
 
 ```bash
-KAFKA_EXPECTED_TOPICS="job.created application.events email.send es.index" \
+KAFKA_EXPECTED_TOPICS="job.created application.events email.send es.index security.events" \
 KAFKA_EXPECTED_PARTITIONS=3 \
 KAFKA_EXPECTED_REPLICATION_FACTOR=1 \
 bash performance/events/kafka-topic-smoke.sh
@@ -169,6 +170,40 @@ Kafka consumer smoke completed.
 - `email.send` 메시지는 `user@example.com`과 smoke run id가 포함된 테스트 제목만 사용한다.
 - 실제 사용자 이메일, 실제 공고, 실제 외부 식별자는 사용하지 않는다.
 - `staging-performance-up.sh`는 Outbox Kafka publish smoke 이후 이 smoke를 자동 실행한다.
+
+## Security event pipeline smoke
+
+`security-event-pipeline-smoke.sh`는 Gateway가 `security.events` topic으로 발행한 보안 이벤트를 Logstash가 Elasticsearch에 적재하는지 확인한다.
+
+검증 경로는 다음과 같다.
+
+- Gateway에 `X-Request-Id`가 포함된 비정상 요청 전송
+- Gateway security event filter가 `ABNORMAL_REQUEST` 이벤트 발행
+- Kafka `security.events` topic 수신
+- Logstash Kafka input이 이벤트 소비
+- Elasticsearch `jobflow-security-events` 인덱스 적재 확인
+
+```bash
+bash performance/security/security-event-pipeline-smoke.sh
+```
+
+기대 결과:
+
+```text
+Security event pipeline smoke completed.
+```
+
+기본 요청은 `/api/.env`이며, 이 요청은 민감 경로 probe로 분류되어 `ABNORMAL_REQUEST` 이벤트가 되어야 한다.
+
+필요하면 환경변수로 바꿀 수 있다.
+
+```bash
+SMOKE_REQUEST_PATH=/api/.git/config \
+SMOKE_WAIT_SECONDS=60 \
+bash performance/security/security-event-pipeline-smoke.sh
+```
+
+`staging-performance-up.sh`는 backend/gateway health 확인 후 이 smoke를 자동 실행한다.
 
 ## 시나리오 A: 알림 배치 on/off 비교
 
