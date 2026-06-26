@@ -21,11 +21,11 @@ public class GatewaySecurityEventClassifier {
         if (rateLimitHit || status == 429) {
             return SecurityEventType.RATE_LIMIT_HIT;
         }
-        if (status == 401 || status == 403) {
-            return SecurityEventType.AUTH_FAILURE;
-        }
         if (isAbnormalRequest(path, status)) {
             return SecurityEventType.ABNORMAL_REQUEST;
+        }
+        if (status == 401 || status == 403) {
+            return SecurityEventType.AUTH_FAILURE;
         }
         if (status >= 500) {
             return SecurityEventType.BACKEND_FAILURE;

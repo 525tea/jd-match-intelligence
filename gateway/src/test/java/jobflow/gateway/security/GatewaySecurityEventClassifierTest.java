@@ -17,7 +17,7 @@ class GatewaySecurityEventClassifierTest {
 
     @Test
     void classifiesUnauthorizedAsAuthFailure() {
-        SecurityEventType eventType = classifier.classify("/api/missing", 401, false);
+        SecurityEventType eventType = classifier.classify("/api/jobs", 401, false);
 
         assertThat(eventType).isEqualTo(SecurityEventType.AUTH_FAILURE);
     }
@@ -39,6 +39,13 @@ class GatewaySecurityEventClassifierTest {
     @Test
     void classifiesSensitiveProbePathAsAbnormalRequest() {
         SecurityEventType eventType = classifier.classify("/api/.env", 404, false);
+
+        assertThat(eventType).isEqualTo(SecurityEventType.ABNORMAL_REQUEST);
+    }
+
+    @Test
+    void classifiesSensitiveProbePathAsAbnormalRequestBeforeAuthFailure() {
+        SecurityEventType eventType = classifier.classify("/api/.env", 401, false);
 
         assertThat(eventType).isEqualTo(SecurityEventType.ABNORMAL_REQUEST);
     }
