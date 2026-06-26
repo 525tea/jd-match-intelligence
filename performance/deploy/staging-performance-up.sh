@@ -183,6 +183,9 @@ run_step "Wait for backend health" \
 run_step "Wait for gateway health" \
   wait_for_healthy gateway
 
+run_step "Security event pipeline smoke" \
+  bash performance/security/security-event-pipeline-smoke.sh
+
 run_step "Wait for performance reindex" \
   wait_for_reindex
 
@@ -212,5 +215,6 @@ echo "kafka=healthy"
 echo "kafka_topics=ok"
 echo "outbox_kafka_publish=ok"
 echo "kafka_consumers=ok"
+echo "security_event_pipeline=ok"
 echo
 echo "Staging performance stack is ready for pre-k6 smoke."

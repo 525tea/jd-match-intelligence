@@ -209,6 +209,42 @@ services:
       retries: 20
       start_period: 30s
 
+  logstash:
+    image: docker.elastic.co/logstash/logstash:9.2.8
+    container_name: jobflow-logstash
+    mem_limit: ${LOGSTASH_MEMORY_LIMIT:-1g}
+    environment:
+      LS_JAVA_OPTS: ${LOGSTASH_JAVA_OPTS:--Xms512m -Xmx512m}
+      LOGSTASH_KAFKA_BOOTSTRAP_SERVERS: ${LOGSTASH_KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
+      LOGSTASH_SECURITY_EVENTS_TOPIC: ${LOGSTASH_SECURITY_EVENTS_TOPIC:-security.events}
+      LOGSTASH_SECURITY_EVENTS_GROUP_ID: ${LOGSTASH_SECURITY_EVENTS_GROUP_ID:-jobflow-logstash-security-events}
+      LOGSTASH_SECURITY_EVENTS_AUTO_OFFSET_RESET: ${LOGSTASH_SECURITY_EVENTS_AUTO_OFFSET_RESET:-latest}
+      LOGSTASH_ELASTICSEARCH_URL: ${LOGSTASH_ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      LOGSTASH_SECURITY_EVENTS_INDEX: ${LOGSTASH_SECURITY_EVENTS_INDEX:-jobflow-security-events}
+      XPACK_MONITORING_ENABLED: "false"
+    volumes:
+      - ./docker/logstash/pipeline:/usr/share/logstash/pipeline:ro
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:9.2.8
+    container_name: jobflow-kibana
+    mem_limit: ${KIBANA_MEMORY_LIMIT:-1g}
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+      XPACK_SECURITY_ENABLED: "false"
+      SERVER_NAME: jobflow-kibana
+      SERVER_HOST: 0.0.0.0
+    ports:
+      - "5601:5601"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
   prometheus:
     image: prom/prometheus:v2.51.2
     container_name: jobflow-prometheus

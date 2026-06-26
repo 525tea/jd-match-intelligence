@@ -171,6 +171,40 @@ Kafka consumer smoke completed.
 - 실제 사용자 이메일, 실제 공고, 실제 외부 식별자는 사용하지 않는다.
 - `staging-performance-up.sh`는 Outbox Kafka publish smoke 이후 이 smoke를 자동 실행한다.
 
+## Security event pipeline smoke
+
+`security-event-pipeline-smoke.sh`는 Gateway가 `security.events` topic으로 발행한 보안 이벤트를 Logstash가 Elasticsearch에 적재하는지 확인한다.
+
+검증 경로는 다음과 같다.
+
+- Gateway에 `X-Request-Id`가 포함된 비정상 요청 전송
+- Gateway security event filter가 `ABNORMAL_REQUEST` 이벤트 발행
+- Kafka `security.events` topic 수신
+- Logstash Kafka input이 이벤트 소비
+- Elasticsearch `jobflow-security-events` 인덱스 적재 확인
+
+```bash
+bash performance/security/security-event-pipeline-smoke.sh
+```
+
+기대 결과:
+
+```text
+Security event pipeline smoke completed.
+```
+
+기본 요청은 `/api/.env`이며, 이 요청은 민감 경로 probe로 분류되어 `ABNORMAL_REQUEST` 이벤트가 되어야 한다.
+
+필요하면 환경변수로 바꿀 수 있다.
+
+```bash
+SMOKE_REQUEST_PATH=/api/.git/config \
+SMOKE_WAIT_SECONDS=60 \
+bash performance/security/security-event-pipeline-smoke.sh
+```
+
+`staging-performance-up.sh`는 backend/gateway health 확인 후 이 smoke를 자동 실행한다.
+
 ## 시나리오 A: 알림 배치 on/off 비교
 
 `run-deadline-reminder-contention-scenario.sh`는 마감 알림 배치가 꺼진 상태와 켜진 상태를 같은 k6 조건으로 비교하기 위한 실행 스크립트다.
