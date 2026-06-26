@@ -180,14 +180,14 @@ run_step "Wait for backend health" \
 run_step "Wait for gateway health" \
   wait_for_healthy gateway
 
+run_step "Wait for performance reindex" \
+  wait_for_reindex
+
 run_step "Outbox Kafka publish smoke" \
   bash performance/events/outbox-kafka-publish-smoke.sh
 
 run_step "Kafka consumer smoke" \
   bash performance/events/kafka-consumer-smoke.sh
-
-run_step "Wait for performance reindex" \
-  wait_for_reindex
 
 run_step "Performance profile smoke" \
   env \
