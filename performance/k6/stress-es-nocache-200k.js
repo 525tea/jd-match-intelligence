@@ -2,6 +2,7 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080/api';
+const ACCESS_TOKEN = __ENV.ACCESS_TOKEN || '';
 const KEYWORDS = (__ENV.KEYWORDS || '백엔드,Spring Boot,프론트엔드,React,데이터 엔지니어,DevOps,Kubernetes,Python,Java,TypeScript')
     .split(',')
     .map((k) => k.trim())
@@ -23,12 +24,23 @@ export const options = {
     },
 };
 
+function authorizationHeaders() {
+    if (!ACCESS_TOKEN) {
+        return {};
+    }
+
+    return { Authorization: `Bearer ${ACCESS_TOKEN}` };
+}
+
 export default function () {
     const keyword = KEYWORDS[__ITER % KEYWORDS.length];
 
     const res = http.get(
         `${BASE_URL}/jobs/search?keyword=${encodeURIComponent(keyword)}&limit=10`,
-        { tags: { endpoint: 'jobs_search' } }
+        {
+            headers: authorizationHeaders(),
+            tags: { endpoint: 'jobs_search' },
+        }
     );
 
     check(res, {
