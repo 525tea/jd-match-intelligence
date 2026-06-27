@@ -15,11 +15,15 @@
 
 ## 1. 성능 DB 준비
 
-기본값은 `jobflow_perf` DB를 사용한다.
+w8-2 기준으로 200,000건 fixture를 준비한다.
 
 ```bash
+PERF_JOB_COUNT=200000 RESET_PERF_DB=true \
 bash performance/dataset/prepare-performance-database.sh
 ```
+
+`RESET_PERF_DB=true`는 기존 `jobflow_perf` DB를 DROP 후 재생성한다.
+기존 DB를 유지하면서 추가 삽입만 하려면 `RESET_PERF_DB=false`(기본값)로 실행한다.
 
 기대 결과:
 
@@ -27,14 +31,14 @@ bash performance/dataset/prepare-performance-database.sh
 Performance database preparation completed.
 ```
 
-성능 DB를 재생성해야 할 때만 `RESET_PERF_DB=true`를 사용한다.
-
-```bash
-RESET_PERF_DB=true \
-bash performance/dataset/prepare-performance-database.sh
-```
-
 주의: `PERF_DB_NAME=jobflow`처럼 실제 앱 DB를 지정하면 스크립트가 중단된다.
+
+fixture 배포 특성:
+- source: `perf_fixture`
+- role 분포: BACKEND 25%, FRONTEND 15%, DEVOPS 10%, DATA_ENGINEER 10%, 기타 40%
+- location 분포: Seoul 70%, Gyeonggi(판교) 15%, 기타 15%
+- deadline null 비율: 약 9% (MOD(n, 11) = 0)
+- description에 역할별 기술 스택 키워드 포함 (FULLTEXT 검색 가능)
 
 ## 2. Dataset Gate 실행
 

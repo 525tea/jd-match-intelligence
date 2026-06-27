@@ -13,7 +13,7 @@ MYSQL_CONTAINER="${MYSQL_CONTAINER:-jobflow-mysql}"
 PERF_DB_NAME="${PERF_DB_NAME:-jobflow_perf}"
 PERF_DB_USER="${PERF_DB_USER:-jobflow}"
 PERF_DB_PASSWORD="${PERF_DB_PASSWORD:-jobflow}"
-PERF_MIN_JOB_COUNT="${PERF_MIN_JOB_COUNT:-1000}"
+PERF_MIN_JOB_COUNT="${PERF_MIN_JOB_COUNT:-200000}"
 
 if [[ "${PERF_DB_NAME}" == "jobflow" ]]; then
   echo "Refusing to run performance dataset gate against real database: ${PERF_DB_NAME}" >&2
