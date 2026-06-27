@@ -1,5 +1,6 @@
 package jobflow.domain.job.search;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import jobflow.domain.job.CareerLevel;
 import jobflow.domain.job.EmploymentType;
@@ -25,7 +26,7 @@ public record JobSearchResult(
         LocalDateTime deadlineAt,
         JobStatus status,
         Double score
-) {
+) implements Serializable {
 
     public static JobSearchResult fromProjection(JobSearchProjection projection) {
         return new JobSearchResult(
