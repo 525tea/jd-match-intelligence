@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:8080/api}"
+BASE_URL="${BASE_URL:-http://localhost:8080}"
 SERVER_URL="${SERVER_URL:-${BASE_URL%/api}}"
 HEALTH_URL="${HEALTH_URL:-${SERVER_URL}/actuator/health}"
 SEARCH_PREFLIGHT_URL="${SEARCH_PREFLIGHT_URL:-${BASE_URL}/jobs/search?keyword=Spring%20Boot&limit=1}"

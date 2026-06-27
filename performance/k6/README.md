@@ -226,7 +226,7 @@ curl -s "http://localhost:9200/jobflow-jobs-perf/_count" | python3 -m json.tool
 
 ```bash
 curl -s http://localhost:8080/actuator/health/liveness | jq
-curl -s "http://localhost:8080/api/jobs/search?keyword=java&limit=10" | head -c 300
+curl -s "http://localhost:8080/jobs/search?keyword=java&limit=10" | head -c 300
 ```
 
 단건 smoke:
@@ -235,7 +235,7 @@ curl -s "http://localhost:8080/api/jobs/search?keyword=java&limit=10" | head -c 
 k6 run \
   --vus 1 \
   --iterations 1 \
-  -e BASE_URL=http://localhost:8080/api \
+  -e BASE_URL=http://localhost:8080 \
   performance/k6/stress-es-nocache-200k.js
 ```
 
@@ -247,7 +247,7 @@ bash performance/k6/run-stress-es-nocache.sh
 
 기본값:
 
-- `BASE_URL=http://localhost:8080/api`
+- `BASE_URL=http://localhost:8080`
 - `ARTIFACT_DIR=artifacts/performance`
 - `SUMMARY_FILE=YYMMDD_k6_es_nocache_200k_500vu.json`
 
