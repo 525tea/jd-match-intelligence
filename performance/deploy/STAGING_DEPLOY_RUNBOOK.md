@@ -325,6 +325,45 @@ BASE_URL=http://localhost:8081/api \
 bash performance/deploy/staging-pre-k6-smoke.sh
 ```
 
+## 트러블슈팅
+
+### Kafka 기동 실패 — KeeperErrorCode = NodeExists
+
+Zookeeper 볼륨에 이전 브로커 세션이 남아 있을 때 발생한다.
+
+```text
+ERROR Creating /brokers/ids/1 ... owner does not match current session
+FATAL KeeperErrorCode = NodeExists
+```
+
+해결: Zookeeper/Kafka 볼륨을 삭제하고 재기동한다.
+
+```bash
+docker compose down zookeeper kafka
+docker volume rm jobflow_zookeeper-data jobflow_zookeeper-log jobflow_kafka-data 2>/dev/null || true
+docker compose -f docker-compose.yml -f docker-compose.performance.yml up -d zookeeper kafka
+```
+
+Kafka가 필요 없는 stress test(w8-3 MySQL FULLTEXT, w8-5 ES, w8-6 ES+Redis)는 Kafka 제외하고 전체 스택을 올린다. `backend gateway`만 지정하면 elasticsearch 등 depends_on 서비스가 내려가 있을 때 자동으로 안 올라온다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml up -d
+```
+
+Kafka만 제외하고 싶으면 down 후 재기동한다.
+
+```bash
+docker compose stop kafka zookeeper
+```
+
+### EC2 t3 인스턴스 CPU 버스트 비용 폭발
+
+t3 시리즈는 unlimited 모드가 기본으로 켜져 있다. k6 고VU 부하 시 CPU 크레딧을 초과하면 잉여 크레딧 비용이 추가 청구된다.
+
+확인: EC2 콘솔 → 작업 → 인스턴스 설정 → 크레딧 사양 변경 → 무한 모드 체크 여부 확인.
+
+stress test용 서버는 **m5.xlarge** 사용을 권장한다. burstable이 아니라 CPU throttle/버스트 비용이 없고 측정값이 왜곡되지 않는다.
+
 ## 6. Staging readiness smoke
 
 전체 준비 상태를 한 번에 확인한다.
