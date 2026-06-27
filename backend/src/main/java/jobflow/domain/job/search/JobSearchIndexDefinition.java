@@ -14,6 +14,8 @@ public class JobSearchIndexDefinition {
 
     public Map<String, Object> settings() {
         return mapOf(
+                "number_of_shards", 1,
+                "number_of_replicas", 0,
                 "analysis", mapOf(
                         "char_filter", mapOf(
                                 TECH_STACK_CHAR_FILTER_NAME, mapOf(

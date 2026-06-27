@@ -16,6 +16,10 @@ class JobSearchIndexDefinitionTest {
     void settings() {
         Map<String, Object> settings = definition.settings();
 
+        assertThat(settings)
+                .containsEntry("number_of_shards", 1)
+                .containsEntry("number_of_replicas", 0);
+
         Map<String, Object> analysis = getMap(settings, "analysis");
         Map<String, Object> analyzers = getMap(analysis, "analyzer");
         Map<String, Object> charFilters = getMap(analysis, "char_filter");
