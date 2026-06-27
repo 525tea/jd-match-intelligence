@@ -22,6 +22,9 @@ docs/metrics/**/*
 # Logs
 *.log
 
+# Local artifacts
+artifacts/
+
 # Gradle
 .gradle/
 build/

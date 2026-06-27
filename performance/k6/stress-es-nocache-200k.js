@@ -1,7 +1,7 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost:8081/api';
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080/api';
 const KEYWORDS = (__ENV.KEYWORDS || '백엔드,Spring Boot,프론트엔드,React,데이터 엔지니어,DevOps,Kubernetes,Python,Java,TypeScript')
     .split(',')
     .map((k) => k.trim())
