@@ -3,6 +3,7 @@ package jobflow.domain.job.search;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -12,10 +13,20 @@ public class JobSearchIndexDefinition {
     private static final String TECH_STACK_CHAR_FILTER_NAME = "jobflow_tech_stack_normalizer";
     private static final String SYNONYM_FILTER_NAME = "jobflow_tech_synonym";
 
+    private final int numberOfShards;
+    private final int numberOfReplicas;
+
+    public JobSearchIndexDefinition(
+            @Value("${elasticsearch.index.number-of-shards:1}") int numberOfShards,
+            @Value("${elasticsearch.index.number-of-replicas:1}") int numberOfReplicas) {
+        this.numberOfShards = numberOfShards;
+        this.numberOfReplicas = numberOfReplicas;
+    }
+
     public Map<String, Object> settings() {
         return mapOf(
-                "number_of_shards", 1,
-                "number_of_replicas", 0,
+                "number_of_shards", numberOfShards,
+                "number_of_replicas", numberOfReplicas,
                 "analysis", mapOf(
                         "char_filter", mapOf(
                                 TECH_STACK_CHAR_FILTER_NAME, mapOf(

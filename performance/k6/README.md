@@ -215,7 +215,7 @@ ES 상태 확인:
 ```bash
 curl -s "http://localhost:9200/_cluster/health" | python3 -m json.tool
 curl -s "http://localhost:9200/_cat/nodes?v&h=name,heap.percent,ram.percent,cpu"
-curl -s "http://localhost:9200/jobflow-jobs-perf/_count" | python3 -m json.tool
+curl -s "http://localhost:9200/jobflow-jobs-performance-v1/_count" | python3 -m json.tool
 ```
 
 정상 진행 기준:
@@ -254,7 +254,6 @@ bash performance/k6/run-stress-es-nocache.sh
 확인할 지표:
 
 - `http_req_duration{endpoint:jobs_search} p(95), p(99)`
-- `http_req_duration{endpoint:jobs_list} p(95), p(99)`
 - `http_req_failed`
 - `checks`
 - Elasticsearch node heap/CPU

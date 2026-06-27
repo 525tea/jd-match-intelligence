@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 class JobSearchIndexDefinitionTest {
 
-    private final JobSearchIndexDefinition definition = new JobSearchIndexDefinition();
+    private final JobSearchIndexDefinition definition = new JobSearchIndexDefinition(1, 0);
 
     @Test
     @DisplayName("nori tokenizer와 기술 용어 char filter/synonym filter를 포함한 analyzer 설정을 만든다")
