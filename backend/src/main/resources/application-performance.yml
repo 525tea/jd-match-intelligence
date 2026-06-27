@@ -5,6 +5,10 @@ spring:
     password: ${PERF_DB_PASSWORD:jobflow}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+  elasticsearch:
+    connection-timeout: ${PERF_ELASTICSEARCH_CONNECTION_TIMEOUT:5s}
+    socket-timeout: ${PERF_ELASTICSEARCH_SOCKET_TIMEOUT:30s}
+
   flyway:
     enabled: false
     locations: classpath:db/migration
@@ -13,6 +17,15 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    elasticsearch:
+      enabled: ${PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED:false}
 
 app:
   search:

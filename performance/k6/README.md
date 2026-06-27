@@ -170,3 +170,92 @@ docker run --rm \
 - `jobs search uses performance fixture`
 
 이 스크립트는 Round 1 최종 측정용이라기보다, k6 측정 전 performance DB/profile/Elasticsearch alias가 올바르게 연결됐는지 확인하는 baseline entrypoint다.
+
+## Elasticsearch No-cache Stress Test
+
+`jobflow_perf` database에 200k 공고 fixture를 준비하고, cache를 끈 상태에서 Elasticsearch 검색 경로의 한계를 측정한다. 이 테스트는 Gateway circuit breaker나 rate limit의 영향을 빼고 ES 검색 성능을 보기 위한 작업이므로 backend를 직접 타격한다.
+
+사전 준비:
+
+```bash
+git pull --rebase
+
+docker compose -f docker-compose.yml -f docker-compose.performance.yml build backend gateway
+
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+performance compose profile은 stress test 중 Elasticsearch health contributor timeout이 backend 컨테이너 health를 흔들지 않도록 다음 기준을 사용한다.
+
+- backend Docker healthcheck는 `/actuator/health/liveness`를 본다.
+- performance profile에서는 `management.health.elasticsearch.enabled=false`를 기본값으로 둔다.
+- ES 검색 API 자체는 계속 Elasticsearch를 사용하므로, health contributor만 lifecycle 판단에서 제외된다.
+
+backend가 `unhealthy`로 끝나면 바로 k6를 실행하지 않는다. 먼저 stale image인지, app startup failure인지, healthcheck failure인지 분리한다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml ps -a backend elasticsearch
+
+docker inspect jobflow-backend --format '{{json .State.Health}}' | jq
+
+docker compose -f docker-compose.yml -f docker-compose.performance.yml logs --tail=300 backend
+
+docker exec jobflow-backend sh -lc '
+  curl -i --max-time 5 http://localhost:8080/actuator/health/liveness || true
+  echo
+  curl -i --max-time 5 http://localhost:8080/actuator/health/readiness || true
+  echo
+  curl -i --max-time 10 http://localhost:8080/actuator/health || true
+'
+```
+
+ES 상태 확인:
+
+```bash
+curl -s "http://localhost:9200/_cluster/health" | python3 -m json.tool
+curl -s "http://localhost:9200/_cat/nodes?v&h=name,heap.percent,ram.percent,cpu"
+curl -s "http://localhost:9200/jobflow-jobs-perf/_count" | python3 -m json.tool
+```
+
+정상 진행 기준:
+
+- backend liveness가 `UP`
+- ES index count가 `200000`
+- backend 직접 검색 API smoke가 응답
+
+```bash
+curl -s http://localhost:8080/actuator/health/liveness | jq
+curl -s "http://localhost:8080/jobs/search?keyword=java&limit=10" | head -c 300
+```
+
+단건 smoke:
+
+```bash
+k6 run \
+  --vus 1 \
+  --iterations 1 \
+  -e BASE_URL=http://localhost:8080 \
+  performance/k6/stress-es-nocache-200k.js
+```
+
+본 테스트:
+
+```bash
+bash performance/k6/run-stress-es-nocache.sh
+```
+
+기본값:
+
+- `BASE_URL=http://localhost:8080`
+- `ARTIFACT_DIR=artifacts/performance`
+- `SUMMARY_FILE=YYMMDD_k6_es_nocache_200k_500vu.json`
+
+확인할 지표:
+
+- `http_req_duration{endpoint:jobs_search} p(95), p(99)`
+- `http_req_duration{endpoint:jobs_list} p(95), p(99)`
+- `http_req_failed`
+- `checks`
+- Elasticsearch node heap/CPU
+- Grafana JVM memory, HTTP request rate, latency
