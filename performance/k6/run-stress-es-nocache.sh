@@ -44,18 +44,16 @@ fi
 echo "backend_health_preflight=$health_body"
 
 if [[ -z "$ACCESS_TOKEN" ]]; then
-    if ! login_body="$(curl -fsS -X POST "${BASE_URL}/auth/login" \
+    if login_body="$(curl -fsS -X POST "${BASE_URL}/auth/login" \
         -H 'Content-Type: application/json' \
         -d "{\"email\":\"${LOGIN_EMAIL}\",\"password\":\"${LOGIN_PASSWORD}\"}" 2>/dev/null)"; then
-        echo "Auth preflight failed: ${BASE_URL}/auth/login" >&2
-        exit 1
-    fi
-
-    ACCESS_TOKEN="$(jq -r '.data.accessToken // empty' <<<"$login_body")"
-    if [[ -z "$ACCESS_TOKEN" ]]; then
-        echo "Auth preflight did not return access token:" >&2
-        echo "$login_body" >&2
-        exit 1
+        ACCESS_TOKEN="$(jq -r '.data.accessToken // empty' <<<"$login_body")"
+        if [[ -z "$ACCESS_TOKEN" ]]; then
+            echo "Auth preflight: login succeeded but no accessToken in response — continuing unauthenticated" >&2
+            echo "$login_body" >&2
+        fi
+    else
+        echo "Auth preflight: login failed — continuing unauthenticated (search preflight will verify reachability)" >&2
     fi
 fi
 
@@ -91,6 +89,7 @@ else
     fi
 
     echo "k6 binary not found; running Docker fallback with BASE_URL=$DOCKER_BASE_URL"
+    chmod 777 "$ARTIFACT_DIR"
 
     docker run --rm \
         --add-host=host.docker.internal:host-gateway \

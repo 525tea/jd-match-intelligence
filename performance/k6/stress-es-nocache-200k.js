@@ -8,6 +8,10 @@ const KEYWORDS = (__ENV.KEYWORDS || '백엔드,Spring Boot,프론트엔드,React
     .map((k) => k.trim())
     .filter((k) => k.length > 0);
 
+if (KEYWORDS.length === 0) {
+    throw new Error('KEYWORDS must contain at least one non-empty keyword');
+}
+
 export const options = {
     stages: [
         { duration: '3m', target: 50 },
