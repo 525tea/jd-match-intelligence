@@ -37,7 +37,7 @@ class JobSearchIndexServiceTest {
             true
     );
 
-    private final JobSearchIndexDefinition jobSearchIndexDefinition = new JobSearchIndexDefinition();
+    private final JobSearchIndexDefinition jobSearchIndexDefinition = new JobSearchIndexDefinition(1, 0);
 
     @Test
     @DisplayName("검색 physical index가 없으면 settings와 mapping으로 생성하고 alias를 연결한다")

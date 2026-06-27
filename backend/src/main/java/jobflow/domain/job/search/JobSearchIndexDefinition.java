@@ -13,11 +13,15 @@ public class JobSearchIndexDefinition {
     private static final String TECH_STACK_CHAR_FILTER_NAME = "jobflow_tech_stack_normalizer";
     private static final String SYNONYM_FILTER_NAME = "jobflow_tech_synonym";
 
-    @Value("${elasticsearch.index.number-of-shards:1}")
-    private int numberOfShards;
+    private final int numberOfShards;
+    private final int numberOfReplicas;
 
-    @Value("${elasticsearch.index.number-of-replicas:1}")
-    private int numberOfReplicas;
+    public JobSearchIndexDefinition(
+            @Value("${elasticsearch.index.number-of-shards:1}") int numberOfShards,
+            @Value("${elasticsearch.index.number-of-replicas:1}") int numberOfReplicas) {
+        this.numberOfShards = numberOfShards;
+        this.numberOfReplicas = numberOfReplicas;
+    }
 
     public Map<String, Object> settings() {
         return mapOf(
