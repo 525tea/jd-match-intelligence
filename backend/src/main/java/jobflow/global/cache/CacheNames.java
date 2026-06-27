@@ -14,6 +14,8 @@ public final class CacheNames {
     public static final String PROJECT_SKILL_INVENTORY = "projectSkillInventory";
     public static final String PROJECT_EXPERIENCE_TAG_INVENTORY = "projectExperienceTagInventory";
 
+    public static final String JOB_SEARCH = "jobSearch";
+
     private CacheNames() {
     }
 }

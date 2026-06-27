@@ -35,16 +35,17 @@ public class CacheConfig {
     }
 
     Map<String, RedisCacheConfiguration> cacheConfigurations(JobFlowCacheProperties cacheProperties) {
-        return Map.of(
-                CacheNames.TREND_SKILLS, cacheConfiguration(cacheProperties.trendTtl()),
-                CacheNames.TREND_SKILL_COOCCURRENCES, cacheConfiguration(cacheProperties.trendTtl()),
-                CacheNames.TREND_SKILL_EXPERIENCE_TAGS, cacheConfiguration(cacheProperties.trendTtl()),
-                CacheNames.TREND_MARKET, cacheConfiguration(cacheProperties.trendTtl()),
-                CacheNames.GAP_ANALYSIS, cacheConfiguration(cacheProperties.gapAnalysisTtl()),
-                CacheNames.JD_MATCH, cacheConfiguration(cacheProperties.jdMatchTtl()),
-                CacheNames.JOB_RECOMMENDATION, cacheConfiguration(cacheProperties.recommendationTtl()),
-                CacheNames.PROJECT_SKILL_INVENTORY, cacheConfiguration(cacheProperties.projectInventoryTtl()),
-                CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY, cacheConfiguration(cacheProperties.projectInventoryTtl())
+        return Map.ofEntries(
+                Map.entry(CacheNames.JOB_SEARCH, cacheConfiguration(cacheProperties.jobSearchTtl())),
+                Map.entry(CacheNames.TREND_SKILLS, cacheConfiguration(cacheProperties.trendTtl())),
+                Map.entry(CacheNames.TREND_SKILL_COOCCURRENCES, cacheConfiguration(cacheProperties.trendTtl())),
+                Map.entry(CacheNames.TREND_SKILL_EXPERIENCE_TAGS, cacheConfiguration(cacheProperties.trendTtl())),
+                Map.entry(CacheNames.TREND_MARKET, cacheConfiguration(cacheProperties.trendTtl())),
+                Map.entry(CacheNames.GAP_ANALYSIS, cacheConfiguration(cacheProperties.gapAnalysisTtl())),
+                Map.entry(CacheNames.JD_MATCH, cacheConfiguration(cacheProperties.jdMatchTtl())),
+                Map.entry(CacheNames.JOB_RECOMMENDATION, cacheConfiguration(cacheProperties.recommendationTtl())),
+                Map.entry(CacheNames.PROJECT_SKILL_INVENTORY, cacheConfiguration(cacheProperties.projectInventoryTtl())),
+                Map.entry(CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY, cacheConfiguration(cacheProperties.projectInventoryTtl()))
         );
     }
 
