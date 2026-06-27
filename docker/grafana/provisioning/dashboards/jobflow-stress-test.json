@@ -1,11 +1,11 @@
 {
-  "uid": "jobflow-backend",
-  "title": "JobFlow Backend Observability",
-  "tags": ["jobflow", "backend", "spring-boot"],
+  "uid": "jobflow-stress-test",
+  "title": "JobFlow Stress Test Dashboard",
+  "tags": ["jobflow", "stress-test", "performance"],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
-  "refresh": "15s",
+  "version": 1,
+  "refresh": "5s",
   "time": {
     "from": "now-15m",
     "to": "now"
@@ -17,8 +17,8 @@
     {
       "id": 1,
       "type": "timeseries",
-      "title": "HTTP Request Rate",
-      "description": "초당 HTTP 요청 수를 uri, method, status 기준으로 확인합니다.",
+      "title": "/jobs/search RPS",
+      "description": "/jobs/search 엔드포인트의 초당 요청 수. 3단계(MySQL → ES → ES+Redis) 비교 기준 패널.",
       "datasource": {
         "type": "prometheus",
         "uid": "Prometheus"
@@ -26,8 +26,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_server_requests_seconds_count{application=\"jobflow-backend\"}[1m])) by (uri, method, status)",
-          "legendFormat": "{{method}} {{uri}} {{status}}"
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"jobflow-backend\", uri=~\".*/jobs/search.*\"}[1m])) by (uri, status)",
+          "legendFormat": "{{uri}} {{status}}"
         }
       ],
       "fieldConfig": {
@@ -37,7 +37,7 @@
             "drawStyle": "line",
             "lineInterpolation": "linear",
             "lineWidth": 2,
-            "fillOpacity": 10,
+            "fillOpacity": 15,
             "showPoints": "never",
             "spanNulls": false
           }
@@ -65,8 +65,8 @@
     {
       "id": 2,
       "type": "timeseries",
-      "title": "P95 / P99 Latency",
-      "description": "HTTP 요청 latency의 P95, P99를 uri 기준으로 확인합니다. 트래픽이 없으면 No data로 표시됩니다.",
+      "title": "/jobs/search p95 Latency",
+      "description": "/jobs/search p95 latency. MySQL → ES → ES+Redis 단계별 응답 시간 비교.",
       "datasource": {
         "type": "prometheus",
         "uid": "Prometheus"
@@ -74,12 +74,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"jobflow-backend\"}[5m])) by (le, uri))",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"jobflow-backend\", uri=~\".*/jobs/search.*\"}[1m])) by (le, uri))",
           "legendFormat": "p95 {{uri}}"
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"jobflow-backend\"}[5m])) by (le, uri))",
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"jobflow-backend\", uri=~\".*/jobs/search.*\"}[1m])) by (le, uri))",
           "legendFormat": "p99 {{uri}}"
         }
       ],
@@ -90,7 +90,7 @@
             "drawStyle": "line",
             "lineInterpolation": "linear",
             "lineWidth": 2,
-            "fillOpacity": 10,
+            "fillOpacity": 15,
             "showPoints": "never",
             "spanNulls": false
           }
@@ -117,9 +117,9 @@
     },
     {
       "id": 3,
-      "type": "stat",
+      "type": "timeseries",
       "title": "Error Rate",
-      "description": "전체 HTTP 요청 중 4xx/5xx 비율입니다. 0%가 정상(초록)입니다.",
+      "description": "전체 HTTP 요청 중 4xx/5xx 비율. 부하 테스트 stop rule 기준(>50%) 확인용.",
       "datasource": {
         "type": "prometheus",
         "uid": "Prometheus"
@@ -136,6 +136,14 @@
           "unit": "percentunit",
           "min": 0,
           "max": 1,
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "spanNulls": false
+          },
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -149,28 +157,27 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 12,
         "x": 0,
         "y": 8
       },
       "options": {
-        "reduceOptions": {
-          "values": false,
-          "calcs": ["lastNotNull"],
-          "fields": ""
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "orientation": "auto",
-        "textMode": "auto",
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto"
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
       }
     },
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Cache Hit Rate",
-      "description": "Spring Cache hit/miss 추이입니다. 캐시가 없는 상태에서는 데이터가 없을 수 있습니다.",
+      "title": "Cache Hit Rate (timeseries)",
+      "description": "Redis cache hit/miss 추이. ES+Redis 3단계에서 hit rate 70%+ 확인용.",
       "datasource": {
         "type": "prometheus",
         "uid": "Prometheus"
@@ -198,7 +205,7 @@
             "drawStyle": "line",
             "lineInterpolation": "linear",
             "lineWidth": 2,
-            "fillOpacity": 10,
+            "fillOpacity": 15,
             "showPoints": "never",
             "spanNulls": false
           }
@@ -224,8 +231,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
+        "w": 12,
+        "x": 12,
         "y": 8
       },
       "options": {
@@ -243,8 +250,8 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "JVM Memory Used",
-      "description": "JVM heap/non-heap memory 사용량입니다.",
+      "title": "JVM Heap Used",
+      "description": "JVM heap 메모리 사용량. 500VU 구간에서 GC 압박과 메모리 증가 패턴 확인.",
       "datasource": {
         "type": "prometheus",
         "uid": "Prometheus"
@@ -252,8 +259,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(jvm_memory_used_bytes{application=\"jobflow-backend\"}) by (area)",
-          "legendFormat": "{{area}}"
+          "expr": "sum(jvm_memory_used_bytes{application=\"jobflow-backend\", area=\"heap\"}) by (id)",
+          "legendFormat": "heap {{id}}"
         }
       ],
       "fieldConfig": {
@@ -263,7 +270,7 @@
             "drawStyle": "line",
             "lineInterpolation": "linear",
             "lineWidth": 2,
-            "fillOpacity": 10,
+            "fillOpacity": 15,
             "showPoints": "never",
             "spanNulls": false
           }
@@ -273,8 +280,8 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 16,
-        "y": 8
+        "x": 0,
+        "y": 16
       },
       "options": {
         "legend": {
@@ -291,8 +298,8 @@
     {
       "id": 6,
       "type": "timeseries",
-      "title": "HikariCP Connections",
-      "description": "DB connection pool 상태입니다. active가 max(빨간 점선)에 근접하면 DB 병목 신호입니다.",
+      "title": "HikariCP Active Connections",
+      "description": "DB connection pool 사용 현황. active가 max에 가까워지면 DB 병목. OS/WAS 튜닝 전후 비교.",
       "datasource": {
         "type": "prometheus",
         "uid": "Prometheus"
@@ -343,8 +350,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
+        "w": 8,
+        "x": 8,
         "y": 16
       },
       "options": {
@@ -362,8 +369,61 @@
     {
       "id": 7,
       "type": "timeseries",
+      "title": "ES Indexing Rate",
+      "description": "Kafka consumer가 Elasticsearch에 색인하는 속도. consumer가 붙었을 때 색인 처리량 확인.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"jobflow-backend\", uri=~\".*/search/index.*\"}[1m])) or vector(0)",
+          "legendFormat": "index requests/s"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(http_client_requests_seconds_count{application=\"jobflow-backend\", uri=~\".*_doc.*\"}[1m])) or vector(0)",
+          "legendFormat": "es doc writes/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
       "title": "Kafka Consumer Lag",
-      "description": "Kafka consumer 미처리 메시지 수입니다. lag이 쌓이면 색인/이메일 처리 지연 신호입니다.",
+      "description": "Kafka consumer가 처리하지 못한 미처리 메시지 수. lag이 쌓이면 consumer 처리 병목.",
       "datasource": {
         "type": "prometheus",
         "uid": "Prometheus"
@@ -382,7 +442,7 @@
             "drawStyle": "line",
             "lineInterpolation": "linear",
             "lineWidth": 2,
-            "fillOpacity": 10,
+            "fillOpacity": 15,
             "showPoints": "never",
             "spanNulls": false
           },
@@ -396,71 +456,6 @@
           }
         },
         "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
-    },
-    {
-      "id": 8,
-      "type": "timeseries",
-      "title": "JVM Thread Count",
-      "description": "JVM 스레드 수입니다. live 스레드가 급증하면 스레드 포화 신호입니다.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "Prometheus"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "jvm_threads_live_threads{application=\"jobflow-backend\"}",
-          "legendFormat": "live"
-        },
-        {
-          "refId": "B",
-          "expr": "jvm_threads_peak_threads{application=\"jobflow-backend\"}",
-          "legendFormat": "peak"
-        },
-        {
-          "refId": "C",
-          "expr": "jvm_threads_states_threads{application=\"jobflow-backend\", state=\"blocked\"}",
-          "legendFormat": "blocked"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "drawStyle": "line",
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "fillOpacity": 10,
-            "showPoints": "never",
-            "spanNulls": false
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "blocked" },
-            "properties": [
-              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
-            ]
-          }
-        ]
       },
       "gridPos": {
         "h": 8,
