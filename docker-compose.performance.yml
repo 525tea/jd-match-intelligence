@@ -4,8 +4,10 @@ services:
     environment:
       ES_JAVA_OPTS: ${PERF_ES_JAVA_OPTS:--Xms2g -Xmx2g}
     healthcheck:
+      interval: ${PERF_ELASTICSEARCH_HEALTH_INTERVAL:-10s}
       timeout: 20s
-      retries: 30
+      retries: ${PERF_ELASTICSEARCH_HEALTH_RETRIES:-60}
+      start_period: ${PERF_ELASTICSEARCH_HEALTH_START_PERIOD:-60s}
 
   backend:
     mem_limit: ${PERF_BACKEND_MEMORY_LIMIT:-2g}
@@ -20,7 +22,7 @@ services:
       APP_SEARCH_ELASTICSEARCH_INDEX_NAME: ${ELASTICSEARCH_JOBS_ALIAS:-jobflow-jobs-performance}
       ELASTICSEARCH_JOBS_ALIAS: ${ELASTICSEARCH_JOBS_ALIAS:-jobflow-jobs-performance}
       ELASTICSEARCH_JOBS_INDEX: ${ELASTICSEARCH_JOBS_INDEX:-jobflow-jobs-performance-v1}
-      ELASTICSEARCH_REINDEX_ON_STARTUP: ${ELASTICSEARCH_REINDEX_ON_STARTUP:-true}
+      ELASTICSEARCH_REINDEX_ON_STARTUP: ${ELASTICSEARCH_REINDEX_ON_STARTUP:-false}
       ELASTICSEARCH_REINDEX_BATCH_SIZE: ${ELASTICSEARCH_REINDEX_BATCH_SIZE:-500}
       MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED: ${PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED:-false}
       SKILL_TREND_AGGREGATION_SCHEDULER_ENABLED: "false"
@@ -39,8 +41,10 @@ services:
       JOBFLOW_KAFKA_CONSUMER_SEARCH_REFRESH_AFTER_INDEX: ${PERF_KAFKA_CONSUMER_SEARCH_REFRESH_AFTER_INDEX:-true}
     healthcheck:
       test: ["CMD-SHELL", "curl --silent --fail http://localhost:8080/actuator/health/liveness || exit 1"]
+      interval: ${PERF_BACKEND_HEALTH_INTERVAL:-15s}
       timeout: 30s
-      retries: 30
+      retries: ${PERF_BACKEND_HEALTH_RETRIES:-60}
+      start_period: ${PERF_BACKEND_HEALTH_START_PERIOD:-600s}
 
   gateway:
     environment:

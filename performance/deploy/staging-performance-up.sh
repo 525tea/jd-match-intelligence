@@ -26,8 +26,14 @@ HEALTH_WAIT_TIMEOUT_SECONDS="${HEALTH_WAIT_TIMEOUT_SECONDS:-240}"
 HEALTH_WAIT_INTERVAL_SECONDS="${HEALTH_WAIT_INTERVAL_SECONDS:-5}"
 REINDEX_LOG_TIMEOUT_SECONDS="${REINDEX_LOG_TIMEOUT_SECONDS:-240}"
 REINDEX_LOG_TAIL_LINES="${REINDEX_LOG_TAIL_LINES:-2000}"
+ELASTICSEARCH_REINDEX_ON_STARTUP="${ELASTICSEARCH_REINDEX_ON_STARTUP:-true}"
+ELASTICSEARCH_REINDEX_BATCH_SIZE="${ELASTICSEARCH_REINDEX_BATCH_SIZE:-500}"
 BUILD_SERVICES="${BUILD_SERVICES:-backend gateway elasticsearch}"
 UP_SERVICES="${UP_SERVICES:-}"
+PERFORMANCE_REINDEX_RESULT="ok"
+
+export ELASTICSEARCH_REINDEX_ON_STARTUP
+export ELASTICSEARCH_REINDEX_BATCH_SIZE
 
 echo "ENV_FILE=${ENV_FILE}"
 echo "BASE_URL=${BASE_URL}"
@@ -43,6 +49,8 @@ echo "EXPECTED_MIN_RESULT_COUNT=${EXPECTED_MIN_RESULT_COUNT}"
 echo "HEALTH_WAIT_TIMEOUT_SECONDS=${HEALTH_WAIT_TIMEOUT_SECONDS}"
 echo "REINDEX_LOG_TIMEOUT_SECONDS=${REINDEX_LOG_TIMEOUT_SECONDS}"
 echo "REINDEX_LOG_TAIL_LINES=${REINDEX_LOG_TAIL_LINES}"
+echo "ELASTICSEARCH_REINDEX_ON_STARTUP=${ELASTICSEARCH_REINDEX_ON_STARTUP}"
+echo "ELASTICSEARCH_REINDEX_BATCH_SIZE=${ELASTICSEARCH_REINDEX_BATCH_SIZE}"
 echo "BUILD_SERVICES=${BUILD_SERVICES}"
 echo "UP_SERVICES=${UP_SERVICES:-all}"
 echo
@@ -86,6 +94,52 @@ compose_state() {
     | jq -r 'if type == "array" then .[0].State else .State end // "unknown"'
 }
 
+print_service_diagnostics() {
+  local service_name="$1"
+
+  echo
+  echo "### ${service_name} diagnostics"
+  compose ps -a "${service_name}" || true
+
+  local container_id
+  container_id="$(compose ps -q "${service_name}" || true)"
+  if [[ -n "${container_id}" ]]; then
+    docker inspect "${container_id}" \
+      --format 'container={{.Name}} state={{.State.Status}} exit={{.State.ExitCode}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+      || true
+    docker inspect "${container_id}" \
+      --format '{{range .State.Health.Log}}{{println .End .ExitCode .Output}}{{end}}' \
+      || true
+  fi
+
+  case "${service_name}" in
+    backend)
+      curl -s "${BACKEND_URL}/actuator/health/liveness" || true
+      echo
+      curl -s "${BACKEND_URL}/actuator/health/readiness" || true
+      echo
+      curl -s "${BACKEND_URL}/actuator/health" || true
+      echo
+      ;;
+    gateway)
+      curl -s "${GATEWAY_URL}/actuator/health/liveness" || true
+      echo
+      curl -s "${GATEWAY_URL}/actuator/health/readiness" || true
+      echo
+      curl -s "${GATEWAY_URL}/actuator/health" || true
+      echo
+      ;;
+    elasticsearch)
+      curl -s "${HOST_ELASTICSEARCH_URL}/_cluster/health?pretty" || true
+      echo
+      curl -s "${HOST_ELASTICSEARCH_URL}/_cat/nodes?v&h=name,heap.percent,ram.percent,cpu" || true
+      echo
+      ;;
+  esac
+
+  compose logs --tail=240 "${service_name}" || true
+}
+
 wait_for_healthy() {
   local service_name="$1"
   local elapsed=0
@@ -107,12 +161,19 @@ wait_for_healthy() {
   done
 
   compose ps
-  compose logs --tail=120 "${service_name}" || true
+  print_service_diagnostics "${service_name}"
   fail "${service_name} did not become healthy within ${HEALTH_WAIT_TIMEOUT_SECONDS}s"
 }
 
 wait_for_reindex() {
   local elapsed=0
+
+  if [[ "${ELASTICSEARCH_REINDEX_ON_STARTUP}" != "true" ]]; then
+    PERFORMANCE_REINDEX_RESULT="skipped"
+    echo "performance_reindex=skipped"
+    echo "reason=ELASTICSEARCH_REINDEX_ON_STARTUP=${ELASTICSEARCH_REINDEX_ON_STARTUP}"
+    return
+  fi
 
   while (( elapsed <= REINDEX_LOG_TIMEOUT_SECONDS )); do
     if compose logs --tail="${REINDEX_LOG_TAIL_LINES}" backend | grep -q 'Job search reindex completed'; then
@@ -214,7 +275,7 @@ echo "compose_config=ok"
 echo "performance_stack=up"
 echo "backend_health=healthy"
 echo "gateway_health=healthy"
-echo "performance_reindex=ok"
+echo "performance_reindex=${PERFORMANCE_REINDEX_RESULT}"
 echo "performance_profile_smoke=ok"
 echo "kafka=healthy"
 echo "kafka_topics=ok"

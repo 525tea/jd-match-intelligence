@@ -2,6 +2,8 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8080/api}"
+SERVER_URL="${SERVER_URL:-${BASE_URL%/api}}"
+HEALTH_URL="${HEALTH_URL:-${SERVER_URL}/actuator/health/liveness}"
 KEYWORDS="${KEYWORDS:-백엔드,Spring Boot,프론트엔드,React,데이터 엔지니어,DevOps,Kubernetes,Python,Java,TypeScript}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/performance}"
 SUMMARY_FILE="${SUMMARY_FILE:-$(date +%y%m%d)_k6_es_nocache_200k_500vu.json}"
@@ -13,11 +15,23 @@ mkdir -p "$ARTIFACT_DIR"
 ARTIFACT_DIR="$(cd "$ARTIFACT_DIR" && pwd)"
 
 echo "BASE_URL=$BASE_URL"
+echo "HEALTH_URL=$HEALTH_URL"
 echo "TARGET=backend-direct"
 echo "KEYWORDS=$KEYWORDS"
 echo "ARTIFACT_DIR=$ARTIFACT_DIR"
 echo "SUMMARY_FILE=$SUMMARY_FILE"
 echo "CACHE_ENABLED=false (set on server via env)"
+echo "REINDEX_EXPECTATION=ELASTICSEARCH_REINDEX_ON_STARTUP=false after 200k index preparation"
+
+if ! health_body="$(curl -fsS "$HEALTH_URL" 2>/dev/null)"; then
+    echo "Backend health preflight failed: $HEALTH_URL" >&2
+    echo "Full health response:" >&2
+    curl -s "${SERVER_URL}/actuator/health" >&2 || true
+    echo >&2
+    exit 1
+fi
+
+echo "backend_health_preflight=$health_body"
 
 if command -v k6 >/dev/null 2>&1; then
     BASE_URL="$BASE_URL" \
