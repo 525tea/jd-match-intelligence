@@ -21,22 +21,24 @@ class CacheConfigTest {
 
     private final CacheConfig cacheConfig = new CacheConfig();
 
-    @Test
-    @DisplayName("Redis CacheManager를 생성한다")
-    void createsRedisCacheManager() {
-        RedisConnectionFactory redisConnectionFactory = mock(RedisConnectionFactory.class);
-        JobFlowCacheProperties cacheProperties = new JobFlowCacheProperties(
+    private static JobFlowCacheProperties defaultProperties() {
+        return new JobFlowCacheProperties(
+                true,
+                Duration.ofMinutes(5),
                 Duration.ofHours(6),
                 Duration.ofMinutes(30),
                 Duration.ofMinutes(30),
                 Duration.ofMinutes(10),
                 Duration.ofHours(1)
         );
+    }
 
-        CacheManager cacheManager = cacheConfig.cacheManager(
-                redisConnectionFactory,
-                cacheProperties
-        );
+    @Test
+    @DisplayName("Redis CacheManager를 생성한다")
+    void createsRedisCacheManager() {
+        RedisConnectionFactory redisConnectionFactory = mock(RedisConnectionFactory.class);
+
+        CacheManager cacheManager = cacheConfig.cacheManager(redisConnectionFactory, defaultProperties());
 
         assertThat(cacheManager).isInstanceOf(RedisCacheManager.class);
     }
@@ -44,18 +46,11 @@ class CacheConfigTest {
     @Test
     @DisplayName("JobFlow cache name별 Redis cache configuration을 등록한다")
     void registersJobFlowCacheConfigurations() {
-        JobFlowCacheProperties cacheProperties = new JobFlowCacheProperties(
-                Duration.ofHours(6),
-                Duration.ofMinutes(30),
-                Duration.ofMinutes(30),
-                Duration.ofMinutes(10),
-                Duration.ofHours(1)
-        );
-
-        Map<String, RedisCacheConfiguration> cacheConfigurations = cacheConfig.cacheConfigurations(cacheProperties);
+        Map<String, RedisCacheConfiguration> cacheConfigurations = cacheConfig.cacheConfigurations(defaultProperties());
 
         assertThat(cacheConfigurations)
                 .containsOnlyKeys(
+                        CacheNames.JOB_SEARCH,
                         CacheNames.TREND_SKILLS,
                         CacheNames.TREND_SKILL_COOCCURRENCES,
                         CacheNames.TREND_SKILL_EXPERIENCE_TAGS,

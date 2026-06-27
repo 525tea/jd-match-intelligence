@@ -5,9 +5,11 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import jobflow.domain.job.CareerLevel;
+import jobflow.global.cache.JobFlowCacheProperties;
 import jobflow.domain.job.EmploymentType;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.job.JobStatus;
@@ -32,7 +34,8 @@ class JobSearchServiceTest {
     void searchWithElasticsearch() {
         JobSearchService service = new JobSearchService(
                 elasticsearchJobSearchService,
-                mySqlFullTextJobSearchService
+                mySqlFullTextJobSearchService,
+                cacheProperties(true)
         );
         JobSearchResult result = result(3.5);
 
@@ -52,7 +55,8 @@ class JobSearchServiceTest {
     void fallbackToMySqlFullText() {
         JobSearchService service = new JobSearchService(
                 elasticsearchJobSearchService,
-                mySqlFullTextJobSearchService
+                mySqlFullTextJobSearchService,
+                cacheProperties(true)
         );
         JobSearchResult fallbackResult = result(0.42);
 
@@ -74,7 +78,8 @@ class JobSearchServiceTest {
     void searchBlankKeyword() {
         JobSearchService service = new JobSearchService(
                 elasticsearchJobSearchService,
-                mySqlFullTextJobSearchService
+                mySqlFullTextJobSearchService,
+                cacheProperties(true)
         );
 
         List<JobSearchResult> results = service.search(" ", 20);
@@ -83,6 +88,12 @@ class JobSearchServiceTest {
 
         verify(elasticsearchJobSearchService, never()).search(" ", 20);
         verify(mySqlFullTextJobSearchService, never()).search(" ", 20);
+    }
+
+    private JobFlowCacheProperties cacheProperties(boolean enabled) {
+        return new JobFlowCacheProperties(enabled, Duration.ofMinutes(5),
+                Duration.ofHours(6), Duration.ofMinutes(30), Duration.ofMinutes(30),
+                Duration.ofMinutes(10), Duration.ofHours(1));
     }
 
     private JobSearchResult result(Double score) {
