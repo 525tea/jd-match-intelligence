@@ -18,8 +18,8 @@ export const options = {
     ],
     summaryTrendStats: ['avg', 'min', 'med', 'p(50)', 'p(90)', 'p(95)', 'p(99)', 'max'],
     thresholds: {
-        http_req_failed: ['rate<0.50'],
-        'http_req_duration{endpoint:jobs_search}': ['p(95)<60000'],
+        http_req_failed: [{ threshold: 'rate<0.50', abortOnFail: true, delayAbortEval: '10s' }],
+        'http_req_duration{endpoint:jobs_search}': [{ threshold: 'p(95)<60000', abortOnFail: true, delayAbortEval: '30s' }],
     },
 };
 
