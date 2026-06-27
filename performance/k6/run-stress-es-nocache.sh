@@ -3,7 +3,9 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8080/api}"
 SERVER_URL="${SERVER_URL:-${BASE_URL%/api}}"
-HEALTH_URL="${HEALTH_URL:-${SERVER_URL}/actuator/health/liveness}"
+HEALTH_URL="${HEALTH_URL:-${SERVER_URL}/actuator/health}"
+SEARCH_PREFLIGHT_URL="${SEARCH_PREFLIGHT_URL:-${BASE_URL}/jobs/search?keyword=Spring%20Boot&limit=1}"
+HOST_ELASTICSEARCH_URL="${HOST_ELASTICSEARCH_URL:-http://localhost:9200}"
 KEYWORDS="${KEYWORDS:-백엔드,Spring Boot,프론트엔드,React,데이터 엔지니어,DevOps,Kubernetes,Python,Java,TypeScript}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/performance}"
 SUMMARY_FILE="${SUMMARY_FILE:-$(date +%y%m%d)_k6_es_nocache_200k_500vu.json}"
@@ -16,6 +18,8 @@ ARTIFACT_DIR="$(cd "$ARTIFACT_DIR" && pwd)"
 
 echo "BASE_URL=$BASE_URL"
 echo "HEALTH_URL=$HEALTH_URL"
+echo "SEARCH_PREFLIGHT_URL=$SEARCH_PREFLIGHT_URL"
+echo "HOST_ELASTICSEARCH_URL=$HOST_ELASTICSEARCH_URL"
 echo "TARGET=backend-direct"
 echo "KEYWORDS=$KEYWORDS"
 echo "ARTIFACT_DIR=$ARTIFACT_DIR"
@@ -32,6 +36,22 @@ if ! health_body="$(curl -fsS "$HEALTH_URL" 2>/dev/null)"; then
 fi
 
 echo "backend_health_preflight=$health_body"
+
+if ! search_body="$(curl -fsS "$SEARCH_PREFLIGHT_URL" 2>/dev/null)"; then
+    echo "Search preflight failed: $SEARCH_PREFLIGHT_URL" >&2
+    echo "Elasticsearch cluster health:" >&2
+    curl -s "${HOST_ELASTICSEARCH_URL}/_cluster/health?pretty" >&2 || true
+    echo >&2
+    exit 1
+fi
+
+if ! grep -Eq '"success"[[:space:]]*:[[:space:]]*true' <<<"$search_body"; then
+    echo "Search preflight returned an unexpected response:" >&2
+    echo "$search_body" >&2
+    exit 1
+fi
+
+echo "search_preflight=ok"
 
 if command -v k6 >/dev/null 2>&1; then
     BASE_URL="$BASE_URL" \
