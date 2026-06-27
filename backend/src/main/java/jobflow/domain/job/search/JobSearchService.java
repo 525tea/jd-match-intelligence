@@ -5,7 +5,10 @@ import jobflow.global.cache.CacheNames;
 import jobflow.global.cache.JobFlowCacheProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -17,28 +20,35 @@ public class JobSearchService {
     private final MySqlFullTextJobSearchService mySqlFullTextJobSearchService;
     private final JobFlowCacheProperties cacheProperties;
 
-    @Cacheable(
-            cacheNames = CacheNames.JOB_SEARCH,
-            key = "#keyword.strip().toLowerCase() + ':' + #limit",
-            condition = "#root.target.cacheEnabled()"
-    )
+    @Lazy
+    @Autowired
+    JobSearchService self;
+
     public List<JobSearchResult> search(String keyword, int limit) {
-        String normalizedKeyword = keyword == null ? "" : keyword.strip();
+        String normalizedKeyword = keyword == null ? "" : keyword.strip().toLowerCase();
         if (normalizedKeyword.isBlank()) {
             return List.of();
         }
 
         try {
-            return elasticsearchJobSearchService.search(normalizedKeyword, limit);
+            return self.searchFromElasticsearch(normalizedKeyword, limit);
         } catch (RuntimeException exception) {
             log.warn(
                     "Elasticsearch search failed, falling back to MySQL FULLTEXT. keyword={}, error={}",
                     normalizedKeyword,
                     exception.getMessage()
             );
-
             return mySqlFullTextJobSearchService.search(normalizedKeyword, limit);
         }
+    }
+
+    @Cacheable(
+            cacheNames = CacheNames.JOB_SEARCH,
+            key = "#keyword + ':' + #limit",
+            condition = "#root.target.cacheEnabled()"
+    )
+    public List<JobSearchResult> searchFromElasticsearch(String keyword, int limit) {
+        return elasticsearchJobSearchService.search(keyword, limit);
     }
 
     public boolean cacheEnabled() {
