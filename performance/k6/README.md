@@ -258,3 +258,77 @@ bash performance/k6/run-stress-es-nocache.sh
 - `checks`
 - Elasticsearch node heap/CPU
 - Grafana JVM memory, HTTP request rate, latency
+
+## Elasticsearch + Redis Cache Stress Test
+
+`jobflow_perf` database에 200k 공고 fixture를 준비하고, `CACHE_ENABLED=true` 상태에서 Redis cache hit이 ES 검색 경로 latency에 미치는 효과를 측정한다. No-cache 결과와의 before/after 비교가 목적이므로 동일하게 backend를 직접 타격한다.
+
+사전 준비:
+
+```bash
+git pull --rebase
+
+docker compose -f docker-compose.yml -f docker-compose.performance.yml build backend gateway
+
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+서버 기동 후 `CACHE_ENABLED=true`가 적용됐는지 확인:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml exec backend env | grep CACHE_ENABLED
+```
+
+ES 상태 확인:
+
+```bash
+curl -s "http://localhost:9200/_cluster/health" | python3 -m json.tool
+curl -s "http://localhost:9200/jobflow-jobs-performance-v1/_count" | python3 -m json.tool
+```
+
+정상 진행 기준:
+
+- backend liveness가 `UP`
+- ES index count가 `200000`
+- `CACHE_ENABLED=true` 환경변수 확인
+
+```bash
+curl -s http://localhost:8080/actuator/health/liveness | jq
+curl -s "http://localhost:8080/jobs/search?keyword=java&limit=10" | head -c 300
+```
+
+단건 smoke:
+
+```bash
+k6 run \
+  --vus 1 \
+  --iterations 1 \
+  -e BASE_URL=http://localhost:8080 \
+  performance/k6/stress-es-cache-200k.js
+```
+
+본 테스트:
+
+```bash
+bash performance/k6/run-stress-es-cache.sh
+```
+
+기본값:
+
+- `BASE_URL=http://localhost:8080`
+- `ARTIFACT_DIR=artifacts/performance`
+- `SUMMARY_FILE=YYMMDD_k6_es_cache_200k_500vu.json`
+
+threshold:
+
+- `http_req_duration{endpoint:jobs_search} p(95) < 10000ms` (no-cache 대비 60000ms → 10000ms)
+- `http_req_failed rate < 0.50`
+
+확인할 지표:
+
+- `http_req_duration{endpoint:jobs_search} p(95), p(99)`
+- `http_req_failed`
+- `checks`
+- Redis cache hit rate (`cache_gets_total{result="hit"}`)
+- Grafana JVM memory, HTTP request rate, latency
