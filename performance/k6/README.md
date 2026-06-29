@@ -182,6 +182,7 @@ git pull --rebase
 
 docker compose -f docker-compose.yml -f docker-compose.performance.yml build backend gateway
 
+PERF_CACHE_ENABLED=true \
 REQUIRED_PORTS="" \
 bash performance/deploy/staging-performance-up.sh
 ```
