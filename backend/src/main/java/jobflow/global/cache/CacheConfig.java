@@ -31,6 +31,7 @@ public class CacheConfig {
                 .cacheDefaults(cacheConfiguration(DEFAULT_CACHE_TTL))
                 .withInitialCacheConfigurations(cacheConfigurations(cacheProperties))
                 .transactionAware()
+                .enableStatistics()
                 .build();
     }
 
