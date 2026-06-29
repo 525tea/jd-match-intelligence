@@ -18,6 +18,7 @@ if [[ -f "${ENV_FILE}" ]]; then
   done < "${ENV_FILE}"
 fi
 
+COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)
 MYSQL_SERVICE="${MYSQL_SERVICE:-mysql}"
 KAFKA_SERVICE="${KAFKA_SERVICE:-kafka}"
 PERF_DB_NAME="${PERF_DB_NAME:-jobflow_perf}"
@@ -37,8 +38,12 @@ fail() {
   exit 1
 }
 
+compose() {
+  docker compose "${COMPOSE_FILES[@]}" "$@"
+}
+
 mysql_exec() {
-  docker compose exec -T -e MYSQL_PWD="${PERF_DB_PASSWORD}" "${MYSQL_SERVICE}" mysql \
+  compose exec -T -e MYSQL_PWD="${PERF_DB_PASSWORD}" "${MYSQL_SERVICE}" mysql \
     -u"${PERF_DB_USER}" \
     --default-character-set=utf8mb4 \
     "$@" \
@@ -47,6 +52,7 @@ mysql_exec() {
 
 echo "ROOT_DIR=${ROOT_DIR}"
 echo "ENV_FILE=${ENV_FILE}"
+echo "COMPOSE_FILES=${COMPOSE_FILES[*]}"
 echo "MYSQL_SERVICE=${MYSQL_SERVICE}"
 echo "KAFKA_SERVICE=${KAFKA_SERVICE}"
 echo "PERF_DB_NAME=${PERF_DB_NAME}"
@@ -66,11 +72,11 @@ if [[ ! "${OUTBOX_SMOKE_RUN_ID}" =~ ^[A-Za-z0-9._:-]+$ ]]; then
   fail "OUTBOX_SMOKE_RUN_ID contains unsupported characters: ${OUTBOX_SMOKE_RUN_ID}"
 fi
 
-if ! docker compose ps --services --filter status=running | grep -qx "${MYSQL_SERVICE}"; then
+if ! compose ps --services --filter status=running | grep -qx "${MYSQL_SERVICE}"; then
   fail "service \"${MYSQL_SERVICE}\" is not running"
 fi
 
-if ! docker compose ps --services --filter status=running | grep -qx "${KAFKA_SERVICE}"; then
+if ! compose ps --services --filter status=running | grep -qx "${KAFKA_SERVICE}"; then
   fail "service \"${KAFKA_SERVICE}\" is not running"
 fi
 
@@ -150,7 +156,7 @@ echo "### Verify Kafka message"
 consumer_output_file="$(mktemp)"
 consumer_error_file="$(mktemp)"
 
-docker compose exec -T "${KAFKA_SERVICE}" \
+compose exec -T "${KAFKA_SERVICE}" \
   kafka-console-consumer \
     --bootstrap-server "${KAFKA_BOOTSTRAP_SERVERS}" \
     --topic "${OUTBOX_SMOKE_TOPIC}" \

@@ -129,6 +129,37 @@ Staging performance stack is ready for pre-k6 smoke.
 
 기본 실행은 이미 준비된 performance Elasticsearch index를 재사용한다. 200k fixture와 index를 최초 준비하거나 의도적으로 재생성할 때만 서버 `.env`에서 `ELASTICSEARCH_REINDEX_ON_STARTUP=true`로 바꾼다. 반복 stress test 실행 전에는 반드시 `false`로 되돌린다.
 
+Kafka가 재기동 중 ZooKeeper ephemeral node(`/brokers/ids/1`) 잔존으로 `NodeExistsException`을 내면 `staging-performance-up.sh`가 이를 감지해 Kafka/ZooKeeper 컨테이너와 Kafka/ZooKeeper 전용 볼륨만 정리한 뒤 한 번 재시도한다. 이 복구는 MySQL/Elasticsearch 볼륨을 건드리지 않는다.
+
+Kafka smoke script는 `docker compose exec kafka ...`처럼 컨테이너 내부에서 Kafka CLI를 실행하므로 bootstrap 주소는 `kafka:29092`를 사용한다. EC2 호스트에서 외부 클라이언트로 직접 붙을 때만 host mapped port인 `localhost:19092`를 사용한다.
+
+`staging-performance-up.sh`는 Kafka smoke script가 이 규칙을 지키는지 시작 전에 검증한다.
+
+```text
+kafka_smoke_context=ok
+```
+
+이 guard가 실패하면 Kafka smoke script에 아래 회귀가 들어간 것이다.
+
+- `localhost:9092` 기본값 사용
+- `docker-compose.performance.yml` 없이 단일 compose context 사용
+- `.env`를 line-by-line parser가 아니라 `source`로 로딩
+
+자동 복구 로그:
+
+```text
+Kafka ZooKeeper NodeExists detected. Recreating only Kafka/ZooKeeper state and preserving MySQL/Elasticsearch volumes.
+kafka_zookeeper_recovery=started
+kafka_zookeeper_recovery=restarted
+```
+
+자동 복구를 끄고 원인 로그만 보고 싶으면 아래처럼 실행한다.
+
+```bash
+KAFKA_ZOOKEEPER_AUTO_RECOVER=false \
+bash performance/deploy/staging-performance-up.sh
+```
+
 ```bash
 grep '^ELASTICSEARCH_REINDEX_ON_STARTUP=' .env
 sed -i 's/^ELASTICSEARCH_REINDEX_ON_STARTUP=.*/ELASTICSEARCH_REINDEX_ON_STARTUP=false/' .env
@@ -389,10 +420,13 @@ ERROR Creating /brokers/ids/1 ... owner does not match current session
 FATAL KeeperErrorCode = NodeExists
 ```
 
-해결: Zookeeper/Kafka 볼륨을 삭제하고 재기동한다.
+기본 해결: `staging-performance-up.sh`는 이 로그를 감지하면 Zookeeper/Kafka 볼륨만 삭제하고 한 번 자동 재기동한다.
+
+자동 복구를 끈 상태이거나 수동으로 처리해야 할 때만 아래 명령을 사용한다. 전체 `down -v`는 MySQL/Elasticsearch 볼륨까지 삭제할 수 있으므로 사용하지 않는다.
 
 ```bash
-docker compose down zookeeper kafka
+docker compose -f docker-compose.yml -f docker-compose.performance.yml stop kafka zookeeper
+docker compose -f docker-compose.yml -f docker-compose.performance.yml rm -f kafka zookeeper
 docker volume rm jobflow_zookeeper-data jobflow_zookeeper-log jobflow_kafka-data 2>/dev/null || true
 docker compose -f docker-compose.yml -f docker-compose.performance.yml up -d zookeeper kafka
 ```
