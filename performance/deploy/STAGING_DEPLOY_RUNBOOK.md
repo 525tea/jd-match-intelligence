@@ -127,6 +127,19 @@ Staging performance stack is ready for pre-k6 smoke.
 12. performance reindex 완료 로그 확인
 13. performance profile smoke
 
+기본 실행은 이미 준비된 performance Elasticsearch index를 재사용한다. 200k fixture와 index를 최초 준비하거나 의도적으로 재생성할 때만 서버 `.env`에서 `ELASTICSEARCH_REINDEX_ON_STARTUP=true`로 바꾼다. 반복 stress test 실행 전에는 반드시 `false`로 되돌린다.
+
+```bash
+grep '^ELASTICSEARCH_REINDEX_ON_STARTUP=' .env
+sed -i 's/^ELASTICSEARCH_REINDEX_ON_STARTUP=.*/ELASTICSEARCH_REINDEX_ON_STARTUP=false/' .env
+```
+
+기대값:
+
+```text
+ELASTICSEARCH_REINDEX_ON_STARTUP=false
+```
+
 서버에서 이미 image를 build했거나 특정 service만 올리고 싶으면 환경변수로 조정할 수 있다.
 
 ```bash
@@ -233,7 +246,7 @@ SPRING_PROFILES_ACTIVE=local,performance
 backend datasource=jobflow_perf
 Elasticsearch alias=jobflow-jobs-performance
 Elasticsearch index=jobflow-jobs-performance-v1
-startup reindex=true
+startup reindex=false after index preparation
 ```
 
 기동 상태 확인:
@@ -246,22 +259,37 @@ backend/gateway가 healthy가 될 때까지 기다린다.
 
 ## 4-3. Performance reindex 확인
 
-performance profile로 backend가 기동되면 `jobflow_perf`의 fixture가 Elasticsearch performance index로 reindex되어야 한다.
+performance profile은 기본적으로 이미 준비된 Elasticsearch performance index를 재사용한다. `ELASTICSEARCH_REINDEX_ON_STARTUP=false`이면 startup reindex는 건너뛰는 것이 정상이다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml logs --tail=200 backend \
+  | grep -Ei 'performance_reindex|ELASTICSEARCH_REINDEX_ON_STARTUP|reindex|indexedCount|Application run failed|alias'
+```
+
+기대 결과:
+
+```text
+performance_reindex=skipped
+reason=ELASTICSEARCH_REINDEX_ON_STARTUP=false
+```
+
+최초 200k index 준비 또는 의도적인 재색인이 필요한 경우에만 서버 `.env`에서 `ELASTICSEARCH_REINDEX_ON_STARTUP=true`로 바꾼 뒤 실행한다.
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.performance.yml logs --tail=200 backend \
   | grep -Ei 'reindex|indexedCount|Application run failed|alias'
 ```
 
-기대 결과:
+reindex 실행 시 기대 결과:
 
 ```text
 Job search reindex batch completed. indexedCount=500
 Job search reindex batch completed. indexedCount=1000
-Job search reindex completed. indexedCount=1000
+...
+Job search reindex completed. indexedCount=200000
 ```
 
-alias 오류가 보이면 performance profile 또는 ES alias 설정이 잘못된 것이다.
+reindex가 끝난 뒤에는 `.env`를 다시 `ELASTICSEARCH_REINDEX_ON_STARTUP=false`로 되돌려 다음 stress test에서 200k reindex를 반복하지 않게 한다. alias 오류가 보이면 performance profile 또는 ES alias 설정이 잘못된 것이다.
 
 대표 오류:
 
