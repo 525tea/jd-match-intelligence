@@ -299,6 +299,9 @@ run_step "Env file check" \
 run_step "Server bootstrap check" \
   bash performance/deploy/server-bootstrap-check.sh
 
+run_step "Performance ops regression guard" \
+  bash performance/deploy/performance-ops-regression-guard.sh
+
 run_step "Performance compose config" \
   compose config
 
