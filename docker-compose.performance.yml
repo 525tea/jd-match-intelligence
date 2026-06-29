@@ -18,7 +18,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${PERF_DB_USER:-jobflow}
       SPRING_DATASOURCE_PASSWORD: ${PERF_DB_PASSWORD:-jobflow}
       SPRING_FLYWAY_ENABLED: "false"
-      CACHE_ENABLED: "false"
+      CACHE_ENABLED: "${PERF_CACHE_ENABLED:-false}"
       APP_SEARCH_ELASTICSEARCH_INDEX_NAME: ${ELASTICSEARCH_JOBS_ALIAS:-jobflow-jobs-performance}
       ELASTICSEARCH_JOBS_ALIAS: ${ELASTICSEARCH_JOBS_ALIAS:-jobflow-jobs-performance}
       ELASTICSEARCH_JOBS_INDEX: ${ELASTICSEARCH_JOBS_INDEX:-jobflow-jobs-performance-v1}
@@ -40,7 +40,7 @@ services:
       JOBFLOW_KAFKA_CONSUMER_GROUP_ID: ${PERF_KAFKA_CONSUMER_GROUP_ID:-jobflow-backend-performance}
       JOBFLOW_KAFKA_CONSUMER_SEARCH_REFRESH_AFTER_INDEX: ${PERF_KAFKA_CONSUMER_SEARCH_REFRESH_AFTER_INDEX:-true}
     healthcheck:
-      test: ["CMD-SHELL", "curl --silent --fail http://localhost:8080/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl --silent --fail http://localhost:8080/actuator/health/liveness || exit 1"]
       interval: ${PERF_BACKEND_HEALTH_INTERVAL:-15s}
       timeout: 30s
       retries: ${PERF_BACKEND_HEALTH_RETRIES:-60}

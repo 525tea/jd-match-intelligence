@@ -7,10 +7,15 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env}"
 
 if [[ -f "${ENV_FILE}" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "${ENV_FILE}"
-  set +a
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// }" ]] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    value="${value%\"}" value="${value#\"}"
+    value="${value%\'}" value="${value#\'}"
+    export "$key=$value"
+  done < "${ENV_FILE}"
 fi
 
 MYSQL_SERVICE="${MYSQL_SERVICE:-mysql}"
@@ -18,7 +23,7 @@ KAFKA_SERVICE="${KAFKA_SERVICE:-kafka}"
 PERF_DB_NAME="${PERF_DB_NAME:-jobflow_perf}"
 PERF_DB_USER="${PERF_DB_USER:-jobflow}"
 PERF_DB_PASSWORD="${PERF_DB_PASSWORD:-jobflow}"
-KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}"
+KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}"
 OUTBOX_SMOKE_TOPIC="${OUTBOX_SMOKE_TOPIC:-job.created}"
 OUTBOX_SMOKE_RUN_ID="${OUTBOX_SMOKE_RUN_ID:-outbox-kafka-smoke-$(date +%Y%m%d%H%M%S)}"
 OUTBOX_SMOKE_AGGREGATE_ID="${OUTBOX_SMOKE_AGGREGATE_ID:-$((7000000000 + $(date +%s) % 1000000000))}"

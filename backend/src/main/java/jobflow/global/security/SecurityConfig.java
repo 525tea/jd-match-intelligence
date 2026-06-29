@@ -73,7 +73,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PATCH, "/skills/{skillId}").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/jobs").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/jobs/{jobId}", "/jobs/{jobId}/close", "/jobs/{jobId}/expire").hasRole("ADMIN")
-                        .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/actuator/prometheus").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .anyRequest().authenticated()
                 )
