@@ -63,6 +63,10 @@ echo "ELASTICSEARCH_REINDEX_BATCH_SIZE=${ELASTICSEARCH_REINDEX_BATCH_SIZE}"
 echo "PERF_CACHE_ENABLED=${PERF_CACHE_ENABLED}"
 echo "BUILD_SERVICES=${BUILD_SERVICES}"
 echo "UP_SERVICES=${UP_SERVICES:-all}"
+if [[ "${ELASTICSEARCH_REINDEX_ON_STARTUP}" == "true" ]]; then
+  echo "WARNING: ELASTICSEARCH_REINDEX_ON_STARTUP=true will rebuild the performance search index."
+  echo "WARNING: Keep it false for repeated stress tests after the 200k index is prepared."
+fi
 echo
 
 fail() {
