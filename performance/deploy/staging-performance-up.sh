@@ -5,10 +5,17 @@ set -euo pipefail
 ENV_FILE="${ENV_FILE:-.env}"
 
 if [[ -f "${ENV_FILE}" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "${ENV_FILE}"
-  set +a
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// }" ]] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    value="${value%\"}"
+    value="${value#\"}"
+    value="${value%\'}"
+    value="${value#\'}"
+    export "$key=$value"
+  done < "${ENV_FILE}"
 fi
 
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)
