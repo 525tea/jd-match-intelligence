@@ -108,7 +108,7 @@ ES 단독 대비 Redis 캐시 적용 후 500VU 조건에서 p95 latency가 5.52s
 
 Raw JSON과 Grafana PNG는 로컬 artifact로만 보관한다.
 
-## 면접에서 설명할 포인트
+## 주요 해석 포인트
 
 - MySQL FULLTEXT는 200k+고VU 조건에서 커넥션 풀 포화와 높은 실패율이 발생했다.
 - ES 단독은 실패율 0%로 완주했지만 500VU에서 p95가 5.52s로 높았다.
