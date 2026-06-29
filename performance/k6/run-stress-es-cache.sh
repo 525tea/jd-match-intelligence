@@ -40,8 +40,8 @@ cache_metric_total() {
     curl -fsS "$PROMETHEUS_URL" 2>/dev/null | awk -v result="$result" '
         $0 !~ /^#/ &&
         $0 ~ /^cache_gets_total/ &&
-        $0 ~ /result="/ result "/ &&
-        ($0 ~ /cache="jobSearch"/ || $0 ~ /name="jobSearch"/) {
+        index($0, "result=\"" result "\"") > 0 &&
+        (index($0, "cache=\"jobSearch\"") > 0 || index($0, "name=\"jobSearch\"") > 0) {
             total += $NF
         }
         END {
