@@ -261,17 +261,42 @@ backend/gateway가 healthy가 될 때까지 기다린다.
 
 performance profile은 기본적으로 이미 준비된 Elasticsearch performance index를 재사용한다. `ELASTICSEARCH_REINDEX_ON_STARTUP=false`이면 startup reindex는 건너뛰는 것이 정상이다.
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.performance.yml logs --tail=200 backend \
-  | grep -Ei 'performance_reindex|ELASTICSEARCH_REINDEX_ON_STARTUP|reindex|indexedCount|Application run failed|alias'
-```
-
-기대 결과:
+통합 스크립트 실행 출력에서는 reindex skip 상태가 다음처럼 표시된다.
 
 ```text
 performance_reindex=skipped
 reason=ELASTICSEARCH_REINDEX_ON_STARTUP=false
 ```
+
+backend reindex runner는 `ELASTICSEARCH_REINDEX_ON_STARTUP=true`일 때만 등록되므로, `false` 상태에서는 backend 로그에 reindex batch/completion 로그가 없어야 정상이다.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.performance.yml logs --tail=200 backend \
+  | grep -Ei 'reindex|indexedCount|Application run failed|alias' || true
+```
+
+반복 stress test 전에는 reindex 로그 대신 MySQL fixture와 Elasticsearch document count가 모두 200,000인지 확인한다.
+
+```bash
+set -a
+source .env
+set +a
+
+docker compose -f docker-compose.yml -f docker-compose.performance.yml exec -T mysql \
+  mysql -u root -p"${MYSQL_ROOT_PASSWORD}" --batch --raw --skip-column-names \
+  --default-character-set=utf8mb4 "${PERF_DB_NAME:-jobflow_perf}" \
+  -e "SELECT COUNT(*) FROM jobs WHERE source='perf_fixture';"
+
+curl -s "http://localhost:9200/${ELASTICSEARCH_JOBS_ALIAS:-jobflow-jobs-performance}/_count" | jq -r '.count'
+```
+
+기대 결과는 두 명령 모두 `200000`이다.
+
+```text
+200000
+200000
+```
+
 
 최초 200k index 준비 또는 의도적인 재색인이 필요한 경우에만 서버 `.env`에서 `ELASTICSEARCH_REINDEX_ON_STARTUP=true`로 바꾼 뒤 실행한다.
 
