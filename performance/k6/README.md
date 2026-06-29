@@ -333,3 +333,70 @@ threshold:
 - `checks`
 - Redis cache hit rate (`cache_gets_total{result="hit"}`)
 - Grafana JVM memory, HTTP request rate, latency
+
+## Elasticsearch + Redis Mixed Hit-rate Stress Test
+
+High cache-hit stress test는 10개 인기 키워드를 반복 조회해 Redis cache가 거의 모든 검색 요청을 흡수하는 조건을 검증한다. mixed hit-rate stress test는 인기 키워드와 long-tail 검색어를 섞어 cache hit rate가 낮아질 때 p95/p99, RPS, error rate, Redis hit/miss가 어떻게 변하는지 확인한다.
+
+사전 준비는 Elasticsearch + Redis cache stress test와 동일하다.
+
+```bash
+PERF_CACHE_ENABLED=true \
+PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false \
+ELASTICSEARCH_REINDEX_ON_STARTUP=false \
+PERF_ELASTICSEARCH_MEMORY_LIMIT=3g \
+PERF_ES_JAVA_OPTS="-Xms2g -Xmx2g" \
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+단건 smoke:
+
+```bash
+k6 run \
+  --vus 1 \
+  --iterations 1 \
+  -e BASE_URL=http://localhost:8080 \
+  -e HOT_TRAFFIC_PERCENT=70 \
+  performance/k6/stress-es-cache-mixed-hit-rate-200k.js
+```
+
+70% hot / 30% long-tail:
+
+```bash
+HOT_TRAFFIC_PERCENT=70 \
+SUMMARY_FILE=260630_k6_es_cache_mixed_70_hot_200k_500vu.json \
+bash performance/k6/run-stress-es-cache-mixed-hit-rate.sh
+```
+
+50% hot / 50% long-tail:
+
+```bash
+HOT_TRAFFIC_PERCENT=50 \
+SUMMARY_FILE=260630_k6_es_cache_mixed_50_hot_200k_500vu.json \
+bash performance/k6/run-stress-es-cache-mixed-hit-rate.sh
+```
+
+30% hot / 70% long-tail:
+
+```bash
+HOT_TRAFFIC_PERCENT=30 \
+SUMMARY_FILE=260630_k6_es_cache_mixed_30_hot_200k_500vu.json \
+bash performance/k6/run-stress-es-cache-mixed-hit-rate.sh
+```
+
+기본값:
+
+- `BASE_URL=http://localhost:8080`
+- `ARTIFACT_DIR=artifacts/performance`
+- `HOT_TRAFFIC_PERCENT=70`
+- `LONG_TAIL_VARIANTS=10000`
+- `SUMMARY_FILE=YYMMDD_k6_es_cache_mixed_${HOT_TRAFFIC_PERCENT}_hot_200k_500vu.json`
+
+확인할 지표:
+
+- `http_req_duration{endpoint:jobs_search,traffic:hot} p(95), p(99)`
+- `http_req_duration{endpoint:jobs_search,traffic:long_tail} p(95), p(99)`
+- `http_req_failed`
+- Redis cache hit/miss rate (`cache_gets_total{result="hit|miss"}`)
+- Grafana JVM memory, HTTP request rate, latency
