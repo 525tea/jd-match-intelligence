@@ -178,17 +178,17 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (cache) (rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m])) / clamp_min(sum by (cache) (rate(cache_gets_total{application=\"jobflow-backend\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m])), 0.001)",
+          "expr": "sum by (cache) ((rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]) or label_replace(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", name=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]), \"cache\", \"$1\", \"name\", \"(.*)\"))) / clamp_min(sum by (cache) ((rate(cache_gets_total{application=\"jobflow-backend\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]) or label_replace(rate(cache_gets_total{application=\"jobflow-backend\", name=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]), \"cache\", \"$1\", \"name\", \"(.*)\"))), 0.001)",
           "legendFormat": "{{cache}} hit rate"
         },
         {
           "refId": "B",
-          "expr": "sum by (cache) (rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]))",
+          "expr": "sum by (cache) ((rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]) or label_replace(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", name=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]), \"cache\", \"$1\", \"name\", \"(.*)\")))",
           "legendFormat": "{{cache}} hits/s"
         },
         {
           "refId": "C",
-          "expr": "sum by (cache) (rate(cache_gets_total{application=\"jobflow-backend\", result=\"miss\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]))",
+          "expr": "sum by (cache) ((rate(cache_gets_total{application=\"jobflow-backend\", result=\"miss\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]) or label_replace(rate(cache_gets_total{application=\"jobflow-backend\", result=\"miss\", name=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]), \"cache\", \"$1\", \"name\", \"(.*)\")))",
           "legendFormat": "{{cache}} misses/s"
         }
       ],

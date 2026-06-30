@@ -37,6 +37,14 @@ if (ENDPOINTS.length === 0) {
     throw new Error('ENDPOINTS must contain at least one endpoint');
 }
 
+if (TARGET_ROLES.length === 0) {
+    throw new Error('TARGET_ROLES must contain at least one role');
+}
+
+if (ENDPOINTS.includes('jd_match') && TARGET_CAREER_LEVELS.length === 0) {
+    throw new Error('TARGET_CAREER_LEVELS must contain at least one career level when jd_match is enabled');
+}
+
 if (!Number.isFinite(VUS) || VUS < 1) {
     throw new Error('VUS must be a positive number');
 }

@@ -32,6 +32,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 mkdir -p "$ARTIFACT_DIR"
+if ! command -v k6 >/dev/null 2>&1; then
+    chmod 777 "$ARTIFACT_DIR"
+fi
 ARTIFACT_DIR="$(cd "$ARTIFACT_DIR" && pwd)"
 
 ANALYSIS_CACHES=(gapAnalysis jdMatch jobRecommendation)
@@ -124,10 +127,14 @@ login() {
         return
     fi
 
-    local login_body
+    local login_body login_payload
+    login_payload="$(jq -nc \
+        --arg email "$LOGIN_EMAIL" \
+        --arg password "$LOGIN_PASSWORD" \
+        '{email:$email,password:$password}')"
     if ! login_body="$(curl -fsS -X POST "${BASE_URL}/auth/login" \
         -H 'Content-Type: application/json' \
-        -d "{\"email\":\"${LOGIN_EMAIL}\",\"password\":\"${LOGIN_PASSWORD}\"}" 2>/dev/null)"; then
+        -d "$login_payload" 2>/dev/null)"; then
         echo "Auth preflight failed: login failed." >&2
         exit 1
     fi
