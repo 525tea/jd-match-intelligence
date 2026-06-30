@@ -11,12 +11,28 @@ TARGET_CAREER_LEVELS="${TARGET_CAREER_LEVELS:-JUNIOR,MID,SENIOR}"
 VUS="${VUS:-200}"
 DURATION="${DURATION:-10m}"
 LIMIT="${LIMIT:-20}"
-SLEEP_SECONDS="${SLEEP_SECONDS:-1}"
+LIMIT_VALUES="${LIMIT_VALUES:-$LIMIT}"
+TARGET_RPS="${TARGET_RPS:-}"
+PRE_ALLOCATED_VUS="${PRE_ALLOCATED_VUS:-800}"
+MAX_VUS="${MAX_VUS:-4000}"
+SLEEP_SECONDS="${SLEEP_SECONDS:-}"
 P95_THRESHOLD_MS="${P95_THRESHOLD_MS:-5000}"
 FAIL_RATE_THRESHOLD="${FAIL_RATE_THRESHOLD:-0.02}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/performance}"
 CACHE_MODE="${CACHE_MODE:-enabled}"
-SUMMARY_FILE="${SUMMARY_FILE:-$(date +%y%m%d)_k6_analysis_cache_${CACHE_MODE}_200vu.json}"
+WORKLOAD_MODE="${WORKLOAD_MODE:-hot}"
+HOT_RATIO="${HOT_RATIO:-0.7}"
+HOT_VARIANTS="${HOT_VARIANTS:-9}"
+LONG_TAIL_VARIANTS="${LONG_TAIL_VARIANTS:-5000}"
+ROLE_COMBINATION_SIZE="${ROLE_COMBINATION_SIZE:-1}"
+RUN_LABEL="${RUN_LABEL:-analysis_cache}"
+RUN_LOCATION="${RUN_LOCATION:-internal}"
+SUMMARY_PREFIX="${SUMMARY_PREFIX:-$(date +%y%m%d)_k6_analysis_cache_${CACHE_MODE}_${WORKLOAD_MODE}_${RUN_LABEL}_${RUN_LOCATION}}"
+if [[ -n "$TARGET_RPS" ]]; then
+    SUMMARY_FILE="${SUMMARY_FILE:-${SUMMARY_PREFIX}_${TARGET_RPS}rps.json}"
+else
+    SUMMARY_FILE="${SUMMARY_FILE:-${SUMMARY_PREFIX}_${VUS}vu.json}"
+fi
 ACCESS_TOKEN="${ACCESS_TOKEN:-}"
 USER_PROJECT_ID="${USER_PROJECT_ID:-}"
 LOGIN_EMAIL="${LOGIN_EMAIL:-frontend-demo@example.com}"
@@ -24,6 +40,7 @@ LOGIN_PASSWORD="${LOGIN_PASSWORD:-password123}"
 REQUIRE_BACKEND_CACHE_ENABLED="${REQUIRE_BACKEND_CACHE_ENABLED:-true}"
 RESET_REDIS_CACHE_BEFORE_RUN="${RESET_REDIS_CACHE_BEFORE_RUN:-true}"
 WARMUP_ROUNDS="${WARMUP_ROUNDS:-2}"
+WARMUP_VARIANTS="${WARMUP_VARIANTS:-$HOT_VARIANTS}"
 MIN_ANALYSIS_CACHE_HIT_DELTA="${MIN_ANALYSIS_CACHE_HIT_DELTA:-3}"
 FAILURE_SAMPLE_BODY_LIMIT="${FAILURE_SAMPLE_BODY_LIMIT:-500}"
 K6_SCRIPT="${K6_SCRIPT:-performance/k6/stress-analysis-cache.js}"
@@ -49,11 +66,22 @@ echo "TARGET_CAREER_LEVELS=$TARGET_CAREER_LEVELS"
 echo "VUS=$VUS"
 echo "DURATION=$DURATION"
 echo "LIMIT=$LIMIT"
-echo "SLEEP_SECONDS=$SLEEP_SECONDS"
+echo "LIMIT_VALUES=$LIMIT_VALUES"
+echo "TARGET_RPS=${TARGET_RPS:-empty}"
+echo "PRE_ALLOCATED_VUS=$PRE_ALLOCATED_VUS"
+echo "MAX_VUS=$MAX_VUS"
+echo "SLEEP_SECONDS=${SLEEP_SECONDS:-default}"
 echo "P95_THRESHOLD_MS=$P95_THRESHOLD_MS"
 echo "FAIL_RATE_THRESHOLD=$FAIL_RATE_THRESHOLD"
 echo "ARTIFACT_DIR=$ARTIFACT_DIR"
 echo "CACHE_MODE=$CACHE_MODE"
+echo "WORKLOAD_MODE=$WORKLOAD_MODE"
+echo "HOT_RATIO=$HOT_RATIO"
+echo "HOT_VARIANTS=$HOT_VARIANTS"
+echo "LONG_TAIL_VARIANTS=$LONG_TAIL_VARIANTS"
+echo "ROLE_COMBINATION_SIZE=$ROLE_COMBINATION_SIZE"
+echo "RUN_LABEL=$RUN_LABEL"
+echo "RUN_LOCATION=$RUN_LOCATION"
 echo "SUMMARY_FILE=$SUMMARY_FILE"
 echo "ACCESS_TOKEN=$([ -n "$ACCESS_TOKEN" ] && echo provided || echo empty)"
 echo "USER_PROJECT_ID=${USER_PROJECT_ID:-empty}"
@@ -62,6 +90,7 @@ echo "LOGIN_PASSWORD=$([ -n "$LOGIN_PASSWORD" ] && echo provided || echo empty)"
 echo "REQUIRE_BACKEND_CACHE_ENABLED=$REQUIRE_BACKEND_CACHE_ENABLED"
 echo "RESET_REDIS_CACHE_BEFORE_RUN=$RESET_REDIS_CACHE_BEFORE_RUN"
 echo "WARMUP_ROUNDS=$WARMUP_ROUNDS"
+echo "WARMUP_VARIANTS=$WARMUP_VARIANTS"
 echo "MIN_ANALYSIS_CACHE_HIT_DELTA=$MIN_ANALYSIS_CACHE_HIT_DELTA"
 echo "FAILURE_SAMPLE_BODY_LIMIT=$FAILURE_SAMPLE_BODY_LIMIT"
 
@@ -167,12 +196,31 @@ resolve_user_project_id() {
     fi
 }
 
-target_role() {
+target_roles_query() {
     local index="$1"
     IFS=',' read -r -a roles <<<"$TARGET_ROLES"
     local role_count="${#roles[@]}"
-    local role="${roles[$((index % role_count))]}"
-    sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<<"$role"
+    local combo_size="$ROLE_COMBINATION_SIZE"
+    local offset role encoded_role query=""
+
+    if ((combo_size < 1)); then
+        combo_size=1
+    fi
+    if ((combo_size > role_count)); then
+        combo_size="$role_count"
+    fi
+
+    for ((offset = 0; offset < combo_size; offset++)); do
+        role="${roles[$(((index + offset) % role_count))]}"
+        role="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<<"$role")"
+        encoded_role="$(urlencode "$role")"
+        if [[ -n "$query" ]]; then
+            query="${query}&"
+        fi
+        query="${query}targetRoles=${encoded_role}"
+    done
+
+    printf "%s" "$query"
 }
 
 target_career_level() {
@@ -183,29 +231,37 @@ target_career_level() {
     sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<<"$career_level"
 }
 
+target_limit() {
+    local index="$1"
+    IFS=',' read -r -a limits <<<"$LIMIT_VALUES"
+    local limit_count="${#limits[@]}"
+    local limit="${limits[$((index % limit_count))]}"
+    sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<<"$limit"
+}
+
 analysis_url() {
     local endpoint="$1"
     local index="$2"
-    local role career_level encoded_project_id encoded_role encoded_career_level
+    local career_level limit encoded_project_id encoded_career_level roles_query
 
-    role="$(target_role "$index")"
     career_level="$(target_career_level "$index")"
+    limit="$(target_limit "$index")"
     encoded_project_id="$(urlencode "$USER_PROJECT_ID")"
-    encoded_role="$(urlencode "$role")"
     encoded_career_level="$(urlencode "$career_level")"
+    roles_query="$(target_roles_query "$index")"
 
     case "$endpoint" in
         gap_analysis)
-            printf "%s/gap-analysis/projects/%s?targetRoles=%s&limit=%s" \
-                "$BASE_URL" "$encoded_project_id" "$encoded_role" "$LIMIT"
+            printf "%s/gap-analysis/projects/%s?%s&limit=%s" \
+                "$BASE_URL" "$encoded_project_id" "$roles_query" "$limit"
             ;;
         jd_match)
-            printf "%s/projects/%s/job-matches?targetRoles=%s&targetCareerLevel=%s&limit=%s" \
-                "$BASE_URL" "$encoded_project_id" "$encoded_role" "$encoded_career_level" "$LIMIT"
+            printf "%s/projects/%s/job-matches?%s&targetCareerLevel=%s&limit=%s" \
+                "$BASE_URL" "$encoded_project_id" "$roles_query" "$encoded_career_level" "$limit"
             ;;
         recommendations_jobs)
-            printf "%s/recommendations/jobs?userProjectId=%s&targetRoles=%s&limit=%s" \
-                "$BASE_URL" "$encoded_project_id" "$encoded_role" "$LIMIT"
+            printf "%s/recommendations/jobs?userProjectId=%s&%s&limit=%s" \
+                "$BASE_URL" "$encoded_project_id" "$roles_query" "$limit"
             ;;
         *)
             echo "Unsupported endpoint in ENDPOINTS: $endpoint" >&2
@@ -234,6 +290,31 @@ request_endpoint() {
 
 if [[ "$CACHE_MODE" != "enabled" && "$CACHE_MODE" != "disabled" ]]; then
     echo "CACHE_MODE must be enabled or disabled." >&2
+    exit 1
+fi
+
+if [[ "$WORKLOAD_MODE" != "hot" && "$WORKLOAD_MODE" != "mixed" && "$WORKLOAD_MODE" != "cold" ]]; then
+    echo "WORKLOAD_MODE must be hot, mixed, or cold." >&2
+    exit 1
+fi
+
+if [[ ! "$ROLE_COMBINATION_SIZE" =~ ^[0-9]+$ || "$ROLE_COMBINATION_SIZE" -lt 1 ]]; then
+    echo "ROLE_COMBINATION_SIZE must be a positive integer." >&2
+    exit 1
+fi
+
+if [[ ! "$HOT_VARIANTS" =~ ^[0-9]+$ || "$HOT_VARIANTS" -lt 1 ]]; then
+    echo "HOT_VARIANTS must be a positive integer." >&2
+    exit 1
+fi
+
+if [[ ! "$LONG_TAIL_VARIANTS" =~ ^[0-9]+$ || "$LONG_TAIL_VARIANTS" -lt 1 ]]; then
+    echo "LONG_TAIL_VARIANTS must be a positive integer." >&2
+    exit 1
+fi
+
+if [[ ! "$WARMUP_VARIANTS" =~ ^[0-9]+$ || "$WARMUP_VARIANTS" -lt 1 ]]; then
+    echo "WARMUP_VARIANTS must be a positive integer." >&2
     exit 1
 fi
 
@@ -298,14 +379,16 @@ echo "analysis_api_preflight=ok endpoints=$ENDPOINTS"
 if [[ "$CACHE_MODE" == "enabled" ]]; then
     warmup_count=0
     for ((round = 1; round <= WARMUP_ROUNDS; round++)); do
-        for endpoint in "${endpoint_array[@]}"; do
-            endpoint="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<<"$endpoint")"
-            [[ -z "$endpoint" ]] && continue
-            request_endpoint "$endpoint" "$warmup_count"
-            warmup_count=$((warmup_count + 1))
+        for ((variant = 0; variant < WARMUP_VARIANTS; variant++)); do
+            for endpoint in "${endpoint_array[@]}"; do
+                endpoint="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<<"$endpoint")"
+                [[ -z "$endpoint" ]] && continue
+                request_endpoint "$endpoint" "$variant"
+                warmup_count=$((warmup_count + 1))
+            done
         done
     done
-    echo "analysis_cache_warmup=ok rounds=${WARMUP_ROUNDS} requests=${warmup_count}"
+    echo "analysis_cache_warmup=ok rounds=${WARMUP_ROUNDS} variants=${WARMUP_VARIANTS} requests=${warmup_count}"
 else
     echo "analysis_cache_warmup=skipped"
 fi
@@ -343,11 +426,20 @@ if command -v k6 >/dev/null 2>&1; then
     VUS="$VUS" \
     DURATION="$DURATION" \
     LIMIT="$LIMIT" \
-    SLEEP_SECONDS="$SLEEP_SECONDS" \
+    LIMIT_VALUES="$LIMIT_VALUES" \
+    TARGET_RPS="$TARGET_RPS" \
+    PRE_ALLOCATED_VUS="$PRE_ALLOCATED_VUS" \
+    MAX_VUS="$MAX_VUS" \
+    SLEEP_SECONDS="${SLEEP_SECONDS:-}" \
     P95_THRESHOLD_MS="$P95_THRESHOLD_MS" \
     FAIL_RATE_THRESHOLD="$FAIL_RATE_THRESHOLD" \
     FAILURE_SAMPLE_BODY_LIMIT="$FAILURE_SAMPLE_BODY_LIMIT" \
     CACHE_MODE="$CACHE_MODE" \
+    WORKLOAD_MODE="$WORKLOAD_MODE" \
+    HOT_RATIO="$HOT_RATIO" \
+    HOT_VARIANTS="$HOT_VARIANTS" \
+    LONG_TAIL_VARIANTS="$LONG_TAIL_VARIANTS" \
+    ROLE_COMBINATION_SIZE="$ROLE_COMBINATION_SIZE" \
     k6 run --summary-export "$summary_path" "$K6_SCRIPT"
 else
     docker run --rm --network host \
@@ -362,16 +454,34 @@ else
         -e VUS="$VUS" \
         -e DURATION="$DURATION" \
         -e LIMIT="$LIMIT" \
-        -e SLEEP_SECONDS="$SLEEP_SECONDS" \
+        -e LIMIT_VALUES="$LIMIT_VALUES" \
+        -e TARGET_RPS="$TARGET_RPS" \
+        -e PRE_ALLOCATED_VUS="$PRE_ALLOCATED_VUS" \
+        -e MAX_VUS="$MAX_VUS" \
+        -e SLEEP_SECONDS="${SLEEP_SECONDS:-}" \
         -e P95_THRESHOLD_MS="$P95_THRESHOLD_MS" \
         -e FAIL_RATE_THRESHOLD="$FAIL_RATE_THRESHOLD" \
         -e FAILURE_SAMPLE_BODY_LIMIT="$FAILURE_SAMPLE_BODY_LIMIT" \
         -e CACHE_MODE="$CACHE_MODE" \
+        -e WORKLOAD_MODE="$WORKLOAD_MODE" \
+        -e HOT_RATIO="$HOT_RATIO" \
+        -e HOT_VARIANTS="$HOT_VARIANTS" \
+        -e LONG_TAIL_VARIANTS="$LONG_TAIL_VARIANTS" \
+        -e ROLE_COMBINATION_SIZE="$ROLE_COMBINATION_SIZE" \
         -v "$ROOT_DIR/performance/k6:/scripts:ro" \
         -v "$ARTIFACT_DIR:/k6-output" \
         grafana/k6 run --summary-export "/k6-output/$SUMMARY_FILE" "/scripts/$(basename "$K6_SCRIPT")"
 fi
 
+analysis_hits_final="$(cache_metric_sum hit)"
+analysis_misses_final="$(cache_metric_sum miss)"
+analysis_hits_run_delta=$((analysis_hits_final - analysis_hits_after))
+analysis_misses_run_delta=$((analysis_misses_final - analysis_misses_after))
+
 echo
 echo "Analysis cache stress test completed."
 echo "summary_export=$summary_path"
+echo "analysis_cache_hits_final=$analysis_hits_final"
+echo "analysis_cache_hits_run_delta=$analysis_hits_run_delta"
+echo "analysis_cache_misses_final=$analysis_misses_final"
+echo "analysis_cache_misses_run_delta=$analysis_misses_run_delta"

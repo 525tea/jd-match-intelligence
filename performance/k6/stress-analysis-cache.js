@@ -7,64 +7,142 @@ const ACCESS_TOKEN = __ENV.ACCESS_TOKEN || '';
 const LOGIN_EMAIL = __ENV.LOGIN_EMAIL || '';
 const LOGIN_PASSWORD = __ENV.LOGIN_PASSWORD || '';
 const USER_PROJECT_ID = __ENV.USER_PROJECT_ID || '';
-const ENDPOINTS = (__ENV.ENDPOINTS || 'gap_analysis,jd_match,recommendations_jobs')
-    .split(',')
-    .map((endpoint) => endpoint.trim())
-    .filter((endpoint) => endpoint.length > 0);
-const TARGET_ROLES = (__ENV.TARGET_ROLES || 'BACKEND,DATA_ENGINEER,DEVOPS')
-    .split(',')
-    .map((role) => role.trim())
-    .filter((role) => role.length > 0);
-const TARGET_CAREER_LEVELS = (__ENV.TARGET_CAREER_LEVELS || 'JUNIOR,MID,SENIOR')
-    .split(',')
-    .map((careerLevel) => careerLevel.trim())
-    .filter((careerLevel) => careerLevel.length > 0);
+const ENDPOINTS = csv(__ENV.ENDPOINTS || 'gap_analysis,jd_match,recommendations_jobs');
+const TARGET_ROLES = csv(__ENV.TARGET_ROLES || 'BACKEND,DATA_ENGINEER,DEVOPS');
+const TARGET_CAREER_LEVELS = csv(__ENV.TARGET_CAREER_LEVELS || 'JUNIOR,MID,SENIOR');
+const LIMIT_VALUES = csv(__ENV.LIMIT_VALUES || __ENV.LIMIT || '20').map((value) => Number(value));
 
-const VUS = Number(__ENV.VUS || 200);
+const VUS = numberEnv('VUS', 200);
 const DURATION = __ENV.DURATION || '10m';
-const LIMIT = Number(__ENV.LIMIT || 20);
-const SLEEP_SECONDS = Number(__ENV.SLEEP_SECONDS || 1);
-const P95_THRESHOLD_MS = Number(__ENV.P95_THRESHOLD_MS || 5000);
-const FAIL_RATE_THRESHOLD = Number(__ENV.FAIL_RATE_THRESHOLD || 0.02);
-const FAILURE_SAMPLE_BODY_LIMIT = Number(__ENV.FAILURE_SAMPLE_BODY_LIMIT || 500);
+const TARGET_RPS = numberEnv('TARGET_RPS', 0);
+const PRE_ALLOCATED_VUS = numberEnv('PRE_ALLOCATED_VUS', Math.max(VUS, TARGET_RPS || VUS));
+const MAX_VUS = numberEnv('MAX_VUS', Math.max(PRE_ALLOCATED_VUS, VUS));
+const SLEEP_SECONDS = numberEnv('SLEEP_SECONDS', TARGET_RPS > 0 ? 0 : 1);
+const P95_THRESHOLD_MS = numberEnv('P95_THRESHOLD_MS', 5000);
+const FAIL_RATE_THRESHOLD = numberEnv('FAIL_RATE_THRESHOLD', 0.02);
+const FAILURE_SAMPLE_BODY_LIMIT = numberEnv('FAILURE_SAMPLE_BODY_LIMIT', 500);
 const CACHE_MODE = __ENV.CACHE_MODE || 'enabled';
+const WORKLOAD_MODE = __ENV.WORKLOAD_MODE || 'hot';
+const HOT_RATIO = numberEnv('HOT_RATIO', 0.7);
+const HOT_VARIANTS = numberEnv('HOT_VARIANTS', 9);
+const LONG_TAIL_VARIANTS = numberEnv('LONG_TAIL_VARIANTS', 5000);
+const ROLE_COMBINATION_SIZE = numberEnv('ROLE_COMBINATION_SIZE', 1);
 
 const httpStatusCodes = new Counter('jobflow_analysis_cache_http_status_codes');
 const failedResponses = new Counter('jobflow_analysis_cache_failed_responses');
 const loggedFailureSamples = {};
 
-if (ENDPOINTS.length === 0) {
-    throw new Error('ENDPOINTS must contain at least one endpoint');
+validateConfig();
+
+export const options = buildOptions();
+
+function csv(value) {
+    return String(value || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0);
 }
 
-if (TARGET_ROLES.length === 0) {
-    throw new Error('TARGET_ROLES must contain at least one role');
+function numberEnv(name, defaultValue) {
+    const value = Number(__ENV[name] || defaultValue);
+    if (!Number.isFinite(value)) {
+        throw new Error(`${name} must be a finite number`);
+    }
+    return value;
 }
 
-if (ENDPOINTS.includes('jd_match') && TARGET_CAREER_LEVELS.length === 0) {
-    throw new Error('TARGET_CAREER_LEVELS must contain at least one career level when jd_match is enabled');
+function validateConfig() {
+    if (ENDPOINTS.length === 0) {
+        throw new Error('ENDPOINTS must contain at least one endpoint');
+    }
+
+    if (TARGET_ROLES.length === 0) {
+        throw new Error('TARGET_ROLES must contain at least one role');
+    }
+
+    if (ENDPOINTS.includes('jd_match') && TARGET_CAREER_LEVELS.length === 0) {
+        throw new Error('TARGET_CAREER_LEVELS must contain at least one career level when jd_match is enabled');
+    }
+
+    if (!Number.isFinite(VUS) || VUS < 1) {
+        throw new Error('VUS must be a positive number');
+    }
+
+    if (!Number.isFinite(TARGET_RPS) || TARGET_RPS < 0) {
+        throw new Error('TARGET_RPS must be zero or a positive number');
+    }
+
+    if (!Number.isFinite(PRE_ALLOCATED_VUS) || PRE_ALLOCATED_VUS < 1) {
+        throw new Error('PRE_ALLOCATED_VUS must be a positive number');
+    }
+
+    if (!Number.isFinite(MAX_VUS) || MAX_VUS < PRE_ALLOCATED_VUS) {
+        throw new Error('MAX_VUS must be greater than or equal to PRE_ALLOCATED_VUS');
+    }
+
+    if (LIMIT_VALUES.length === 0 || LIMIT_VALUES.some((limit) => !Number.isInteger(limit) || limit < 1 || limit > 50)) {
+        throw new Error('LIMIT_VALUES must contain integers between 1 and 50');
+    }
+
+    if (!['enabled', 'disabled'].includes(CACHE_MODE)) {
+        throw new Error('CACHE_MODE must be enabled or disabled');
+    }
+
+    if (!['hot', 'mixed', 'cold'].includes(WORKLOAD_MODE)) {
+        throw new Error('WORKLOAD_MODE must be hot, mixed, or cold');
+    }
+
+    if (HOT_RATIO < 0 || HOT_RATIO > 1) {
+        throw new Error('HOT_RATIO must be between 0 and 1');
+    }
+
+    if (!Number.isInteger(HOT_VARIANTS) || HOT_VARIANTS < 1) {
+        throw new Error('HOT_VARIANTS must be a positive integer');
+    }
+
+    if (!Number.isInteger(LONG_TAIL_VARIANTS) || LONG_TAIL_VARIANTS < 1) {
+        throw new Error('LONG_TAIL_VARIANTS must be a positive integer');
+    }
+
+    if (!Number.isInteger(ROLE_COMBINATION_SIZE) || ROLE_COMBINATION_SIZE < 1) {
+        throw new Error('ROLE_COMBINATION_SIZE must be a positive integer');
+    }
 }
 
-if (!Number.isFinite(VUS) || VUS < 1) {
-    throw new Error('VUS must be a positive number');
-}
+function buildOptions() {
+    const commonOptions = {
+        summaryTrendStats: ['avg', 'min', 'med', 'p(50)', 'p(90)', 'p(95)', 'p(99)', 'max'],
+        thresholds: {
+            checks: [{ threshold: 'rate>0.99', abortOnFail: true, delayAbortEval: '10s' }],
+            http_req_failed: [{ threshold: `rate<${FAIL_RATE_THRESHOLD}`, abortOnFail: true, delayAbortEval: '10s' }],
+            'http_req_duration{endpoint:gap_analysis}': [{ threshold: `p(95)<${P95_THRESHOLD_MS}`, abortOnFail: false }],
+            'http_req_duration{endpoint:jd_match}': [{ threshold: `p(95)<${P95_THRESHOLD_MS}`, abortOnFail: false }],
+            'http_req_duration{endpoint:recommendations_jobs}': [{ threshold: `p(95)<${P95_THRESHOLD_MS}`, abortOnFail: false }],
+        },
+    };
 
-if (!Number.isFinite(LIMIT) || LIMIT < 1 || LIMIT > 50) {
-    throw new Error('LIMIT must be between 1 and 50');
-}
+    if (TARGET_RPS > 0) {
+        return {
+            ...commonOptions,
+            scenarios: {
+                analysis_cache: {
+                    executor: 'constant-arrival-rate',
+                    rate: TARGET_RPS,
+                    timeUnit: '1s',
+                    duration: DURATION,
+                    preAllocatedVUs: PRE_ALLOCATED_VUS,
+                    maxVUs: MAX_VUS,
+                },
+            },
+        };
+    }
 
-export const options = {
-    vus: VUS,
-    duration: DURATION,
-    summaryTrendStats: ['avg', 'min', 'med', 'p(50)', 'p(90)', 'p(95)', 'p(99)', 'max'],
-    thresholds: {
-        checks: [{ threshold: 'rate>0.99', abortOnFail: true, delayAbortEval: '10s' }],
-        http_req_failed: [{ threshold: `rate<${FAIL_RATE_THRESHOLD}`, abortOnFail: true, delayAbortEval: '10s' }],
-        'http_req_duration{endpoint:gap_analysis}': [{ threshold: `p(95)<${P95_THRESHOLD_MS}`, abortOnFail: false }],
-        'http_req_duration{endpoint:jd_match}': [{ threshold: `p(95)<${P95_THRESHOLD_MS}`, abortOnFail: false }],
-        'http_req_duration{endpoint:recommendations_jobs}': [{ threshold: `p(95)<${P95_THRESHOLD_MS}`, abortOnFail: false }],
-    },
-};
+    return {
+        ...commonOptions,
+        vus: VUS,
+        duration: DURATION,
+    };
+}
 
 function authorizationHeaders(token) {
     if (!token) {
@@ -83,11 +161,13 @@ function truncateBody(body) {
     return `${value.slice(0, FAILURE_SAMPLE_BODY_LIMIT)}...<truncated>`;
 }
 
-function recordResponse(endpoint, response) {
+function recordResponse(endpoint, cachePath, response) {
     const tags = {
         endpoint,
         status: String(response.status),
         cache_mode: CACHE_MODE,
+        workload_mode: WORKLOAD_MODE,
+        cache_path: cachePath,
     };
 
     httpStatusCodes.add(1, tags);
@@ -111,8 +191,8 @@ function logFailureSample(endpoint, response) {
     console.error(`[failure-sample] vu=${__VU} iter=${__ITER} endpoint=${endpoint} status=${response.status} body=${truncateBody(response.body)}`);
 }
 
-function observeResponse(endpoint, response) {
-    recordResponse(endpoint, response);
+function observeResponse(endpoint, cachePath, response) {
+    recordResponse(endpoint, cachePath, response);
     logFailureSample(endpoint, response);
 }
 
@@ -134,10 +214,12 @@ function login() {
             tags: {
                 endpoint: 'auth_login',
                 cache_mode: CACHE_MODE,
+                workload_mode: WORKLOAD_MODE,
+                cache_path: 'auth',
             },
         },
     );
-    observeResponse('auth_login', response);
+    observeResponse('auth_login', 'auth', response);
 
     const ok = check(response, {
         'auth login status is 200': (res) => res.status === 200,
@@ -165,9 +247,11 @@ function resolveUserProjectId(token) {
         tags: {
             endpoint: 'auth_me',
             cache_mode: CACHE_MODE,
+            workload_mode: WORKLOAD_MODE,
+            cache_path: 'auth',
         },
     });
-    observeResponse('auth_me', response);
+    observeResponse('auth_me', 'auth', response);
 
     const ok = check(response, {
         'auth me status is 200': (res) => res.status === 200,
@@ -204,12 +288,55 @@ function queryString(params) {
     return pairs.join('&');
 }
 
-function endpointUrl(endpoint, userProjectId) {
-    const role = TARGET_ROLES[__ITER % TARGET_ROLES.length];
-    const careerLevel = TARGET_CAREER_LEVELS[__ITER % TARGET_CAREER_LEVELS.length];
+function cachePathForIteration() {
+    if (WORKLOAD_MODE === 'hot') {
+        return 'hot';
+    }
+
+    if (WORKLOAD_MODE === 'cold') {
+        return 'long_tail';
+    }
+
+    const bucket = (__ITER * 37) % 10000;
+    return bucket < HOT_RATIO * 10000 ? 'hot' : 'long_tail';
+}
+
+function variantIndex(cachePath) {
+    if (cachePath === 'hot') {
+        return __ITER % HOT_VARIANTS;
+    }
+
+    return HOT_VARIANTS + ((__ITER + (__VU * 1009)) % LONG_TAIL_VARIANTS);
+}
+
+function rolesForVariant(index) {
+    const roleCount = TARGET_ROLES.length;
+    const size = Math.min(ROLE_COMBINATION_SIZE, roleCount);
+    const roles = [];
+
+    for (let offset = 0; offset < size; offset += 1) {
+        const role = TARGET_ROLES[(index + offset) % roleCount];
+        if (!roles.includes(role)) {
+            roles.push(role);
+        }
+    }
+
+    return roles;
+}
+
+function paramsForVariant(index) {
+    return {
+        roles: rolesForVariant(index),
+        careerLevel: TARGET_CAREER_LEVELS[index % TARGET_CAREER_LEVELS.length],
+        limit: LIMIT_VALUES[index % LIMIT_VALUES.length],
+    };
+}
+
+function endpointUrl(endpoint, userProjectId, variant) {
+    const params = paramsForVariant(variant);
     const commonParams = {
-        targetRoles: [role],
-        limit: LIMIT,
+        targetRoles: params.roles,
+        limit: params.limit,
     };
 
     if (endpoint === 'gap_analysis') {
@@ -219,7 +346,7 @@ function endpointUrl(endpoint, userProjectId) {
     if (endpoint === 'jd_match') {
         return `${BASE_URL}/projects/${encodeURIComponent(userProjectId)}/job-matches?${queryString({
             ...commonParams,
-            targetCareerLevel: careerLevel,
+            targetCareerLevel: params.careerLevel,
         })}`;
     }
 
@@ -249,14 +376,18 @@ export function setup() {
 
 export default function (context) {
     const endpoint = ENDPOINTS[__ITER % ENDPOINTS.length];
-    const response = http.get(endpointUrl(endpoint, context.userProjectId), {
+    const cachePath = cachePathForIteration();
+    const variant = variantIndex(cachePath);
+    const response = http.get(endpointUrl(endpoint, context.userProjectId, variant), {
         headers: authorizationHeaders(context.token),
         tags: {
             endpoint,
             cache_mode: CACHE_MODE,
+            workload_mode: WORKLOAD_MODE,
+            cache_path: cachePath,
         },
     });
-    observeResponse(endpoint, response);
+    observeResponse(endpoint, cachePath, response);
 
     check(response, {
         [`${endpoint} status is 200`]: (res) => res.status === 200,
