@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "${ROOT_DIR}"
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8081/api}"
 LIMIT="${LIMIT:-10}"
@@ -14,6 +15,10 @@ SUMMARY_FILE="${SUMMARY_FILE:-}"
 MIN_NDCG="${MIN_NDCG:-0.0}"
 FAIL_ON_THRESHOLD="${FAIL_ON_THRESHOLD:-false}"
 
+is_true() {
+  [[ "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" == "true" ]]
+}
+
 args=(
   --base-url "${BASE_URL}"
   --limit "${LIMIT}"
@@ -24,13 +29,13 @@ args=(
   --min-ndcg "${MIN_NDCG}"
 )
 
-if [[ "${FETCH_DETAILS_FOR_TFIDF}" == "true" ]]; then
+if is_true "${FETCH_DETAILS_FOR_TFIDF}"; then
   args+=(--fetch-details)
 else
   args+=(--no-fetch-details)
 fi
 
-if [[ "${FAIL_ON_THRESHOLD}" == "true" ]]; then
+if is_true "${FAIL_ON_THRESHOLD}"; then
   args+=(--fail-on-threshold)
 else
   args+=(--no-fail-on-threshold)

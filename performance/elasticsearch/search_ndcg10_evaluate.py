@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate JobFlow search quality with NDCG@10 and TF-IDF skill reranking."""
+"""Evaluate JobFlow search quality with NDCG and TF-IDF skill reranking."""
 
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ TOKEN_PATTERN = re.compile(r"[a-z0-9+#.]+|[가-힣]+", re.IGNORECASE)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Evaluate /jobs/search ranking quality using NDCG@10 and offline TF-IDF skill reranking."
+        description="Evaluate /jobs/search ranking quality using NDCG@limit and offline TF-IDF skill reranking."
     )
     parser.add_argument("--base-url", default=os.getenv("BASE_URL", "http://127.0.0.1:8081/api"))
     parser.add_argument("--limit", type=int, default=int(os.getenv("LIMIT", "10")))
@@ -127,15 +127,32 @@ def normalize(value: Any) -> str:
 
 
 def contains_any(haystack: str, terms: tuple[str, ...]) -> bool:
-    normalized = normalize(haystack)
-    return any(term and normalize(term) in normalized for term in terms)
+    tokens = tokenize(haystack)
+    return any(term_occurrences(tokens, term) > 0 for term in terms)
 
 
 def tokenize(text: str) -> list[str]:
     return [token.casefold() for token in TOKEN_PATTERN.findall(text or "")]
 
 
+def term_occurrences(tokens: list[str], term: str) -> int:
+    term_tokens = tokenize(term)
+    if not term_tokens:
+        return 0
+
+    width = len(term_tokens)
+    return sum(
+        1
+        for index in range(len(tokens) - width + 1)
+        if tokens[index:index + width] == term_tokens
+    )
+
+
 def api_get(base_url: str, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+    parsed_base_url = urllib.parse.urlparse(base_url)
+    if parsed_base_url.scheme not in {"http", "https"}:
+        raise ValueError(f"base_url must use http or https scheme: {base_url}")
+
     url = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
@@ -249,19 +266,18 @@ def tfidf_scores(texts: list[str], skill_terms: tuple[str, ...]) -> list[float]:
     if document_count == 0:
         return []
 
-    normalized_terms = [normalize(term) for term in skill_terms]
     document_frequency = {
-        term: sum(1 for tokens in documents if term in " ".join(tokens)) for term in normalized_terms
+        term: sum(1 for tokens in documents if term_occurrences(tokens, term) > 0)
+        for term in skill_terms
     }
 
     scores: list[float] = []
     for tokens in documents:
-        joined = " ".join(tokens)
         score = 0.0
-        for term in normalized_terms:
+        for term in skill_terms:
             if not term:
                 continue
-            term_frequency = joined.count(term)
+            term_frequency = term_occurrences(tokens, term)
             if term_frequency == 0:
                 continue
             idf = math.log((document_count + 1) / (document_frequency[term] + 1)) + 1
@@ -319,6 +335,11 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
     csv_rows: list[dict[str, Any]] = []
     query_summaries: list[dict[str, Any]] = []
+    metric_suffix = f"ndcg_at_{args.limit}"
+    baseline_metric_key = f"baseline_{metric_suffix}"
+    reranked_metric_key = f"skill_tfidf_{metric_suffix}"
+    baseline_mean_metric_key = f"baseline_mean_{metric_suffix}"
+    reranked_mean_metric_key = f"skill_tfidf_mean_{metric_suffix}"
 
     print(f"BASE_URL={args.base_url}")
     print(f"LIMIT={args.limit}")
@@ -361,8 +382,8 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         query_summary = {
             "query": query.keyword,
             "result_count": len(jobs),
-            "baseline_ndcg_at_10": round(baseline_ndcg, 4),
-            "skill_tfidf_ndcg_at_10": round(reranked_ndcg, 4),
+            baseline_metric_key: round(baseline_ndcg, 4),
+            reranked_metric_key: round(reranked_ndcg, 4),
             "delta": round(reranked_ndcg - baseline_ndcg, 4),
             "top_relevance_grades": baseline_grades[: args.limit],
             "reranked_top_relevance_grades": reranked_grades[: args.limit],
@@ -379,8 +400,8 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             )
         )
 
-    baseline_average = sum(item["baseline_ndcg_at_10"] for item in query_summaries) / len(query_summaries)
-    reranked_average = sum(item["skill_tfidf_ndcg_at_10"] for item in query_summaries) / len(query_summaries)
+    baseline_average = sum(item[baseline_metric_key] for item in query_summaries) / len(query_summaries)
+    reranked_average = sum(item[reranked_metric_key] for item in query_summaries) / len(query_summaries)
     summary = {
         "run_label": args.run_label,
         "base_url": args.base_url,
@@ -388,8 +409,8 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "fetch_limit": args.fetch_limit,
         "fetch_details_for_tfidf": args.fetch_details,
         "query_count": len(query_summaries),
-        "baseline_mean_ndcg_at_10": round(baseline_average, 4),
-        "skill_tfidf_mean_ndcg_at_10": round(reranked_average, 4),
+        baseline_mean_metric_key: round(baseline_average, 4),
+        reranked_mean_metric_key: round(reranked_average, 4),
         "mean_delta": round(reranked_average - baseline_average, 4),
         "queries": query_summaries,
     }
@@ -398,20 +419,20 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     write_summary(args.summary_file, summary)
 
     print()
-    print("### Search NDCG@10 Summary")
+    print(f"### Search NDCG@{args.limit} Summary")
     print(f"query_count={summary['query_count']}")
-    print(f"baseline_mean_ndcg_at_10={summary['baseline_mean_ndcg_at_10']:.4f}")
-    print(f"skill_tfidf_mean_ndcg_at_10={summary['skill_tfidf_mean_ndcg_at_10']:.4f}")
+    print(f"{baseline_mean_metric_key}={summary[baseline_mean_metric_key]:.4f}")
+    print(f"{reranked_mean_metric_key}={summary[reranked_mean_metric_key]:.4f}")
     print(f"mean_delta={summary['mean_delta']:+.4f}")
     if args.output_file:
         print(f"csv_output={args.output_file}")
     if args.summary_file:
         print(f"summary_output={args.summary_file}")
 
-    if args.fail_on_threshold and summary["baseline_mean_ndcg_at_10"] < args.min_ndcg:
+    if args.fail_on_threshold and summary[baseline_mean_metric_key] < args.min_ndcg:
         raise RuntimeError(
-            "Search NDCG@10 is below threshold. "
-            f"expected>={args.min_ndcg:.4f} actual={summary['baseline_mean_ndcg_at_10']:.4f}"
+            f"Search NDCG@{args.limit} is below threshold. "
+            f"expected>={args.min_ndcg:.4f} actual={summary[baseline_mean_metric_key]:.4f}"
         )
 
     return summary
@@ -421,7 +442,7 @@ def main() -> int:
     try:
         evaluate(parse_args())
     except Exception as exc:
-        print(f"Search NDCG@10 evaluation failed: {exc}", file=sys.stderr)
+        print(f"Search NDCG evaluation failed: {exc}", file=sys.stderr)
         return 1
     return 0
 

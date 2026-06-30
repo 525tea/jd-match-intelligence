@@ -17,10 +17,10 @@
 | 측정일 | `YYYY-MM-DD` |
 | 대상 API | `/jobs/search`, `/jobs/{id}` |
 | 평가 기준 | `NDCG@10` |
-| fetch limit | `40` |
+| fetch limit | `40` per query |
 | query 수 | `9` |
 | 평가 스크립트 | `performance/elasticsearch/search-ndcg10-evaluate.sh` |
-| raw output | local only |
+| raw output | local only: set via `OUTPUT_FILE`, `SUMMARY_FILE` |
 
 ## 실행 명령
 
