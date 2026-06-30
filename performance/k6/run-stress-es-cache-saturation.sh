@@ -10,12 +10,17 @@ HOST_ELASTICSEARCH_URL="${HOST_ELASTICSEARCH_URL:-http://localhost:9200}"
 HOT_KEYWORDS="${HOT_KEYWORDS:-백엔드,Spring Boot,프론트엔드,React,데이터 엔지니어,DevOps,Kubernetes,Python,Java,TypeScript}"
 TARGET_RPS_LIST="${TARGET_RPS_LIST:-1000,1500,2000,2500,3000}"
 DURATION="${DURATION:-5m}"
+LOAD_PROFILE="${LOAD_PROFILE:-constant}"
+RAMP_UP_DURATION="${RAMP_UP_DURATION:-1m}"
+STEADY_DURATION="${STEADY_DURATION:-$DURATION}"
+RAMP_DOWN_DURATION="${RAMP_DOWN_DURATION:-30s}"
 PRE_ALLOCATED_VUS="${PRE_ALLOCATED_VUS:-800}"
 MAX_VUS="${MAX_VUS:-4000}"
 SEARCH_LIMIT="${SEARCH_LIMIT:-10}"
 P95_THRESHOLD_MS="${P95_THRESHOLD_MS:-1000}"
 FAIL_RATE_THRESHOLD="${FAIL_RATE_THRESHOLD:-0.01}"
 MAX_DROPPED_ITERATIONS="${MAX_DROPPED_ITERATIONS:-0}"
+K6_NOFILE_LIMIT="${K6_NOFILE_LIMIT:-65535}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/performance}"
 RUN_LOCATION="${RUN_LOCATION:-internal}"
 RUN_LABEL="${RUN_LABEL:-capacity_rework}"
@@ -70,12 +75,17 @@ echo "TARGET=backend-direct"
 echo "HOT_KEYWORDS=$HOT_KEYWORDS"
 echo "TARGET_RPS_LIST=$TARGET_RPS_LIST"
 echo "DURATION=$DURATION"
+echo "LOAD_PROFILE=$LOAD_PROFILE"
+echo "RAMP_UP_DURATION=$RAMP_UP_DURATION"
+echo "STEADY_DURATION=$STEADY_DURATION"
+echo "RAMP_DOWN_DURATION=$RAMP_DOWN_DURATION"
 echo "PRE_ALLOCATED_VUS=$PRE_ALLOCATED_VUS"
 echo "MAX_VUS=$MAX_VUS"
 echo "SEARCH_LIMIT=$SEARCH_LIMIT"
 echo "P95_THRESHOLD_MS=$P95_THRESHOLD_MS"
 echo "FAIL_RATE_THRESHOLD=$FAIL_RATE_THRESHOLD"
 echo "MAX_DROPPED_ITERATIONS=$MAX_DROPPED_ITERATIONS"
+echo "K6_NOFILE_LIMIT=$K6_NOFILE_LIMIT"
 echo "ARTIFACT_DIR=$ARTIFACT_DIR"
 echo "RUN_LOCATION=$RUN_LOCATION"
 echo "RUN_LABEL=$RUN_LABEL"
@@ -360,6 +370,29 @@ fi
 
 echo "job_search_cache_preflight=ok"
 
+raise_nofile_limit() {
+    local current_limit hard_limit
+    current_limit="$(ulimit -Sn)"
+    hard_limit="$(ulimit -Hn)"
+
+    if [[ "$current_limit" == "unlimited" || "$K6_NOFILE_LIMIT" == "0" ]]; then
+        echo "k6_nofile_limit=skipped current=${current_limit} requested=${K6_NOFILE_LIMIT}"
+        return
+    fi
+
+    if [[ "$hard_limit" != "unlimited" && "$K6_NOFILE_LIMIT" -gt "$hard_limit" ]]; then
+        echo "k6_nofile_limit=skipped current=${current_limit} hard=${hard_limit} requested=${K6_NOFILE_LIMIT}"
+        return
+    fi
+
+    if (( current_limit < K6_NOFILE_LIMIT )); then
+        ulimit -Sn "$K6_NOFILE_LIMIT"
+        current_limit="$(ulimit -Sn)"
+    fi
+
+    echo "k6_nofile_limit=current:${current_limit},hard:${hard_limit},requested:${K6_NOFILE_LIMIT}"
+}
+
 run_k6() {
     local target_rps="$1"
     local summary_file="${SUMMARY_PREFIX}_${target_rps}rps.json"
@@ -379,10 +412,15 @@ run_k6() {
 
     set +e
     if command -v k6 >/dev/null 2>&1; then
+        raise_nofile_limit
         BASE_URL="$BASE_URL" \
         HOT_KEYWORDS="$HOT_KEYWORDS" \
         TARGET_RPS="$target_rps" \
         DURATION="$DURATION" \
+        LOAD_PROFILE="$LOAD_PROFILE" \
+        RAMP_UP_DURATION="$RAMP_UP_DURATION" \
+        STEADY_DURATION="$STEADY_DURATION" \
+        RAMP_DOWN_DURATION="$RAMP_DOWN_DURATION" \
         PRE_ALLOCATED_VUS="$PRE_ALLOCATED_VUS" \
         MAX_VUS="$MAX_VUS" \
         SEARCH_LIMIT="$SEARCH_LIMIT" \
@@ -408,6 +446,10 @@ run_k6() {
             -e HOT_KEYWORDS="$HOT_KEYWORDS" \
             -e TARGET_RPS="$target_rps" \
             -e DURATION="$DURATION" \
+            -e LOAD_PROFILE="$LOAD_PROFILE" \
+            -e RAMP_UP_DURATION="$RAMP_UP_DURATION" \
+            -e STEADY_DURATION="$STEADY_DURATION" \
+            -e RAMP_DOWN_DURATION="$RAMP_DOWN_DURATION" \
             -e PRE_ALLOCATED_VUS="$PRE_ALLOCATED_VUS" \
             -e MAX_VUS="$MAX_VUS" \
             -e SEARCH_LIMIT="$SEARCH_LIMIT" \
