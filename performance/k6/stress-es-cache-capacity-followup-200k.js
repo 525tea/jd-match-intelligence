@@ -167,6 +167,7 @@ export default function () {
         {
             headers: authorizationHeaders(),
             tags: {
+                name: '/jobs/search',
                 endpoint: 'jobs_search',
                 capacity_scenario: CAPACITY_SCENARIO,
                 traffic: search.traffic,

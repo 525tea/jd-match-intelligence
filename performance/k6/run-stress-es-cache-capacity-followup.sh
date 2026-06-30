@@ -499,7 +499,7 @@ run_capacity_case() {
         validation_status=$k6_status
     fi
 
-    if (( validation_status != 0 && "$FAIL_FAST" == "true" )); then
+    if (( validation_status != 0 )) && [[ "$FAIL_FAST" == "true" ]]; then
         return "$validation_status"
     fi
 
