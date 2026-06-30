@@ -155,6 +155,8 @@ assert_contains "${STAGING_UP}" "recover_kafka_zookeeper_node_exists" \
   "staging-performance-up.sh must include Kafka/ZooKeeper NodeExists recovery"
 assert_contains "${STAGING_UP}" "compose_volume_name" \
   "staging-performance-up.sh must derive Kafka/ZooKeeper volume names from Compose"
+assert_contains "${STAGING_UP}" 'if [[ -z "${!key+x}" ]]; then' \
+  "staging-performance-up.sh env parser must not let .env override explicitly provided shell env"
 
 echo "kafka_smoke_invariants=ok"
 echo
