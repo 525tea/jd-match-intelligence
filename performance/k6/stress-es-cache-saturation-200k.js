@@ -5,6 +5,10 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const ACCESS_TOKEN = __ENV.ACCESS_TOKEN || '';
 const TARGET_RPS = Number.parseInt(__ENV.TARGET_RPS || '1000', 10);
 const DURATION = __ENV.DURATION || '2m';
+const LOAD_PROFILE = __ENV.LOAD_PROFILE || 'constant';
+const RAMP_UP_DURATION = __ENV.RAMP_UP_DURATION || '1m';
+const STEADY_DURATION = __ENV.STEADY_DURATION || DURATION;
+const RAMP_DOWN_DURATION = __ENV.RAMP_DOWN_DURATION || '30s';
 const PRE_ALLOCATED_VUS = Number.parseInt(__ENV.PRE_ALLOCATED_VUS || '800', 10);
 const MAX_VUS = Number.parseInt(__ENV.MAX_VUS || '4000', 10);
 const SEARCH_LIMIT = __ENV.SEARCH_LIMIT || '10';
@@ -31,16 +35,39 @@ if (!Number.isFinite(MAX_VUS) || MAX_VUS < PRE_ALLOCATED_VUS) {
     throw new Error('MAX_VUS must be greater than or equal to PRE_ALLOCATED_VUS');
 }
 
-export const options = {
-    scenarios: {
-        search_saturation: {
-            executor: 'constant-arrival-rate',
-            rate: TARGET_RPS,
+function scenarioOptions() {
+    if (LOAD_PROFILE === 'ramping') {
+        return {
+            executor: 'ramping-arrival-rate',
+            startRate: 0,
             timeUnit: '1s',
-            duration: DURATION,
             preAllocatedVUs: PRE_ALLOCATED_VUS,
             maxVUs: MAX_VUS,
-        },
+            stages: [
+                { target: TARGET_RPS, duration: RAMP_UP_DURATION },
+                { target: TARGET_RPS, duration: STEADY_DURATION },
+                { target: 0, duration: RAMP_DOWN_DURATION },
+            ],
+        };
+    }
+
+    if (LOAD_PROFILE !== 'constant') {
+        throw new Error('LOAD_PROFILE must be constant or ramping');
+    }
+
+    return {
+        executor: 'constant-arrival-rate',
+        rate: TARGET_RPS,
+        timeUnit: '1s',
+        duration: DURATION,
+        preAllocatedVUs: PRE_ALLOCATED_VUS,
+        maxVUs: MAX_VUS,
+    };
+}
+
+export const options = {
+    scenarios: {
+        search_saturation: scenarioOptions(),
     },
     summaryTrendStats: ['avg', 'min', 'med', 'p(50)', 'p(90)', 'p(95)', 'p(99)', 'max'],
     thresholds: {
@@ -69,6 +96,7 @@ export default function () {
             tags: {
                 endpoint: 'jobs_search',
                 workload: 'saturation',
+                load_profile: LOAD_PROFILE,
                 target_rps: String(TARGET_RPS),
             },
         }

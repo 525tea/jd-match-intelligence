@@ -8,28 +8,63 @@ PROMETHEUS_URL="${PROMETHEUS_URL:-${SERVER_URL}/actuator/prometheus}"
 SEARCH_PREFLIGHT_URL="${SEARCH_PREFLIGHT_URL:-${BASE_URL}/jobs/search?keyword=Spring%20Boot&limit=1}"
 HOST_ELASTICSEARCH_URL="${HOST_ELASTICSEARCH_URL:-http://localhost:9200}"
 HOT_KEYWORDS="${HOT_KEYWORDS:-백엔드,Spring Boot,프론트엔드,React,데이터 엔지니어,DevOps,Kubernetes,Python,Java,TypeScript}"
-TARGET_RPS_LIST="${TARGET_RPS_LIST:-1000,2000,3000}"
-DURATION="${DURATION:-2m}"
+TARGET_RPS_LIST="${TARGET_RPS_LIST:-1000,1500,2000,2500,3000}"
+DURATION="${DURATION:-5m}"
+LOAD_PROFILE="${LOAD_PROFILE:-constant}"
+RAMP_UP_DURATION="${RAMP_UP_DURATION:-1m}"
+STEADY_DURATION="${STEADY_DURATION:-$DURATION}"
+RAMP_DOWN_DURATION="${RAMP_DOWN_DURATION:-30s}"
 PRE_ALLOCATED_VUS="${PRE_ALLOCATED_VUS:-800}"
 MAX_VUS="${MAX_VUS:-4000}"
 SEARCH_LIMIT="${SEARCH_LIMIT:-10}"
 P95_THRESHOLD_MS="${P95_THRESHOLD_MS:-1000}"
 FAIL_RATE_THRESHOLD="${FAIL_RATE_THRESHOLD:-0.01}"
+MAX_DROPPED_ITERATIONS="${MAX_DROPPED_ITERATIONS:-0}"
+K6_NOFILE_LIMIT="${K6_NOFILE_LIMIT:-65535}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/performance}"
-SUMMARY_PREFIX="${SUMMARY_PREFIX:-$(date +%y%m%d)_k6_es_cache_saturation_200k}"
+RUN_LOCATION="${RUN_LOCATION:-internal}"
+RUN_LABEL="${RUN_LABEL:-capacity_rework}"
+SUMMARY_PREFIX="${SUMMARY_PREFIX:-$(date +%y%m%d)_k6_es_cache_capacity_${RUN_LABEL}_${RUN_LOCATION}_200k}"
 ACCESS_TOKEN="${ACCESS_TOKEN:-}"
+SEARCH_AUTH_MODE="${SEARCH_AUTH_MODE:-public}"
 LOGIN_EMAIL="${LOGIN_EMAIL:-frontend-demo@example.com}"
 LOGIN_PASSWORD="${LOGIN_PASSWORD:-password123}"
 REQUIRE_BACKEND_CACHE_ENABLED="${REQUIRE_BACKEND_CACHE_ENABLED:-true}"
 WARMUP_ROUNDS="${WARMUP_ROUNDS:-5}"
 WARMUP_LIMIT="${WARMUP_LIMIT:-10}"
 MIN_CACHE_HIT_DELTA="${MIN_CACHE_HIT_DELTA:-1}"
+MYSQL_SERVICE="${MYSQL_SERVICE:-mysql}"
+PERF_DB_NAME="${PERF_DB_NAME:-jobflow_perf}"
+PERF_DB_USER="${PERF_DB_USER:-root}"
+PERF_DB_PASSWORD="${PERF_DB_PASSWORD:-root}"
+EXPECTED_PERF_JOB_COUNT="${EXPECTED_PERF_JOB_COUNT:-200000}"
+EXPECTED_ES_DOC_COUNT="${EXPECTED_ES_DOC_COUNT:-200000}"
+ELASTICSEARCH_JOBS_ALIAS="${ELASTICSEARCH_JOBS_ALIAS:-jobflow-jobs-performance}"
+PROMETHEUS_SNAPSHOT_METRICS="${PROMETHEUS_SNAPSHOT_METRICS:-cache_gets_total|http_server_requests_seconds|http_server_requests_active_seconds|hikaricp_connections|jvm_memory_used_bytes|process_cpu_usage|system_cpu_usage}"
+LOCAL_COMPOSE_PREFLIGHT="${LOCAL_COMPOSE_PREFLIGHT:-auto}"
+ES_COUNT_PREFLIGHT="${ES_COUNT_PREFLIGHT:-auto}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 mkdir -p "$ARTIFACT_DIR"
 ARTIFACT_DIR="$(cd "$ARTIFACT_DIR" && pwd)"
+
+if [[ "$LOCAL_COMPOSE_PREFLIGHT" == "auto" ]]; then
+    if [[ "$BASE_URL" == http://localhost:* || "$BASE_URL" == http://127.0.0.1:* ]]; then
+        LOCAL_COMPOSE_PREFLIGHT="true"
+    else
+        LOCAL_COMPOSE_PREFLIGHT="false"
+    fi
+fi
+
+if [[ "$ES_COUNT_PREFLIGHT" == "auto" ]]; then
+    if [[ "$LOCAL_COMPOSE_PREFLIGHT" == "true" ]]; then
+        ES_COUNT_PREFLIGHT="true"
+    else
+        ES_COUNT_PREFLIGHT="false"
+    fi
+fi
 
 echo "BASE_URL=$BASE_URL"
 echo "HEALTH_URL=$HEALTH_URL"
@@ -40,20 +75,34 @@ echo "TARGET=backend-direct"
 echo "HOT_KEYWORDS=$HOT_KEYWORDS"
 echo "TARGET_RPS_LIST=$TARGET_RPS_LIST"
 echo "DURATION=$DURATION"
+echo "LOAD_PROFILE=$LOAD_PROFILE"
+echo "RAMP_UP_DURATION=$RAMP_UP_DURATION"
+echo "STEADY_DURATION=$STEADY_DURATION"
+echo "RAMP_DOWN_DURATION=$RAMP_DOWN_DURATION"
 echo "PRE_ALLOCATED_VUS=$PRE_ALLOCATED_VUS"
 echo "MAX_VUS=$MAX_VUS"
 echo "SEARCH_LIMIT=$SEARCH_LIMIT"
 echo "P95_THRESHOLD_MS=$P95_THRESHOLD_MS"
 echo "FAIL_RATE_THRESHOLD=$FAIL_RATE_THRESHOLD"
+echo "MAX_DROPPED_ITERATIONS=$MAX_DROPPED_ITERATIONS"
+echo "K6_NOFILE_LIMIT=$K6_NOFILE_LIMIT"
 echo "ARTIFACT_DIR=$ARTIFACT_DIR"
+echo "RUN_LOCATION=$RUN_LOCATION"
+echo "RUN_LABEL=$RUN_LABEL"
 echo "SUMMARY_PREFIX=$SUMMARY_PREFIX"
 echo "ACCESS_TOKEN=$([ -n "$ACCESS_TOKEN" ] && echo provided || echo empty)"
+echo "SEARCH_AUTH_MODE=$SEARCH_AUTH_MODE"
 echo "LOGIN_EMAIL=$([ -n "$LOGIN_EMAIL" ] && echo provided || echo empty)"
 echo "LOGIN_PASSWORD=$([ -n "$LOGIN_PASSWORD" ] && echo provided || echo empty)"
 echo "REQUIRE_BACKEND_CACHE_ENABLED=$REQUIRE_BACKEND_CACHE_ENABLED"
 echo "WARMUP_ROUNDS=$WARMUP_ROUNDS"
 echo "WARMUP_LIMIT=$WARMUP_LIMIT"
 echo "MIN_CACHE_HIT_DELTA=$MIN_CACHE_HIT_DELTA"
+echo "EXPECTED_PERF_JOB_COUNT=$EXPECTED_PERF_JOB_COUNT"
+echo "EXPECTED_ES_DOC_COUNT=$EXPECTED_ES_DOC_COUNT"
+echo "ELASTICSEARCH_JOBS_ALIAS=$ELASTICSEARCH_JOBS_ALIAS"
+echo "LOCAL_COMPOSE_PREFLIGHT=$LOCAL_COMPOSE_PREFLIGHT"
+echo "ES_COUNT_PREFLIGHT=$ES_COUNT_PREFLIGHT"
 echo "CACHE_ENABLED=true (set on server via env)"
 echo "REINDEX_EXPECTATION=ELASTICSEARCH_REINDEX_ON_STARTUP=false after 200k index preparation"
 echo "WORKLOAD=saturation constant-arrival-rate without per-iteration sleep"
@@ -79,9 +128,102 @@ cache_metric_total() {
 
 backend_env_value() {
     local name="$1"
+    if [[ "$LOCAL_COMPOSE_PREFLIGHT" != "true" ]]; then
+        return 0
+    fi
+
     docker compose -f docker-compose.yml -f docker-compose.performance.yml exec -T backend \
         sh -lc "printenv ${name} || true" 2>/dev/null | tr -d '\r'
 }
+
+compose_exec() {
+    if [[ "$LOCAL_COMPOSE_PREFLIGHT" != "true" ]]; then
+        return 1
+    fi
+
+    docker compose -f docker-compose.yml -f docker-compose.performance.yml exec -T "$@"
+}
+
+prometheus_snapshot() {
+    local output_file="$1"
+
+    if curl -fsS "$PROMETHEUS_URL" 2>/dev/null |
+        grep -E "$PROMETHEUS_SNAPSHOT_METRICS" >"$output_file"; then
+        echo "prometheus_snapshot=$output_file"
+    else
+        echo "prometheus_snapshot=empty_or_failed file=$output_file" >&2
+        : >"$output_file"
+    fi
+}
+
+validate_k6_summary() {
+    local summary_path="$1"
+    local target_rps="$2"
+
+    if [[ ! -s "$summary_path" ]]; then
+        echo "Saturation summary validation failed: missing summary file ${summary_path}" >&2
+        return 1
+    fi
+
+    local dropped_iterations
+    if ! dropped_iterations="$(jq -r '.metrics.dropped_iterations.count // 0' "$summary_path" 2>/dev/null)"; then
+        echo "Saturation summary validation failed: cannot parse ${summary_path}" >&2
+        return 1
+    fi
+
+    if ! [[ "$dropped_iterations" =~ ^[0-9]+$ ]]; then
+        echo "Saturation summary validation failed: dropped_iterations is not numeric (${dropped_iterations})" >&2
+        return 1
+    fi
+
+    echo "saturation_dropped_iterations target_rps=${target_rps} value=${dropped_iterations} max=${MAX_DROPPED_ITERATIONS}"
+
+    if (( dropped_iterations > MAX_DROPPED_ITERATIONS )); then
+        echo "Saturation stability check failed: target_rps=${target_rps} dropped_iterations=${dropped_iterations} max=${MAX_DROPPED_ITERATIONS}" >&2
+        echo "Treat this run as boundary/saturation evidence, not a stable capacity result." >&2
+        return 1
+    fi
+
+    echo "saturation_stability_check=ok target_rps=${target_rps}"
+}
+
+perf_fixture_count() {
+    compose_exec "$MYSQL_SERVICE" \
+        mysql -u "$PERF_DB_USER" "-p${PERF_DB_PASSWORD}" \
+        --batch --raw --skip-column-names "$PERF_DB_NAME" \
+        -e "SELECT COUNT(*) FROM jobs WHERE source='perf_fixture';" 2>/dev/null | tr -d '\r'
+}
+
+es_doc_count() {
+    curl -fsS "${HOST_ELASTICSEARCH_URL}/${ELASTICSEARCH_JOBS_ALIAS}/_count" 2>/dev/null |
+        jq -r '.count // 0'
+}
+
+if [[ "$LOCAL_COMPOSE_PREFLIGHT" == "true" ]]; then
+    perf_job_count="$(perf_fixture_count || true)"
+    if [[ "$perf_job_count" != "$EXPECTED_PERF_JOB_COUNT" ]]; then
+        echo "Performance fixture preflight failed: expected ${EXPECTED_PERF_JOB_COUNT}, got ${perf_job_count:-empty}" >&2
+        echo "Check ${PERF_DB_NAME}.jobs and rerun performance dataset preparation if needed." >&2
+        exit 1
+    fi
+
+    echo "perf_fixture_job_count=$perf_job_count"
+else
+    echo "perf_fixture_job_count=skipped reason=LOCAL_COMPOSE_PREFLIGHT_false"
+fi
+
+if [[ "$ES_COUNT_PREFLIGHT" == "true" ]]; then
+    es_count="$(es_doc_count || true)"
+    if [[ "$es_count" != "$EXPECTED_ES_DOC_COUNT" ]]; then
+        echo "Elasticsearch performance index preflight failed: expected ${EXPECTED_ES_DOC_COUNT}, got ${es_count:-empty}" >&2
+        echo "Check ${HOST_ELASTICSEARCH_URL}/${ELASTICSEARCH_JOBS_ALIAS}/_count and performance profile reindex settings." >&2
+        exit 1
+    fi
+
+    echo "es_performance_doc_count=$es_count"
+else
+    echo "es_performance_doc_count=skipped reason=ES_COUNT_PREFLIGHT_false"
+fi
 
 if ! health_body="$(curl -fsS "$HEALTH_URL" 2>/dev/null)"; then
     echo "Backend health preflight failed: $HEALTH_URL" >&2
@@ -102,37 +244,65 @@ fi
 echo "prometheus_preflight=ok"
 
 if [[ "$REQUIRE_BACKEND_CACHE_ENABLED" == "true" ]]; then
-    cache_enabled_value="$(backend_env_value CACHE_ENABLED)"
-    perf_cache_enabled_value="$(backend_env_value PERF_CACHE_ENABLED)"
+    if [[ "$LOCAL_COMPOSE_PREFLIGHT" == "true" ]]; then
+        cache_enabled_value="$(backend_env_value CACHE_ENABLED)"
+        perf_cache_enabled_value="$(backend_env_value PERF_CACHE_ENABLED)"
 
-    if [[ "$cache_enabled_value" != "true" && "$perf_cache_enabled_value" != "true" ]]; then
-        echo "Backend cache preflight failed: expected CACHE_ENABLED=true or PERF_CACHE_ENABLED=true in the running backend container." >&2
-        echo "Current values: CACHE_ENABLED=${cache_enabled_value:-empty}, PERF_CACHE_ENABLED=${perf_cache_enabled_value:-empty}" >&2
-        echo "Restart the stack with:" >&2
-        echo 'PERF_CACHE_ENABLED=true PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false ELASTICSEARCH_REINDEX_ON_STARTUP=false PERF_ELASTICSEARCH_MEMORY_LIMIT=3g PERF_ES_JAVA_OPTS="-Xms2g -Xmx2g" REQUIRED_PORTS="" bash performance/deploy/staging-performance-up.sh' >&2
-        exit 1
+        if [[ "$cache_enabled_value" != "true" && "$perf_cache_enabled_value" != "true" ]]; then
+            echo "Backend cache preflight failed: expected CACHE_ENABLED=true or PERF_CACHE_ENABLED=true in the running backend container." >&2
+            echo "Current values: CACHE_ENABLED=${cache_enabled_value:-empty}, PERF_CACHE_ENABLED=${perf_cache_enabled_value:-empty}" >&2
+            echo "Restart the stack with:" >&2
+            echo 'PERF_CACHE_ENABLED=true PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false ELASTICSEARCH_REINDEX_ON_STARTUP=false PERF_ELASTICSEARCH_MEMORY_LIMIT=3g PERF_ES_JAVA_OPTS="-Xms2g -Xmx2g" REQUIRED_PORTS="" bash performance/deploy/staging-performance-up.sh' >&2
+            exit 1
+        fi
+
+        echo "backend_cache_enabled=true"
+    else
+        echo "backend_cache_enabled=not_checked_directly reason=LOCAL_COMPOSE_PREFLIGHT_false"
+        echo "backend_cache_enabled_validation=cache_hit_delta_preflight"
     fi
-
-    echo "backend_cache_enabled=true"
 else
     echo "backend_cache_enabled=skipped"
 fi
 
-if [[ -z "$ACCESS_TOKEN" ]]; then
-    if login_body="$(curl -fsS -X POST "${BASE_URL}/auth/login" \
-        -H 'Content-Type: application/json' \
-        -d "{\"email\":\"${LOGIN_EMAIL}\",\"password\":\"${LOGIN_PASSWORD}\"}" 2>/dev/null)"; then
-        ACCESS_TOKEN="$(jq -r '.data.accessToken // empty' <<<"$login_body")"
-        if [[ -z "$ACCESS_TOKEN" ]]; then
-            echo "Auth preflight: login succeeded but no accessToken in response - continuing unauthenticated" >&2
-            echo "$login_body" >&2
+case "$SEARCH_AUTH_MODE" in
+    public)
+        if [[ -n "$ACCESS_TOKEN" ]]; then
+            echo "SEARCH_AUTH_MODE=public ignores provided ACCESS_TOKEN so public /jobs/search capacity does not include JWT DB lookup cost."
         fi
-    else
-        echo "Auth preflight: login failed - continuing unauthenticated (search preflight will verify reachability)" >&2
-    fi
-fi
-
-echo "auth_preflight=ok"
+        ACCESS_TOKEN=""
+        echo "auth_preflight=skipped mode=public"
+        ;;
+    login)
+        if [[ -z "$ACCESS_TOKEN" ]]; then
+            if login_body="$(curl -fsS -X POST "${BASE_URL}/auth/login" \
+                -H 'Content-Type: application/json' \
+                -d "{\"email\":\"${LOGIN_EMAIL}\",\"password\":\"${LOGIN_PASSWORD}\"}" 2>/dev/null)"; then
+                ACCESS_TOKEN="$(jq -r '.data.accessToken // empty' <<<"$login_body")"
+                if [[ -z "$ACCESS_TOKEN" ]]; then
+                    echo "Auth preflight failed: login succeeded but no accessToken in response." >&2
+                    echo "$login_body" >&2
+                    exit 1
+                fi
+            else
+                echo "Auth preflight failed: login failed for SEARCH_AUTH_MODE=login." >&2
+                exit 1
+            fi
+        fi
+        echo "auth_preflight=ok mode=login"
+        ;;
+    token)
+        if [[ -z "$ACCESS_TOKEN" ]]; then
+            echo "Auth preflight failed: SEARCH_AUTH_MODE=token requires ACCESS_TOKEN." >&2
+            exit 1
+        fi
+        echo "auth_preflight=ok mode=token"
+        ;;
+    *)
+        echo "Invalid SEARCH_AUTH_MODE: $SEARCH_AUTH_MODE (expected public, login, or token)" >&2
+        exit 1
+        ;;
+esac
 
 auth_header=()
 if [[ -n "$ACCESS_TOKEN" ]]; then
@@ -200,9 +370,34 @@ fi
 
 echo "job_search_cache_preflight=ok"
 
+raise_nofile_limit() {
+    local current_limit hard_limit
+    current_limit="$(ulimit -Sn)"
+    hard_limit="$(ulimit -Hn)"
+
+    if [[ "$current_limit" == "unlimited" || "$K6_NOFILE_LIMIT" == "0" ]]; then
+        echo "k6_nofile_limit=skipped current=${current_limit} requested=${K6_NOFILE_LIMIT}"
+        return
+    fi
+
+    if [[ "$hard_limit" != "unlimited" && "$K6_NOFILE_LIMIT" -gt "$hard_limit" ]]; then
+        echo "k6_nofile_limit=skipped current=${current_limit} hard=${hard_limit} requested=${K6_NOFILE_LIMIT}"
+        return
+    fi
+
+    if (( current_limit < K6_NOFILE_LIMIT )); then
+        ulimit -Sn "$K6_NOFILE_LIMIT"
+        current_limit="$(ulimit -Sn)"
+    fi
+
+    echo "k6_nofile_limit=current:${current_limit},hard:${hard_limit},requested:${K6_NOFILE_LIMIT}"
+}
+
 run_k6() {
     local target_rps="$1"
     local summary_file="${SUMMARY_PREFIX}_${target_rps}rps.json"
+    local prom_before="${SUMMARY_PREFIX}_${target_rps}rps_prometheus_before.prom"
+    local prom_after="${SUMMARY_PREFIX}_${target_rps}rps_prometheus_after.prom"
 
     echo
     echo "================================================================================"
@@ -210,12 +405,22 @@ run_k6() {
     echo "================================================================================"
     echo "TARGET_RPS=${target_rps}"
     echo "summary_file=${ARTIFACT_DIR}/${summary_file}"
+    echo "prometheus_before_file=${ARTIFACT_DIR}/${prom_before}"
+    prometheus_snapshot "${ARTIFACT_DIR}/${prom_before}"
 
+    local k6_status=0
+
+    set +e
     if command -v k6 >/dev/null 2>&1; then
+        raise_nofile_limit
         BASE_URL="$BASE_URL" \
         HOT_KEYWORDS="$HOT_KEYWORDS" \
         TARGET_RPS="$target_rps" \
         DURATION="$DURATION" \
+        LOAD_PROFILE="$LOAD_PROFILE" \
+        RAMP_UP_DURATION="$RAMP_UP_DURATION" \
+        STEADY_DURATION="$STEADY_DURATION" \
+        RAMP_DOWN_DURATION="$RAMP_DOWN_DURATION" \
         PRE_ALLOCATED_VUS="$PRE_ALLOCATED_VUS" \
         MAX_VUS="$MAX_VUS" \
         SEARCH_LIMIT="$SEARCH_LIMIT" \
@@ -225,6 +430,7 @@ run_k6() {
         k6 run \
             --summary-export "$ARTIFACT_DIR/$summary_file" \
             performance/k6/stress-es-cache-saturation-200k.js
+        k6_status=$?
     else
         local docker_base_url="$BASE_URL"
         if [[ "$docker_base_url" == http://localhost:* ]]; then
@@ -240,6 +446,10 @@ run_k6() {
             -e HOT_KEYWORDS="$HOT_KEYWORDS" \
             -e TARGET_RPS="$target_rps" \
             -e DURATION="$DURATION" \
+            -e LOAD_PROFILE="$LOAD_PROFILE" \
+            -e RAMP_UP_DURATION="$RAMP_UP_DURATION" \
+            -e STEADY_DURATION="$STEADY_DURATION" \
+            -e RAMP_DOWN_DURATION="$RAMP_DOWN_DURATION" \
             -e PRE_ALLOCATED_VUS="$PRE_ALLOCATED_VUS" \
             -e MAX_VUS="$MAX_VUS" \
             -e SEARCH_LIMIT="$SEARCH_LIMIT" \
@@ -251,9 +461,19 @@ run_k6() {
             grafana/k6 run \
                 --summary-export "/k6-output/$summary_file" \
                 /scripts/stress-es-cache-saturation-200k.js
+        k6_status=$?
     fi
+    set -e
 
+    echo "prometheus_after_file=${ARTIFACT_DIR}/${prom_after}"
+    prometheus_snapshot "${ARTIFACT_DIR}/${prom_after}"
     echo "saturation_summary_export=${ARTIFACT_DIR}/${summary_file}"
+    validate_k6_summary "${ARTIFACT_DIR}/${summary_file}" "$target_rps"
+
+    if (( k6_status != 0 )); then
+        echo "saturation_run_failed target_rps=${target_rps} exit_code=${k6_status}" >&2
+        return "$k6_status"
+    fi
 }
 
 IFS=',' read -r -a target_rps_array <<<"$TARGET_RPS_LIST"
