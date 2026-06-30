@@ -404,3 +404,109 @@ bash performance/k6/run-stress-es-cache-mixed-hit-rate.sh
 - `http_req_failed`
 - Redis cache hit/miss rate (`cache_gets_total{result="hit|miss"}`)
 - Grafana JVM memory, HTTP request rate, latency
+
+## Elasticsearch + Redis Saturation Stress Test
+
+Mixed hit-rate stress test는 각 VU가 1초 pacing으로 반복 요청하므로 500VU 조건에서 약 500 RPS plateau가 자연스럽다. saturation stress test는 이 pacing을 제거하고 k6 `constant-arrival-rate` executor로 `/jobs/search` cache-hit 중심 처리량 상한을 별도로 측정한다.
+
+이 테스트의 목표는 3000 RPS를 시도하는 것이다. 단, 성공/실패만 보는 것이 아니라 1000 → 2000 → 3000 RPS 단계에서 error rate, p95/p99, dropped iterations, k6 VU 사용량, JVM heap, Tomcat/Hikari, Redis/ES 지표를 함께 기록한다.
+
+사전 준비는 Elasticsearch + Redis cache stress test와 동일하다. 3000 RPS 시도 전에는 backend가 cache enabled 상태이고 200k index가 이미 준비되어 있어야 한다.
+
+```bash
+PERF_CACHE_ENABLED=true \
+PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false \
+ELASTICSEARCH_REINDEX_ON_STARTUP=false \
+PERF_ELASTICSEARCH_MEMORY_LIMIT=3g \
+PERF_ES_JAVA_OPTS="-Xms2g -Xmx2g" \
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+기존 realistic workload 기준선을 다시 확인하려면 mixed hit-rate runner를 먼저 실행한다.
+
+```bash
+HOT_TRAFFIC_PERCENT=70 \
+SUMMARY_FILE=260630_k6_es_cache_mixed_70_hot_200k_500vu.json \
+bash performance/k6/run-stress-es-cache-mixed-hit-rate.sh
+```
+
+saturation 단계별 실행:
+
+```bash
+TARGET_RPS_LIST=1000,2000,3000 \
+DURATION=2m \
+PRE_ALLOCATED_VUS=800 \
+MAX_VUS=4000 \
+SUMMARY_PREFIX=260630_k6_es_cache_saturation_200k \
+bash performance/k6/run-stress-es-cache-saturation.sh
+```
+
+기본값:
+
+- `BASE_URL=http://localhost:8080`
+- `ARTIFACT_DIR=artifacts/performance`
+- `TARGET_RPS_LIST=1000,2000,3000`
+- `DURATION=2m`
+- `PRE_ALLOCATED_VUS=800`
+- `MAX_VUS=4000`
+- `P95_THRESHOLD_MS=1000`
+- `FAIL_RATE_THRESHOLD=0.01`
+- `SUMMARY_PREFIX=YYMMDD_k6_es_cache_saturation_200k`
+
+OS/WAS 튜닝은 saturation baseline을 먼저 찍은 뒤 적용한다. 서버에서 적용 전 값을 반드시 저장한다.
+
+```bash
+SNAPSHOT_FILE=260630_before_saturation_tuning.txt \
+bash performance/deploy/performance-host-tuning-snapshot.sh
+```
+
+OS sysctl 적용은 기본 dry-run이다. 실제 적용할 때만 `APPLY=true`를 붙인다.
+
+```bash
+bash performance/deploy/performance-host-tuning-apply.sh
+
+APPLY=true \
+bash performance/deploy/performance-host-tuning-apply.sh
+```
+
+Tomcat/Hikari/JVM tuning은 `docker-compose.performance.yml`의 `PERF_*` 환경변수로 조정한다. cache-hit 중심 `/jobs/search`에서는 DB pool보다 k6 generator, Tomcat connection/thread queue, Redis, CPU 한계를 먼저 본다.
+
+```bash
+PERF_CACHE_ENABLED=true \
+PERF_SERVER_TOMCAT_THREADS_MAX=400 \
+PERF_SERVER_TOMCAT_THREADS_MIN_SPARE=50 \
+PERF_SERVER_TOMCAT_ACCEPT_COUNT=1000 \
+PERF_SERVER_TOMCAT_MAX_CONNECTIONS=12000 \
+PERF_HIKARI_MAXIMUM_POOL_SIZE=30 \
+PERF_HIKARI_MINIMUM_IDLE=10 \
+PERF_BACKEND_MEMORY_LIMIT=2g \
+PERF_BACKEND_JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0" \
+PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false \
+ELASTICSEARCH_REINDEX_ON_STARTUP=false \
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+튜닝 적용 후에도 snapshot을 남긴다.
+
+```bash
+SNAPSHOT_FILE=260630_after_saturation_tuning.txt \
+bash performance/deploy/performance-host-tuning-snapshot.sh
+```
+
+확인할 지표:
+
+- k6 `http_reqs`, `http_req_failed`, `http_req_duration p(95)/p(99)`
+- k6 `dropped_iterations`
+- k6 `vus`, `vus_max`가 `MAX_VUS`에 닿는지 여부
+- Grafana `/jobs/search` RPS와 p95/p99
+- JVM heap/GC, Tomcat request latency
+- Hikari active/pending connection
+- Redis cache hit rate
+- Elasticsearch indexing/search 관련 지표
+
+판정 기준:
+
+- 3000 RPS 성공: error rate 1% 미만, checks 99% 초과, p95/p99와 Grafana 캡처를 함께 기록한다.
+- 3000 RPS 실패: 최대 안정 RPS와 병목 근거를 기록한다. 예를 들어 dropped iterations가 먼저 증가하면 k6 generator 한계, backend CPU/heap이 포화되면 WAS/instance 한계, cache miss가 늘면서 ES latency가 증가하면 검색 backend 한계로 분리한다.

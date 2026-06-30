@@ -57,6 +57,8 @@ cd "${ROOT_DIR}"
 RUNBOOK="performance/deploy/STAGING_DEPLOY_RUNBOOK.md"
 STAGING_UP="performance/deploy/staging-performance-up.sh"
 SERVER_BOOTSTRAP="performance/deploy/server-bootstrap-check.sh"
+HOST_TUNING_SNAPSHOT="performance/deploy/performance-host-tuning-snapshot.sh"
+HOST_TUNING_APPLY="performance/deploy/performance-host-tuning-apply.sh"
 STAGING_ENV_EXAMPLE="performance/deploy/staging.env.example"
 COMPOSE_PERF="docker-compose.performance.yml"
 
@@ -70,6 +72,7 @@ KAFKA_SMOKE_SCRIPTS=(
 CACHE_STRESS_RUNNERS=(
   performance/k6/run-stress-es-cache.sh
   performance/k6/run-stress-es-cache-mixed-hit-rate.sh
+  performance/k6/run-stress-es-cache-saturation.sh
 )
 
 echo "ROOT_DIR=${ROOT_DIR}"
@@ -82,6 +85,8 @@ echo "### Required operational guard files"
 assert_file_exists "${RUNBOOK}"
 assert_file_exists "${STAGING_UP}"
 assert_file_exists "${SERVER_BOOTSTRAP}"
+assert_file_exists "${HOST_TUNING_SNAPSHOT}"
+assert_file_exists "${HOST_TUNING_APPLY}"
 assert_file_exists "${STAGING_ENV_EXAMPLE}"
 assert_file_exists "${COMPOSE_PERF}"
 
@@ -109,6 +114,12 @@ assert_compose_json '.services.backend.environment.SPRING_KAFKA_BOOTSTRAP_SERVER
   "performance backend Kafka bootstrap must default to kafka:29092"
 assert_compose_json '.services.backend.environment.APP_NOTIFICATION_EMAIL_PROVIDER == "mock"' \
   "performance notification provider must default to mock"
+assert_compose_json '.services.backend.environment.SERVER_TOMCAT_THREADS_MAX == "200"' \
+  "performance backend Tomcat max threads must be externally tunable"
+assert_compose_json '.services.backend.environment.SERVER_TOMCAT_MAX_CONNECTIONS == "8192"' \
+  "performance backend Tomcat max connections must be externally tunable"
+assert_compose_json '.services.backend.environment.HIKARI_MAXIMUM_POOL_SIZE == "20"' \
+  "performance backend Hikari maximum pool size must be externally tunable"
 assert_compose_json '.services.kafka.ports[] | select(.target == 9092 and .published == "19092")' \
   "performance Kafka host-mapped port must default to 19092"
 
@@ -140,6 +151,19 @@ assert_contains "${STAGING_UP}" "compose_volume_name" \
   "staging-performance-up.sh must derive Kafka/ZooKeeper volume names from Compose"
 
 echo "kafka_smoke_invariants=ok"
+echo
+
+echo "### Host tuning invariants"
+assert_contains "${HOST_TUNING_APPLY}" 'APPLY="${APPLY:-false}"' \
+  "host tuning apply script must default to dry-run"
+assert_contains "${HOST_TUNING_APPLY}" "Rerun with APPLY=true" \
+  "host tuning apply script must explain explicit apply mode"
+assert_contains "${HOST_TUNING_SNAPSHOT}" "net.core.somaxconn" \
+  "host tuning snapshot must capture network backlog sysctl values"
+assert_contains "${HOST_TUNING_SNAPSHOT}" "SERVER_TOMCAT" \
+  "host tuning snapshot must capture backend Tomcat tuning env"
+
+echo "host_tuning_invariants=ok"
 echo
 
 echo "### k6 search stress invariants"
@@ -174,6 +198,12 @@ assert_contains "${STAGING_ENV_EXAMPLE}" "KAFKA_BOOTSTRAP_SERVERS=localhost:1909
   "staging env example must document host-side Kafka bootstrap"
 assert_contains "${STAGING_ENV_EXAMPLE}" "PERF_NOTIFICATION_EMAIL_PROVIDER" \
   "staging env example must expose mock notification provider for performance runs"
+assert_contains "${STAGING_ENV_EXAMPLE}" "PERF_SERVER_TOMCAT_THREADS_MAX" \
+  "staging env example must expose performance Tomcat max threads tuning"
+assert_contains "${STAGING_ENV_EXAMPLE}" "PERF_SERVER_TOMCAT_MAX_CONNECTIONS" \
+  "staging env example must expose performance Tomcat max connections tuning"
+assert_contains "${STAGING_ENV_EXAMPLE}" "PERF_HIKARI_MAXIMUM_POOL_SIZE" \
+  "staging env example must expose performance Hikari maximum pool tuning"
 
 echo "staging_env_invariants=ok"
 echo
@@ -199,6 +229,7 @@ echo "### Performance Ops Regression Guard Summary"
 echo "required_operational_guard_files=ok"
 echo "performance_compose_invariants=ok"
 echo "kafka_smoke_invariants=ok"
+echo "host_tuning_invariants=ok"
 echo "k6_search_stress_invariants=ok"
 echo "staging_env_invariants=ok"
 echo "runbook_invariants=ok"
