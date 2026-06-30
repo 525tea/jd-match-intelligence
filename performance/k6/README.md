@@ -385,12 +385,16 @@ SUMMARY_FILE=260630_k6_es_cache_mixed_30_hot_200k_500vu.json \
 bash performance/k6/run-stress-es-cache-mixed-hit-rate.sh
 ```
 
+각 ratio 실행은 cold cache 기준으로 비교해야 한다. `run-stress-es-cache-mixed-hit-rate.sh`는 기본값으로 실행 직전 Redis `FLUSHDB`를 수행해 이전 70%/50%/30% 실행의 `jobSearch` cache 상태가 다음 실행에 섞이지 않게 한다. 수동으로 관리해야 하는 경우에만 `RESET_REDIS_CACHE_BEFORE_RUN=false`로 끄고, ratio 사이에 Redis flush 또는 stack restart를 별도로 수행한다.
+
 기본값:
 
 - `BASE_URL=http://localhost:8080`
 - `ARTIFACT_DIR=artifacts/performance`
 - `HOT_TRAFFIC_PERCENT=70`
-- `LONG_TAIL_VARIANTS=10000`
+- `LONG_TAIL_RUN_ID=$(date +%Y%m%d%H%M%S)`
+- `LONG_TAIL_VARIANTS=1000000` (VU별 long-tail variant block 크기)
+- `RESET_REDIS_CACHE_BEFORE_RUN=true`
 - `SUMMARY_FILE=YYMMDD_k6_es_cache_mixed_${HOT_TRAFFIC_PERCENT}_hot_200k_500vu.json`
 
 확인할 지표:

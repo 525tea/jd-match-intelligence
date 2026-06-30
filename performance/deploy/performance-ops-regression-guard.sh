@@ -126,14 +126,18 @@ for script in "${KAFKA_SMOKE_SCRIPTS[@]}"; do
     "${script} must use both compose files"
   assert_contains "${script}" 'KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}"' \
     "${script} must default Kafka bootstrap to kafka:29092 inside the Docker network"
-  assert_not_contains_regex "${script}" 'localhost:9092|source[[:space:]].*ENV_FILE' \
-    "${script} must not regress to localhost:9092 or source .env"
+  assert_contains "${script}" 'cd "${ROOT_DIR}"' \
+    "${script} must cd to ROOT_DIR before invoking docker compose"
+  assert_not_contains_regex "${script}" 'localhost:9092|(^|[[:space:]])source[[:space:]].*ENV_FILE|(^|[[:space:]])\.[[:space:]].*ENV_FILE' \
+    "${script} must not regress to localhost:9092 or source/dot-load .env"
 done
 
 assert_contains "${STAGING_UP}" "validate_kafka_smoke_context" \
   "staging-performance-up.sh must run Kafka smoke context guard"
 assert_contains "${STAGING_UP}" "recover_kafka_zookeeper_node_exists" \
   "staging-performance-up.sh must include Kafka/ZooKeeper NodeExists recovery"
+assert_contains "${STAGING_UP}" "compose_volume_name" \
+  "staging-performance-up.sh must derive Kafka/ZooKeeper volume names from Compose"
 
 echo "kafka_smoke_invariants=ok"
 echo

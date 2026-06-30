@@ -105,12 +105,16 @@ validate_kafka_smoke_context() {
   for script in "${scripts[@]}"; do
     [[ -f "${script}" ]] || fail "Kafka smoke script does not exist: ${script}"
 
-    if grep -Eq 'localhost:9092|source[[:space:]].*ENV_FILE' "${script}"; then
-      fail "${script} violates performance Kafka smoke context. Use kafka:29092 from inside the kafka container and parse .env line-by-line instead of source."
+    if grep -Eq 'localhost:9092|(^|[[:space:]])source[[:space:]].*ENV_FILE|(^|[[:space:]])\.[[:space:]].*ENV_FILE' "${script}"; then
+      fail "${script} violates performance Kafka smoke context. Use kafka:29092 from inside the kafka container and parse .env line-by-line instead of source/dot-load."
     fi
 
     if ! grep -Fq 'COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)' "${script}"; then
       fail "${script} must use docker-compose.yml + docker-compose.performance.yml explicitly."
+    fi
+
+    if ! grep -Fq 'cd "${ROOT_DIR}"' "${script}"; then
+      fail "${script} must cd to ROOT_DIR before invoking docker compose."
     fi
 
     if ! grep -Fq 'KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}"' "${script}"; then
@@ -139,6 +143,29 @@ compose_state() {
     | jq -r 'if type == "array" then .[0].State else .State end // "unknown"'
 }
 
+compose_volume_name() {
+  local logical_name="$1"
+  local rendered_name
+
+  rendered_name="$(
+    compose config --format json \
+      | jq -r --arg volume "${logical_name}" '.volumes[$volume].name // empty'
+  )"
+
+  if [[ -n "${rendered_name}" ]]; then
+    echo "${rendered_name}"
+    return
+  fi
+
+  local project_name
+  project_name="$(compose config --format json | jq -r '.name // empty')"
+  if [[ -z "${project_name}" ]]; then
+    project_name="$(basename "$PWD")"
+  fi
+
+  echo "${project_name}_${logical_name}"
+}
+
 kafka_node_exists_detected() {
   compose logs --tail=260 kafka 2>/dev/null \
     | grep -Eq 'NodeExistsException|node already exists.*(/brokers/ids|brokers/ids)|/brokers/ids/[0-9]+.*node already exists'
@@ -163,9 +190,9 @@ recover_kafka_zookeeper_node_exists() {
   compose rm -f kafka zookeeper || true
 
   docker volume rm \
-    jobflow_kafka-data \
-    jobflow_zookeeper-data \
-    jobflow_zookeeper-log \
+    "$(compose_volume_name kafka-data)" \
+    "$(compose_volume_name zookeeper-data)" \
+    "$(compose_volume_name zookeeper-log)" \
     || true
 
   compose up -d zookeeper kafka

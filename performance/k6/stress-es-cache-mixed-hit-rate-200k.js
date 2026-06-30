@@ -6,7 +6,8 @@ const ACCESS_TOKEN = __ENV.ACCESS_TOKEN || '';
 const HOT_TRAFFIC_PERCENT = Number.parseInt(__ENV.HOT_TRAFFIC_PERCENT || '70', 10);
 const SEARCH_LIMIT = __ENV.SEARCH_LIMIT || '10';
 const LONG_TAIL_PREFIX = __ENV.LONG_TAIL_PREFIX || 'mixed-tail';
-const LONG_TAIL_VARIANTS = Number.parseInt(__ENV.LONG_TAIL_VARIANTS || '10000', 10);
+const LONG_TAIL_RUN_ID = __ENV.LONG_TAIL_RUN_ID || `${Date.now()}`;
+const LONG_TAIL_VARIANTS = Number.parseInt(__ENV.LONG_TAIL_VARIANTS || '1000000', 10);
 const SLEEP_SECONDS = Number.parseFloat(__ENV.SLEEP_SECONDS || '1');
 
 const HOT_KEYWORDS = (__ENV.HOT_KEYWORDS || '백엔드,Spring Boot,프론트엔드,React,데이터 엔지니어,DevOps,Kubernetes,Python,Java,TypeScript')
@@ -60,10 +61,10 @@ function chooseSearch() {
         };
     }
 
-    const variant = ((__VU * 1000003) + __ITER) % LONG_TAIL_VARIANTS;
+    const variant = ((__VU - 1) * LONG_TAIL_VARIANTS) + (__ITER % LONG_TAIL_VARIANTS);
     return {
         traffic: 'long_tail',
-        keyword: `${LONG_TAIL_PREFIX}-${variant}`,
+        keyword: `${LONG_TAIL_PREFIX}-${LONG_TAIL_RUN_ID}-${variant}`,
     };
 }
 
