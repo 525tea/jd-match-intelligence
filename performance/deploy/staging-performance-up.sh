@@ -38,11 +38,14 @@ ELASTICSEARCH_REINDEX_BATCH_SIZE="${ELASTICSEARCH_REINDEX_BATCH_SIZE:-500}"
 PERF_CACHE_ENABLED="${PERF_CACHE_ENABLED:-false}"
 BUILD_SERVICES="${BUILD_SERVICES:-backend gateway elasticsearch}"
 UP_SERVICES="${UP_SERVICES:-}"
+KAFKA_ZOOKEEPER_AUTO_RECOVER="${KAFKA_ZOOKEEPER_AUTO_RECOVER:-true}"
 PERFORMANCE_REINDEX_RESULT="ok"
+KAFKA_ZOOKEEPER_RECOVERY_ATTEMPTED=0
 
 export ELASTICSEARCH_REINDEX_ON_STARTUP
 export ELASTICSEARCH_REINDEX_BATCH_SIZE
 export PERF_CACHE_ENABLED
+export KAFKA_BOOTSTRAP_SERVERS
 
 echo "ENV_FILE=${ENV_FILE}"
 echo "BASE_URL=${BASE_URL}"
@@ -63,6 +66,7 @@ echo "ELASTICSEARCH_REINDEX_BATCH_SIZE=${ELASTICSEARCH_REINDEX_BATCH_SIZE}"
 echo "PERF_CACHE_ENABLED=${PERF_CACHE_ENABLED}"
 echo "BUILD_SERVICES=${BUILD_SERVICES}"
 echo "UP_SERVICES=${UP_SERVICES:-all}"
+echo "KAFKA_ZOOKEEPER_AUTO_RECOVER=${KAFKA_ZOOKEEPER_AUTO_RECOVER}"
 if [[ "${ELASTICSEARCH_REINDEX_ON_STARTUP}" == "true" ]]; then
   echo "WARNING: ELASTICSEARCH_REINDEX_ON_STARTUP=true will rebuild the performance search index."
   echo "WARNING: Keep it false for repeated stress tests after the 200k index is prepared."
@@ -90,6 +94,33 @@ require_env_file() {
   echo "env_file=ok"
 }
 
+validate_kafka_smoke_context() {
+  local scripts=(
+    performance/events/ensure-kafka-topics.sh
+    performance/events/kafka-topic-smoke.sh
+    performance/events/outbox-kafka-publish-smoke.sh
+    performance/events/kafka-consumer-smoke.sh
+  )
+
+  for script in "${scripts[@]}"; do
+    [[ -f "${script}" ]] || fail "Kafka smoke script does not exist: ${script}"
+
+    if grep -Eq 'localhost:9092|source[[:space:]].*ENV_FILE' "${script}"; then
+      fail "${script} violates performance Kafka smoke context. Use kafka:29092 from inside the kafka container and parse .env line-by-line instead of source."
+    fi
+
+    if ! grep -Fq 'COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)' "${script}"; then
+      fail "${script} must use docker-compose.yml + docker-compose.performance.yml explicitly."
+    fi
+
+    if ! grep -Fq 'KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}"' "${script}"; then
+      fail "${script} must default KAFKA_BOOTSTRAP_SERVERS to kafka:29092."
+    fi
+  done
+
+  echo "kafka_smoke_context=ok"
+}
+
 compose() {
   docker compose "${COMPOSE_FILES[@]}" "$@"
 }
@@ -106,6 +137,41 @@ compose_state() {
 
   compose ps --format json "${service_name}" \
     | jq -r 'if type == "array" then .[0].State else .State end // "unknown"'
+}
+
+kafka_node_exists_detected() {
+  compose logs --tail=260 kafka 2>/dev/null \
+    | grep -Eq 'NodeExistsException|node already exists.*(/brokers/ids|brokers/ids)|/brokers/ids/[0-9]+.*node already exists'
+}
+
+recover_kafka_zookeeper_node_exists() {
+  if [[ "${KAFKA_ZOOKEEPER_AUTO_RECOVER}" != "true" ]]; then
+    return 1
+  fi
+
+  if (( KAFKA_ZOOKEEPER_RECOVERY_ATTEMPTED > 0 )); then
+    return 1
+  fi
+
+  KAFKA_ZOOKEEPER_RECOVERY_ATTEMPTED=1
+
+  echo
+  echo "Kafka ZooKeeper NodeExists detected. Recreating only Kafka/ZooKeeper state and preserving MySQL/Elasticsearch volumes."
+  echo "kafka_zookeeper_recovery=started"
+
+  compose stop kafka zookeeper || true
+  compose rm -f kafka zookeeper || true
+
+  docker volume rm \
+    jobflow_kafka-data \
+    jobflow_zookeeper-data \
+    jobflow_zookeeper-log \
+    || true
+
+  compose up -d zookeeper kafka
+
+  echo "kafka_zookeeper_recovery=restarted"
+  echo
 }
 
 print_service_diagnostics() {
@@ -170,11 +236,29 @@ wait_for_healthy() {
       return
     fi
 
+    if [[ "${service_name}" == "kafka" ]] \
+      && (( KAFKA_ZOOKEEPER_RECOVERY_ATTEMPTED == 0 )) \
+      && kafka_node_exists_detected; then
+      recover_kafka_zookeeper_node_exists || true
+      elapsed=0
+      sleep "${HEALTH_WAIT_INTERVAL_SECONDS}"
+      continue
+    fi
+
     sleep "${HEALTH_WAIT_INTERVAL_SECONDS}"
     elapsed=$((elapsed + HEALTH_WAIT_INTERVAL_SECONDS))
   done
 
   compose ps
+
+  if [[ "${service_name}" == "kafka" ]] \
+    && (( KAFKA_ZOOKEEPER_RECOVERY_ATTEMPTED == 0 )) \
+    && kafka_node_exists_detected; then
+    recover_kafka_zookeeper_node_exists || true
+    wait_for_healthy kafka
+    return
+  fi
+
   print_service_diagnostics "${service_name}"
   fail "${service_name} did not become healthy within ${HEALTH_WAIT_TIMEOUT_SECONDS}s"
 }
@@ -215,8 +299,14 @@ run_step "Env file check" \
 run_step "Server bootstrap check" \
   bash performance/deploy/server-bootstrap-check.sh
 
+run_step "Performance ops regression guard" \
+  bash performance/deploy/performance-ops-regression-guard.sh
+
 run_step "Performance compose config" \
   compose config
+
+run_step "Kafka smoke script context guard" \
+  validate_kafka_smoke_context
 
 run_step "Start performance database dependencies" \
   compose up -d mysql redis elasticsearch zookeeper kafka

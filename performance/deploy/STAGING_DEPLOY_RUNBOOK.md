@@ -115,19 +115,84 @@ Staging performance stack is ready for pre-k6 smoke.
 
 1. `.env` 존재 확인
 2. 서버 bootstrap check
-3. performance DB 준비와 dataset gate
-4. `docker-compose.yml` + `docker-compose.performance.yml` config 검증
-5. backend/gateway/elasticsearch image build
-6. mysql/redis/elasticsearch/zookeeper/kafka 선기동
-7. performance stack 기동
-8. backend/gateway health 대기
-9. Kafka topic ensure
-10. Kafka topic smoke
-11. Outbox Relay Kafka publish smoke
-12. performance reindex 완료 로그 확인
-13. performance profile smoke
+3. performance 운영 회귀 guard
+4. performance DB 준비와 dataset gate
+5. `docker-compose.yml` + `docker-compose.performance.yml` config 검증
+6. backend/gateway/elasticsearch image build
+7. mysql/redis/elasticsearch/zookeeper/kafka 선기동
+8. performance stack 기동
+9. backend/gateway health 대기
+10. Kafka topic ensure
+11. Kafka topic smoke
+12. Outbox Relay Kafka publish smoke
+13. performance reindex 완료 로그 확인
+14. performance profile smoke
+
+운영 회귀 guard는 이전에 반복 발생했던 staging/performance 사고가 코드에 다시 들어오면 stack 기동 전에 실패시킨다.
+
+```bash
+bash performance/deploy/performance-ops-regression-guard.sh
+```
+
+성공 기준:
+
+```text
+Performance ops regression guard completed.
+```
+
+이 guard가 막는 대표 회귀:
+
+- performance backend healthcheck가 `/actuator/health/liveness`가 아닌 전체 `/actuator/health`로 돌아가는 것
+- `CACHE_ENABLED=false` 하드코딩으로 cache stress test가 무의미해지는 것
+- `ELASTICSEARCH_REINDEX_ON_STARTUP` 기본값이 `true`로 돌아가는 것
+- Kafka smoke script가 `kafka:29092` 대신 `localhost:9092` 또는 단일 compose context를 쓰는 것
+- Kafka smoke script가 `.env`를 `source`해서 공백 있는 값(`ES_JAVA_OPTS`)에서 깨지는 것
+- k6 검색 stress runner가 Gateway를 기본 target으로 쓰는 것
+- cache stress runner가 cache hit delta를 확인하지 않고 본 테스트로 들어가는 것
+- performance stack에서 notification provider가 실제 Mailgun 계열로 돌아가는 것
+
+반복 stress test에서는 `ELASTICSEARCH_REINDEX_ON_STARTUP=true`가 남아 있으면 guard가 실패한다. 200k index를 최초 생성하거나 의도적으로 재색인하는 경우에만 아래처럼 명시적으로 예외를 연다.
+
+```bash
+ALLOW_REINDEX_ON_STARTUP=true \
+ELASTICSEARCH_REINDEX_ON_STARTUP=true \
+bash performance/deploy/staging-performance-up.sh
+```
+
+재색인이 끝난 뒤에는 `.env`와 실행 환경을 다시 false로 되돌린다.
 
 기본 실행은 이미 준비된 performance Elasticsearch index를 재사용한다. 200k fixture와 index를 최초 준비하거나 의도적으로 재생성할 때만 서버 `.env`에서 `ELASTICSEARCH_REINDEX_ON_STARTUP=true`로 바꾼다. 반복 stress test 실행 전에는 반드시 `false`로 되돌린다.
+
+Kafka가 재기동 중 ZooKeeper ephemeral node(`/brokers/ids/1`) 잔존으로 `NodeExistsException`을 내면 `staging-performance-up.sh`가 이를 감지해 Kafka/ZooKeeper 컨테이너와 Kafka/ZooKeeper 전용 볼륨만 정리한 뒤 한 번 재시도한다. 이 복구는 MySQL/Elasticsearch 볼륨을 건드리지 않는다.
+
+Kafka smoke script는 `docker compose exec kafka ...`처럼 컨테이너 내부에서 Kafka CLI를 실행하므로 bootstrap 주소는 `kafka:29092`를 사용한다. EC2 호스트에서 외부 클라이언트로 직접 붙을 때만 host mapped port인 `localhost:19092`를 사용한다.
+
+`staging-performance-up.sh`는 Kafka smoke script가 이 규칙을 지키는지 시작 전에 검증한다.
+
+```text
+kafka_smoke_context=ok
+```
+
+이 guard가 실패하면 Kafka smoke script에 아래 회귀가 들어간 것이다.
+
+- `localhost:9092` 기본값 사용
+- `docker-compose.performance.yml` 없이 단일 compose context 사용
+- `.env`를 line-by-line parser가 아니라 `source`로 로딩
+
+자동 복구 로그:
+
+```text
+Kafka ZooKeeper NodeExists detected. Recreating only Kafka/ZooKeeper state and preserving MySQL/Elasticsearch volumes.
+kafka_zookeeper_recovery=started
+kafka_zookeeper_recovery=restarted
+```
+
+자동 복구를 끄고 원인 로그만 보고 싶으면 아래처럼 실행한다.
+
+```bash
+KAFKA_ZOOKEEPER_AUTO_RECOVER=false \
+bash performance/deploy/staging-performance-up.sh
+```
 
 ```bash
 grep '^ELASTICSEARCH_REINDEX_ON_STARTUP=' .env
@@ -389,10 +454,13 @@ ERROR Creating /brokers/ids/1 ... owner does not match current session
 FATAL KeeperErrorCode = NodeExists
 ```
 
-해결: Zookeeper/Kafka 볼륨을 삭제하고 재기동한다.
+기본 해결: `staging-performance-up.sh`는 이 로그를 감지하면 Zookeeper/Kafka 볼륨만 삭제하고 한 번 자동 재기동한다.
+
+자동 복구를 끈 상태이거나 수동으로 처리해야 할 때만 아래 명령을 사용한다. 전체 `docker compose down -v`는 MySQL/Elasticsearch 볼륨까지 삭제할 수 있으므로 사용하지 않는다.
 
 ```bash
-docker compose down zookeeper kafka
+docker compose -f docker-compose.yml -f docker-compose.performance.yml stop kafka zookeeper
+docker compose -f docker-compose.yml -f docker-compose.performance.yml rm -f kafka zookeeper
 docker volume rm jobflow_zookeeper-data jobflow_zookeeper-log jobflow_kafka-data 2>/dev/null || true
 docker compose -f docker-compose.yml -f docker-compose.performance.yml up -d zookeeper kafka
 ```

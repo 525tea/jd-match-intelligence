@@ -7,18 +7,24 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env}"
 
 if [[ -f "${ENV_FILE}" ]]; then
-  set -a
-  # shellcheck disable=SC1090
-  source "${ENV_FILE}"
-  set +a
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// }" ]] && continue
+    key="${line%%=*}"
+    value="${line#*=}"
+    value="${value%\"}" value="${value#\"}"
+    value="${value%\'}" value="${value#\'}"
+    export "$key=$value"
+  done < "${ENV_FILE}"
 fi
 
+COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)
 MYSQL_SERVICE="${MYSQL_SERVICE:-mysql}"
 KAFKA_SERVICE="${KAFKA_SERVICE:-kafka}"
 PERF_DB_NAME="${PERF_DB_NAME:-jobflow_perf}"
 PERF_DB_USER="${PERF_DB_USER:-jobflow}"
 PERF_DB_PASSWORD="${PERF_DB_PASSWORD:-jobflow}"
-KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}"
+KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}"
 JOB_EVENTS_TOPIC="${JOB_EVENTS_TOPIC:-job.created}"
 EMAIL_SEND_TOPIC="${EMAIL_SEND_TOPIC:-email.send}"
 KAFKA_CONSUMER_SMOKE_RUN_ID="${KAFKA_CONSUMER_SMOKE_RUN_ID:-kafka-consumer-smoke-$(date +%Y%m%d%H%M%S)}"
@@ -31,8 +37,12 @@ fail() {
   exit 1
 }
 
+compose() {
+  docker compose "${COMPOSE_FILES[@]}" "$@"
+}
+
 mysql_exec() {
-  docker compose exec -T -e MYSQL_PWD="${PERF_DB_PASSWORD}" "${MYSQL_SERVICE}" mysql \
+  compose exec -T -e MYSQL_PWD="${PERF_DB_PASSWORD}" "${MYSQL_SERVICE}" mysql \
     -u"${PERF_DB_USER}" \
     --default-character-set=utf8mb4 \
     "$@" \
@@ -45,7 +55,7 @@ publish_message() {
   local message="$3"
 
   printf '%s|%s\n' "${key}" "${message}" \
-    | docker compose exec -T "${KAFKA_SERVICE}" kafka-console-producer \
+    | compose exec -T "${KAFKA_SERVICE}" kafka-console-producer \
         --bootstrap-server "${KAFKA_BOOTSTRAP_SERVERS}" \
         --topic "${topic}" \
         --property parse.key=true \
@@ -59,7 +69,7 @@ wait_for_log() {
 
   for ((i = 1; i <= KAFKA_CONSUMER_SMOKE_WAIT_SECONDS; i++)); do
     local logs
-    logs="$(docker compose logs --since=2m backend)"
+    logs="$(compose logs --since=5m backend)"
     if printf '%s\n' "${logs}" | grep -F "${message_pattern}" | grep -Fq "${run_pattern}"; then
       echo "${description}=ok"
       return
@@ -69,12 +79,13 @@ wait_for_log() {
     sleep 1
   done
 
-  docker compose logs --since=3m backend | grep -Ei 'Kafka|consumer|error|exception' || true
+  compose logs --since=5m backend | grep -Ei 'Kafka|consumer|error|exception' || true
   fail "${description} was not observed in backend logs"
 }
 
 echo "ROOT_DIR=${ROOT_DIR}"
 echo "ENV_FILE=${ENV_FILE}"
+echo "COMPOSE_FILES=${COMPOSE_FILES[*]}"
 echo "MYSQL_SERVICE=${MYSQL_SERVICE}"
 echo "KAFKA_SERVICE=${KAFKA_SERVICE}"
 echo "PERF_DB_NAME=${PERF_DB_NAME}"
@@ -89,11 +100,11 @@ if [[ "${PERF_DB_NAME}" == "jobflow" ]]; then
   fail "Refusing to run Kafka consumer smoke against real database: ${PERF_DB_NAME}"
 fi
 
-if ! docker compose ps --services --filter status=running | grep -qx "${MYSQL_SERVICE}"; then
+if ! compose ps --services --filter status=running | grep -qx "${MYSQL_SERVICE}"; then
   fail "service \"${MYSQL_SERVICE}\" is not running"
 fi
 
-if ! docker compose ps --services --filter status=running | grep -qx "${KAFKA_SERVICE}"; then
+if ! compose ps --services --filter status=running | grep -qx "${KAFKA_SERVICE}"; then
   fail "service \"${KAFKA_SERVICE}\" is not running"
 fi
 

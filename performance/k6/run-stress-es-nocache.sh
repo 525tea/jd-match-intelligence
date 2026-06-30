@@ -3,7 +3,7 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
 SERVER_URL="${SERVER_URL:-${BASE_URL%/api}}"
-HEALTH_URL="${HEALTH_URL:-${SERVER_URL}/actuator/health}"
+HEALTH_URL="${HEALTH_URL:-${SERVER_URL}/actuator/health/liveness}"
 SEARCH_PREFLIGHT_URL="${SEARCH_PREFLIGHT_URL:-${BASE_URL}/jobs/search?keyword=Spring%20Boot&limit=1}"
 HOST_ELASTICSEARCH_URL="${HOST_ELASTICSEARCH_URL:-http://localhost:9200}"
 KEYWORDS="${KEYWORDS:-백엔드,Spring Boot,프론트엔드,React,데이터 엔지니어,DevOps,Kubernetes,Python,Java,TypeScript}"
@@ -59,7 +59,12 @@ fi
 
 echo "auth_preflight=ok"
 
-if ! search_body="$(curl -fsS -H "Authorization: Bearer ${ACCESS_TOKEN}" "$SEARCH_PREFLIGHT_URL" 2>/dev/null)"; then
+auth_header=()
+if [[ -n "$ACCESS_TOKEN" ]]; then
+    auth_header=(-H "Authorization: Bearer ${ACCESS_TOKEN}")
+fi
+
+if ! search_body="$(curl -fsS "${auth_header[@]}" "$SEARCH_PREFLIGHT_URL" 2>/dev/null)"; then
     echo "Search preflight failed: $SEARCH_PREFLIGHT_URL" >&2
     echo "Elasticsearch cluster health:" >&2
     curl -s "${HOST_ELASTICSEARCH_URL}/_cluster/health?pretty" >&2 || true
