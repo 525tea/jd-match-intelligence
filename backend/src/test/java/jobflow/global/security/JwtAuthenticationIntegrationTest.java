@@ -27,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -74,7 +75,8 @@ class JwtAuthenticationIntegrationTest {
                         .param("limit", "10"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(result -> assertThat(result.getRequest().getSession(false)).isNull());
     }
 
     @Test
