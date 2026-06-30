@@ -481,11 +481,11 @@ bash performance/k6/run-stress-analysis-cache.sh
 - Redis cache hit/miss rate for `gapAnalysis`, `jdMatch`, `jobRecommendation`
 - Grafana JVM memory, HTTP request rate, latency, HikariCP active/pending
 
-## Elasticsearch + Redis Saturation Stress Test
+## Elasticsearch + Redis Capacity Rework
 
 Mixed hit-rate stress test는 각 VU가 1초 pacing으로 반복 요청하므로 500VU 조건에서 약 500 RPS plateau가 자연스럽다. saturation stress test는 이 pacing을 제거하고 k6 `constant-arrival-rate` executor로 `/jobs/search` cache-hit 중심 처리량 상한을 별도로 측정한다.
 
-이 테스트의 목표는 3000 RPS를 시도하는 것이다. 단, 성공/실패만 보는 것이 아니라 1000 → 2000 → 3000 RPS 단계에서 error rate, p95/p99, dropped iterations, k6 VU 사용량, JVM heap, Tomcat/Hikari, Redis/ES 지표를 함께 기록한다.
+이 테스트의 목표는 3000 RPS를 목표로, 1000 → 1500 → 2000 → 2500 → 3000 RPS 단계에서 안정 구간, 경계 구간, 포화 구간을 분리하는 것이다. 각 단계에서 error rate, p95/p99, dropped iterations, k6 VU 사용량, JVM heap, Tomcat/Hikari, Redis/ES 지표를 함께 기록한다.
 
 사전 준비는 Elasticsearch + Redis cache stress test와 동일하다. 3000 RPS 시도 전에는 backend가 cache enabled 상태이고 200k index가 이미 준비되어 있어야 한다.
 
@@ -518,17 +518,60 @@ SUMMARY_PREFIX=260630_k6_es_cache_saturation_200k \
 bash performance/k6/run-stress-es-cache-saturation.sh
 ```
 
+### Internal runner
+
+EC2 서버 내부에서 backend direct port를 호출하는 방식이다. MySQL fixture count, Elasticsearch document count, backend cache env를 Docker Compose로 직접 확인한다.
+
+```bash
+TARGET_RPS_LIST=1000,1500,2000,2500,3000 \
+DURATION=5m \
+PRE_ALLOCATED_VUS=800 \
+MAX_VUS=4000 \
+RUN_LOCATION=internal \
+RUN_LABEL=capacity_rework \
+bash performance/k6/run-stress-es-cache-saturation.sh
+```
+
+### External runner
+
+로컬 Mac 또는 별도 load generator에서 EC2 public endpoint를 호출하는 방식이다. 이 경우 로컬에서 서버의 Docker Compose에 접근할 수 없으므로 Compose 기반 preflight는 끈다. 서버 내부에서는 별도로 MySQL 200k, Elasticsearch 200k, `CACHE_ENABLED=true`를 확인한 뒤 실행한다.
+
+```bash
+BASE_URL=http://EC2_PUBLIC_IP:8080 \
+PROMETHEUS_URL=http://EC2_PUBLIC_IP:8080/actuator/prometheus \
+HEALTH_URL=http://EC2_PUBLIC_IP:8080/actuator/health/liveness \
+LOCAL_COMPOSE_PREFLIGHT=false \
+ES_COUNT_PREFLIGHT=false \
+TARGET_RPS_LIST=1000,1500,2000,2500,3000 \
+DURATION=5m \
+PRE_ALLOCATED_VUS=800 \
+MAX_VUS=4000 \
+RUN_LOCATION=external \
+RUN_LABEL=capacity_rework \
+bash performance/k6/run-stress-es-cache-saturation.sh
+```
+
+External runner에서도 search preflight와 cache hit delta preflight는 유지한다. 즉, 서버 env를 직접 읽지 못하더라도 `/jobs/search` warmup 이후 `jobSearch` cache hit가 증가하지 않으면 본 테스트로 들어가지 않는다.
+
 기본값:
 
 - `BASE_URL=http://localhost:8080`
 - `ARTIFACT_DIR=artifacts/performance`
-- `TARGET_RPS_LIST=1000,2000,3000`
-- `DURATION=2m`
+- `TARGET_RPS_LIST=1000,1500,2000,2500,3000`
+- `DURATION=5m`
 - `PRE_ALLOCATED_VUS=800`
 - `MAX_VUS=4000`
 - `P95_THRESHOLD_MS=1000`
 - `FAIL_RATE_THRESHOLD=0.01`
-- `SUMMARY_PREFIX=YYMMDD_k6_es_cache_saturation_200k`
+- `RUN_LOCATION=internal`
+- `RUN_LABEL=capacity_rework`
+- `SUMMARY_PREFIX=YYMMDD_k6_es_cache_capacity_${RUN_LABEL}_${RUN_LOCATION}_200k`
+
+각 RPS run은 k6 summary JSON과 함께 Prometheus metric snapshot을 저장한다.
+
+- `*_1000rps.json`
+- `*_1000rps_prometheus_before.prom`
+- `*_1000rps_prometheus_after.prom`
 
 Saturation workload는 순수 `/jobs/search` 처리량 상한을 보기 위한 테스트이므로 performance stack의 tracing sampling은 기본 `0.0`으로 둔다. Zipkin/trace export 비용까지 포함한 관측성 부하 테스트가 필요하면 `PERF_TRACING_SAMPLING_PROBABILITY=1.0`을 별도 케이스로 분리해서 실행한다.
 
