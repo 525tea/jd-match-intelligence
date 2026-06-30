@@ -75,6 +75,10 @@ CACHE_STRESS_RUNNERS=(
   performance/k6/run-stress-es-cache-saturation.sh
 )
 
+ANALYSIS_CACHE_STRESS_RUNNERS=(
+  performance/k6/run-stress-analysis-cache.sh
+)
+
 echo "ROOT_DIR=${ROOT_DIR}"
 echo
 
@@ -90,7 +94,7 @@ assert_file_exists "${HOST_TUNING_APPLY}"
 assert_file_exists "${STAGING_ENV_EXAMPLE}"
 assert_file_exists "${COMPOSE_PERF}"
 
-for script in "${KAFKA_SMOKE_SCRIPTS[@]}" "${CACHE_STRESS_RUNNERS[@]}"; do
+for script in "${KAFKA_SMOKE_SCRIPTS[@]}" "${CACHE_STRESS_RUNNERS[@]}" "${ANALYSIS_CACHE_STRESS_RUNNERS[@]}"; do
   assert_file_exists "${script}"
 done
 
@@ -169,7 +173,7 @@ echo "host_tuning_invariants=ok"
 echo
 
 echo "### k6 search stress invariants"
-for runner in "${CACHE_STRESS_RUNNERS[@]}" performance/k6/run-stress-es-nocache.sh; do
+for runner in "${CACHE_STRESS_RUNNERS[@]}" "${ANALYSIS_CACHE_STRESS_RUNNERS[@]}" performance/k6/run-stress-es-nocache.sh; do
   assert_file_exists "${runner}"
   assert_contains "${runner}" 'BASE_URL="${BASE_URL:-http://localhost:8080}"' \
     "${runner} must default to backend direct, not Gateway"
@@ -182,6 +186,19 @@ for runner in "${CACHE_STRESS_RUNNERS[@]}"; do
     "${runner} must verify cache hit delta before stress test"
   assert_contains "${runner}" "cache_gets_total" \
     "${runner} must verify cache metrics before stress test"
+done
+
+for runner in "${ANALYSIS_CACHE_STRESS_RUNNERS[@]}"; do
+  assert_contains "${runner}" "MIN_ANALYSIS_CACHE_HIT_DELTA" \
+    "${runner} must verify analysis cache hit delta before cache-enabled stress test"
+  assert_contains "${runner}" "cache_gets_total" \
+    "${runner} must verify cache metrics before stress test"
+  assert_contains "${runner}" "gapAnalysis" \
+    "${runner} must include gapAnalysis cache metrics"
+  assert_contains "${runner}" "jdMatch" \
+    "${runner} must include jdMatch cache metrics"
+  assert_contains "${runner}" "jobRecommendation" \
+    "${runner} must include jobRecommendation cache metrics"
 done
 
 echo "k6_search_stress_invariants=ok"
