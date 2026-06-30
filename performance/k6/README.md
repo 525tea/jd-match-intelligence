@@ -406,6 +406,81 @@ bash performance/k6/run-stress-es-cache-mixed-hit-rate.sh
 - Redis cache hit/miss rate (`cache_gets_total{result="hit|miss"}`)
 - Grafana JVM memory, HTTP request rate, latency
 
+## Analysis API Cache Before/After Stress Test
+
+검색 API가 아니라 사용자별 분석 API 캐시 효과를 비교한다. 대상은 `gapAnalysis`, `jdMatch`, `jobRecommendation` cache를 사용하는 다음 endpoint다.
+
+- `GET /gap-analysis/projects/{userProjectId}`
+- `GET /projects/{userProjectId}/job-matches`
+- `GET /recommendations/jobs`
+
+before/after는 같은 k6 workload로 비교하고, 서버의 cache env만 바꾼다.
+
+before stack:
+
+```bash
+PERF_CACHE_ENABLED=false \
+PERF_TRACING_SAMPLING_PROBABILITY=0.0 \
+PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false \
+ELASTICSEARCH_REINDEX_ON_STARTUP=false \
+PERF_ELASTICSEARCH_MEMORY_LIMIT=3g \
+PERF_ES_JAVA_OPTS="-Xms2g -Xmx2g" \
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+before run:
+
+```bash
+CACHE_MODE=disabled \
+SUMMARY_FILE=260630_k6_analysis_cache_disabled_200vu.json \
+bash performance/k6/run-stress-analysis-cache.sh
+```
+
+after stack:
+
+```bash
+PERF_CACHE_ENABLED=true \
+PERF_TRACING_SAMPLING_PROBABILITY=0.0 \
+PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false \
+ELASTICSEARCH_REINDEX_ON_STARTUP=false \
+PERF_ELASTICSEARCH_MEMORY_LIMIT=3g \
+PERF_ES_JAVA_OPTS="-Xms2g -Xmx2g" \
+REQUIRED_PORTS="" \
+bash performance/deploy/staging-performance-up.sh
+```
+
+after run:
+
+```bash
+CACHE_MODE=enabled \
+SUMMARY_FILE=260630_k6_analysis_cache_enabled_200vu.json \
+bash performance/k6/run-stress-analysis-cache.sh
+```
+
+기본값:
+
+- `BASE_URL=http://localhost:8080`
+- `ENDPOINTS=gap_analysis,jd_match,recommendations_jobs`
+- `TARGET_ROLES=BACKEND,DATA_ENGINEER,DEVOPS`
+- `TARGET_CAREER_LEVELS=JUNIOR,MID,SENIOR`
+- `VUS=200`
+- `DURATION=10m`
+- `LIMIT=20`
+- `SLEEP_SECONDS=1`
+- `ARTIFACT_DIR=artifacts/performance`
+- `RESET_REDIS_CACHE_BEFORE_RUN=true`
+
+확인할 지표:
+
+- `http_req_duration{endpoint:gap_analysis} p(95), p(99)`
+- `http_req_duration{endpoint:jd_match} p(95), p(99)`
+- `http_req_duration{endpoint:recommendations_jobs} p(95), p(99)`
+- `http_req_failed`
+- `checks`
+- Redis cache hit/miss rate for `gapAnalysis`, `jdMatch`, `jobRecommendation`
+- Grafana JVM memory, HTTP request rate, latency, HikariCP active/pending
+
 ## Elasticsearch + Redis Saturation Stress Test
 
 Mixed hit-rate stress test는 각 VU가 1초 pacing으로 반복 요청하므로 500VU 조건에서 약 500 RPS plateau가 자연스럽다. saturation stress test는 이 pacing을 제거하고 k6 `constant-arrival-rate` executor로 `/jobs/search` cache-hit 중심 처리량 상한을 별도로 측정한다.

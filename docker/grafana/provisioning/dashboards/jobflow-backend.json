@@ -169,8 +169,8 @@
     {
       "id": 4,
       "type": "timeseries",
-      "title": "Job Search Cache Hit Rate",
-      "description": "jobSearch cache hit/miss 추이입니다. /jobs/search 캐시가 꺼져 있으면 0으로 표시됩니다.",
+      "title": "Cache Hit Rate",
+      "description": "jobSearch, gapAnalysis, jdMatch, jobRecommendation cache hit/miss 추이입니다.",
       "datasource": {
         "type": "prometheus",
         "uid": "Prometheus"
@@ -178,18 +178,18 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "((sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", cache=\"jobSearch\"}[1m])) or sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", name=\"jobSearch\"}[1m])) or vector(0)) / clamp_min((sum(rate(cache_gets_total{application=\"jobflow-backend\", cache=\"jobSearch\"}[1m])) or sum(rate(cache_gets_total{application=\"jobflow-backend\", name=\"jobSearch\"}[1m])) or vector(0)), 0.001))",
-          "legendFormat": "hit rate"
+          "expr": "sum by (cache) ((rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]) or label_replace(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", name=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]), \"cache\", \"$1\", \"name\", \"(.*)\"))) / clamp_min(sum by (cache) ((rate(cache_gets_total{application=\"jobflow-backend\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]) or label_replace(rate(cache_gets_total{application=\"jobflow-backend\", name=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]), \"cache\", \"$1\", \"name\", \"(.*)\"))), 0.001)",
+          "legendFormat": "{{cache}} hit rate"
         },
         {
           "refId": "B",
-          "expr": "sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", cache=\"jobSearch\"}[1m])) or sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", name=\"jobSearch\"}[1m])) or vector(0)",
-          "legendFormat": "hits/s"
+          "expr": "sum by (cache) ((rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]) or label_replace(rate(cache_gets_total{application=\"jobflow-backend\", result=\"hit\", name=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]), \"cache\", \"$1\", \"name\", \"(.*)\")))",
+          "legendFormat": "{{cache}} hits/s"
         },
         {
           "refId": "C",
-          "expr": "sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"miss\", cache=\"jobSearch\"}[1m])) or sum(rate(cache_gets_total{application=\"jobflow-backend\", result=\"miss\", name=\"jobSearch\"}[1m])) or vector(0)",
-          "legendFormat": "misses/s"
+          "expr": "sum by (cache) ((rate(cache_gets_total{application=\"jobflow-backend\", result=\"miss\", cache=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]) or label_replace(rate(cache_gets_total{application=\"jobflow-backend\", result=\"miss\", name=~\"jobSearch|gapAnalysis|jdMatch|jobRecommendation\"}[1m]), \"cache\", \"$1\", \"name\", \"(.*)\")))",
+          "legendFormat": "{{cache}} misses/s"
         }
       ],
       "fieldConfig": {
@@ -205,7 +205,7 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "hit rate" },
+            "matcher": { "id": "byRegexp", "options": ".* hit rate$" },
             "properties": [
               { "id": "unit", "value": "percentunit" },
               { "id": "min", "value": 0 },
@@ -213,11 +213,11 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "hits/s" },
+            "matcher": { "id": "byRegexp", "options": ".* hits/s$" },
             "properties": [{ "id": "unit", "value": "reqps" }]
           },
           {
-            "matcher": { "id": "byName", "options": "misses/s" },
+            "matcher": { "id": "byRegexp", "options": ".* misses/s$" },
             "properties": [{ "id": "unit", "value": "reqps" }]
           }
         ]
