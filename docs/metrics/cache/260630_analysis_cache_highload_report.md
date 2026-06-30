@@ -61,6 +61,19 @@ Cache enabled run 직후 backend Prometheus metric에서 다음 값을 확인했
 
 Redis reset 이후 warmup 단계에서도 `hit_delta=6`, `miss_delta=3`이 확인되었다. 따라서 캐시가 활성화되지 않았거나 metric이 누락된 상태는 아니다.
 
+## Grafana 관찰
+
+| 항목 | 관찰 |
+|---|---|
+| HTTP Request Rate | 분석 API 3종이 endpoint별 약 60~66 req/s로 관측됨 |
+| 전체 RPS | k6 summary 기준 198.59 req/s |
+| P95 / P99 Latency | 분석 API line은 낮은 ms 구간에 유지됨 |
+| Error Rate | 0% |
+| Cache Hit Rate | `gapAnalysis`, `jdMatch`, `jobRecommendation` hit rate가 90~100% 근처에서 유지됨 |
+| HikariCP | active connection은 max 20 아래에서 유지, pending 0 |
+
+Grafana Backend Observability 대시보드는 전체 RPS를 합산하지 않고 endpoint별 request rate를 라인으로 표시한다. 따라서 k6 summary의 전체 RPS 198.59 req/s가 Grafana에서는 분석 API 3종 각각 약 60~66 req/s로 나뉘어 보인다.
+
 ## 해석
 
 ### 1. 캐시 적용은 검증됐지만, 200VU에서는 latency 개선 폭이 작다
@@ -106,4 +119,5 @@ cache enabled run에서 세 cache 모두 99.99% 수준의 hit rate를 보였다.
 |---|---|
 | cache disabled k6 summary | `jobflow-server-env/artifacts/260630_analysis_cache_200vu/260630_k6_analysis_cache_disabled_200vu.json` |
 | cache enabled k6 summary | `jobflow-server-env/artifacts/260630_analysis_cache_200vu/260630_k6_analysis_cache_enabled_200vu.json` |
-
+| Grafana Backend Observability screenshot | `jobflow-server-env/artifacts/260630_analysis_cache_200vu/260630_grafana_backend_analysis_cache_enabled_1603_1613.png` |
+| Grafana Backend Observability live screenshot | `jobflow-server-env/artifacts/260630_analysis_cache_200vu/260630_grafana_backend_analysis_cache_enabled_live_161916.png` |
