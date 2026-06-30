@@ -24,7 +24,8 @@ public class ProjectInventoryService {
 
     @Cacheable(
             cacheNames = CacheNames.PROJECT_SKILL_INVENTORY,
-            key = "T(jobflow.domain.project.ProjectInventoryService).projectInventoryCacheKey(#userId, #userProjectId)"
+            key = "T(jobflow.domain.project.ProjectInventoryService).projectInventoryCacheKey(#userId, #userProjectId)",
+            sync = true
     )
     public List<ProjectSkillInventoryResponse> getProjectSkills(Long userId, Long userProjectId) {
         validateOwnedProject(userId, userProjectId);
@@ -62,7 +63,8 @@ public class ProjectInventoryService {
 
     @Cacheable(
             cacheNames = CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY,
-            key = "T(jobflow.domain.project.ProjectInventoryService).projectInventoryCacheKey(#userId, #userProjectId)"
+            key = "T(jobflow.domain.project.ProjectInventoryService).projectInventoryCacheKey(#userId, #userProjectId)",
+            sync = true
     )
     public List<ProjectExperienceTagInventoryResponse> getProjectExperienceTags(
             Long userId,

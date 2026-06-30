@@ -169,6 +169,7 @@ class JobRecommendationServiceTest {
 
         assertThat(cacheable).isNotNull();
         assertThat(cacheable.cacheNames()).containsExactly(CacheNames.JOB_RECOMMENDATION);
+        assertThat(cacheable.sync()).isTrue();
     }
 
     @Test

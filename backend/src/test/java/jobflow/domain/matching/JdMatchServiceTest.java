@@ -74,6 +74,7 @@ class JdMatchServiceTest {
         assertThat(cacheable).isNotNull();
         assertThat(cacheable.cacheNames()).containsExactly(CacheNames.JD_MATCH);
         assertThat(cacheable.key()).contains("jdMatchCacheKey");
+        assertThat(cacheable.sync()).isTrue();
     }
 
     @Test

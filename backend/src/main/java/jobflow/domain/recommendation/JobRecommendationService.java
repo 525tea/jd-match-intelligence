@@ -53,7 +53,8 @@ public class JobRecommendationService {
 
     @Cacheable(
             cacheNames = CacheNames.JOB_RECOMMENDATION,
-            key = "T(jobflow.domain.recommendation.JobRecommendationService).recommendationCacheKey(#userId, #userProjectId, #targetRoles, #limit)"
+            key = "T(jobflow.domain.recommendation.JobRecommendationService).recommendationCacheKey(#userId, #userProjectId, #targetRoles, #limit)",
+            sync = true
     )
     public List<JobRecommendationResponse> recommendJobs(
             Long userId,

@@ -115,6 +115,7 @@ class GapAnalysisServiceTest {
 
         assertThat(cacheable.cacheNames()).containsExactly(CacheNames.GAP_ANALYSIS);
         assertThat(cacheable.key()).contains("gapAnalysisCacheKey");
+        assertThat(cacheable.sync()).isTrue();
     }
 
     @Test

@@ -38,7 +38,8 @@ public class GapAnalysisService {
 
     @Cacheable(
             cacheNames = CacheNames.GAP_ANALYSIS,
-            key = "T(jobflow.domain.gap.GapAnalysisService).gapAnalysisCacheKey(#userId, #userProjectId, #targetRoles, #limit)"
+            key = "T(jobflow.domain.gap.GapAnalysisService).gapAnalysisCacheKey(#userId, #userProjectId, #targetRoles, #limit)",
+            sync = true
     )
     public GapAnalysisResponse analyzeProjectSkillGap(
             Long userId,

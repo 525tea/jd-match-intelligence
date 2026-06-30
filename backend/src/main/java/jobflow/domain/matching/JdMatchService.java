@@ -68,7 +68,8 @@ public class JdMatchService {
     @Cacheable(
             cacheNames = CacheNames.JD_MATCH,
             key = "T(jobflow.domain.matching.JdMatchService).jdMatchCacheKey("
-                    + "#userId, #userProjectId, #targetRoles, #targetCareerLevel, #limit)"
+                    + "#userId, #userProjectId, #targetRoles, #targetCareerLevel, #limit)",
+            sync = true
     )
     public List<JdJobMatchResponse> findProjectJobMatches(
             Long userId,

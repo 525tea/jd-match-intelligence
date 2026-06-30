@@ -197,6 +197,7 @@ class ProjectInventoryServiceTest {
 
         assertThat(cacheable.cacheNames()).containsExactly(CacheNames.PROJECT_SKILL_INVENTORY);
         assertThat(cacheable.key()).contains("projectInventoryCacheKey");
+        assertThat(cacheable.sync()).isTrue();
     }
 
     @Test
@@ -208,6 +209,7 @@ class ProjectInventoryServiceTest {
 
         assertThat(cacheable.cacheNames()).containsExactly(CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY);
         assertThat(cacheable.key()).contains("projectInventoryCacheKey");
+        assertThat(cacheable.sync()).isTrue();
     }
 
     @Test
