@@ -24,6 +24,7 @@ import jobflow.global.error.exception.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
@@ -125,6 +126,7 @@ public class JobService {
                 .toList();
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<JobSearchResponse> searchJobs(String keyword, int limit) {
         return jobSearchService.search(keyword, limit)
                 .stream()

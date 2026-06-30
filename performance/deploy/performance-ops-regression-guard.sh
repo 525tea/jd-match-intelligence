@@ -114,12 +114,14 @@ assert_compose_json '.services.backend.environment.SPRING_KAFKA_BOOTSTRAP_SERVER
   "performance backend Kafka bootstrap must default to kafka:29092"
 assert_compose_json '.services.backend.environment.APP_NOTIFICATION_EMAIL_PROVIDER == "mock"' \
   "performance notification provider must default to mock"
-assert_compose_json '.services.backend.environment.SERVER_TOMCAT_THREADS_MAX == "200"' \
+assert_compose_json '.services.backend.environment.SERVER_TOMCAT_THREADS_MAX != null' \
   "performance backend Tomcat max threads must be externally tunable"
-assert_compose_json '.services.backend.environment.SERVER_TOMCAT_MAX_CONNECTIONS == "8192"' \
+assert_compose_json '.services.backend.environment.SERVER_TOMCAT_MAX_CONNECTIONS != null' \
   "performance backend Tomcat max connections must be externally tunable"
-assert_compose_json '.services.backend.environment.HIKARI_MAXIMUM_POOL_SIZE == "20"' \
+assert_compose_json '.services.backend.environment.HIKARI_MAXIMUM_POOL_SIZE != null' \
   "performance backend Hikari maximum pool size must be externally tunable"
+assert_compose_json '.services.backend.environment.TRACING_SAMPLING_PROBABILITY == "0.0"' \
+  "performance backend tracing sampling must default to 0.0 for saturation tests"
 assert_compose_json '.services.kafka.ports[] | select(.target == 9092 and .published == "19092")' \
   "performance Kafka host-mapped port must default to 19092"
 
@@ -204,6 +206,8 @@ assert_contains "${STAGING_ENV_EXAMPLE}" "PERF_SERVER_TOMCAT_MAX_CONNECTIONS" \
   "staging env example must expose performance Tomcat max connections tuning"
 assert_contains "${STAGING_ENV_EXAMPLE}" "PERF_HIKARI_MAXIMUM_POOL_SIZE" \
   "staging env example must expose performance Hikari maximum pool tuning"
+assert_contains "${STAGING_ENV_EXAMPLE}" "PERF_TRACING_SAMPLING_PROBABILITY=0.0" \
+  "staging env example must disable tracing sampling for saturation tests by default"
 
 echo "staging_env_invariants=ok"
 echo

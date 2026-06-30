@@ -342,6 +342,7 @@ High cache-hit stress test는 10개 인기 키워드를 반복 조회해 Redis c
 
 ```bash
 PERF_CACHE_ENABLED=true \
+PERF_TRACING_SAMPLING_PROBABILITY=0.0 \
 PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false \
 ELASTICSEARCH_REINDEX_ON_STARTUP=false \
 PERF_ELASTICSEARCH_MEMORY_LIMIT=3g \
@@ -454,6 +455,8 @@ bash performance/k6/run-stress-es-cache-saturation.sh
 - `FAIL_RATE_THRESHOLD=0.01`
 - `SUMMARY_PREFIX=YYMMDD_k6_es_cache_saturation_200k`
 
+Saturation workload는 순수 `/jobs/search` 처리량 상한을 보기 위한 테스트이므로 performance stack의 tracing sampling은 기본 `0.0`으로 둔다. Zipkin/trace export 비용까지 포함한 관측성 부하 테스트가 필요하면 `PERF_TRACING_SAMPLING_PROBABILITY=1.0`을 별도 케이스로 분리해서 실행한다.
+
 OS/WAS 튜닝은 saturation baseline을 먼저 찍은 뒤 적용한다. 서버에서 적용 전 값을 반드시 저장한다.
 
 ```bash
@@ -480,6 +483,7 @@ PERF_SERVER_TOMCAT_ACCEPT_COUNT=1000 \
 PERF_SERVER_TOMCAT_MAX_CONNECTIONS=12000 \
 PERF_HIKARI_MAXIMUM_POOL_SIZE=30 \
 PERF_HIKARI_MINIMUM_IDLE=10 \
+PERF_TRACING_SAMPLING_PROBABILITY=0.0 \
 PERF_BACKEND_MEMORY_LIMIT=2g \
 PERF_BACKEND_JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0" \
 PERF_MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED=false \
