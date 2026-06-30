@@ -335,10 +335,13 @@ fi
 
 echo "prometheus_preflight=ok"
 
-cache_enabled_value="$(backend_env_value CACHE_ENABLED)"
-perf_cache_enabled_value="$(backend_env_value PERF_CACHE_ENABLED)"
+cache_enabled_value="skipped"
+perf_cache_enabled_value="skipped"
 
 if [[ "$REQUIRE_BACKEND_CACHE_ENABLED" == "true" ]]; then
+    cache_enabled_value="$(backend_env_value CACHE_ENABLED)"
+    perf_cache_enabled_value="$(backend_env_value PERF_CACHE_ENABLED)"
+
     if [[ "$CACHE_MODE" == "enabled" && "$cache_enabled_value" != "true" && "$perf_cache_enabled_value" != "true" ]]; then
         echo "Backend cache preflight failed: expected CACHE_ENABLED=true or PERF_CACHE_ENABLED=true." >&2
         echo "Current values: CACHE_ENABLED=${cache_enabled_value:-empty}, PERF_CACHE_ENABLED=${perf_cache_enabled_value:-empty}" >&2

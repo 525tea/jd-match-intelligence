@@ -15,6 +15,119 @@
   },
   "panels": [
     {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Analysis API Total RPS",
+      "description": "gap analysis, JD match, job recommendation 3개 분석 API의 합산 처리량입니다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"jobflow-backend\", uri=~\"/gap-analysis/projects/.*|/projects/.*/job-matches|/recommendations/jobs\", status=\"200\"}[1m]))",
+          "legendFormat": "analysis total 200"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(http_server_requests_seconds_count{application=\"jobflow-backend\", uri=~\"/gap-analysis/projects/.*|/projects/.*/job-matches|/recommendations/jobs\", status=\"200\"}[1m])) by (uri)",
+          "legendFormat": "{{uri}} 200"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "analysis total 200" },
+            "properties": [
+              { "id": "custom.lineWidth", "value": 3 }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Analysis API P95 / P99 Latency",
+      "description": "gap analysis, JD match, job recommendation 3개 분석 API만 합산한 latency입니다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{application=\"jobflow-backend\", uri=~\"/gap-analysis/projects/.*|/projects/.*/job-matches|/recommendations/jobs\"}[5m])) by (le))",
+          "legendFormat": "analysis p95"
+        },
+        {
+          "refId": "B",
+          "expr": "histogram_quantile(0.99, sum(rate(http_server_requests_seconds_bucket{application=\"jobflow-backend\", uri=~\"/gap-analysis/projects/.*|/projects/.*/job-matches|/recommendations/jobs\"}[5m])) by (le))",
+          "legendFormat": "analysis p99"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
       "id": 1,
       "type": "timeseries",
       "title": "HTTP Request Rate",
@@ -48,7 +161,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 16
       },
       "options": {
         "legend": {
@@ -101,7 +214,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 16
       },
       "options": {
         "legend": {
@@ -149,7 +262,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 6,
         "x": 0,
         "y": 8
       },
@@ -224,8 +337,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
-        "x": 8,
+        "w": 10,
+        "x": 6,
         "y": 8
       },
       "options": {
@@ -273,8 +386,8 @@
       "gridPos": {
         "h": 8,
         "w": 8,
-        "x": 16,
-        "y": 8
+        "x": 0,
+        "y": 24
       },
       "options": {
         "legend": {
@@ -343,9 +456,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
+        "w": 8,
+        "x": 16,
+        "y": 8
       },
       "options": {
         "legend": {
@@ -399,9 +512,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
+        "w": 8,
+        "x": 16,
+        "y": 24
       },
       "options": {
         "legend": {
@@ -464,8 +577,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
-        "x": 0,
+        "w": 8,
+        "x": 8,
         "y": 24
       },
       "options": {
