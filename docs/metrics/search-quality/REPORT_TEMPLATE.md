@@ -15,7 +15,7 @@
 | 항목 | 값 |
 | --- | --- |
 | 측정일 | `YYYY-MM-DD` |
-| 대상 API | `/api/jobs/search`, `/api/jobs/{id}` |
+| 대상 API | `/jobs/search`, `/jobs/{id}` |
 | 평가 기준 | `NDCG@10` |
 | fetch limit | `40` |
 | query 수 | `9` |
@@ -27,17 +27,19 @@
 ```bash
 mkdir -p artifacts/search-quality
 
-BASE_URL=http://127.0.0.1:8081/api \
+BASE_URL=http://127.0.0.1:8080 \
 RUN_LABEL=260630_search_ndcg10 \
 OUTPUT_FILE=artifacts/search-quality/260630_search_ndcg10_rows.csv \
 SUMMARY_FILE=artifacts/search-quality/260630_search_ndcg10_summary.json \
 bash performance/elasticsearch/search-ndcg10-evaluate.sh
 ```
 
+Gateway `http://127.0.0.1:8081/api`는 상세 조회를 반복하는 평가 스크립트에서 rate limit `429`가 발생할 수 있다. ranking 품질 측정은 backend direct endpoint를 사용한다.
+
 threshold를 gate로 사용할 때:
 
 ```bash
-BASE_URL=http://127.0.0.1:8081/api \
+BASE_URL=http://127.0.0.1:8080 \
 MIN_NDCG=0.80 \
 FAIL_ON_THRESHOLD=true \
 bash performance/elasticsearch/search-ndcg10-evaluate.sh
