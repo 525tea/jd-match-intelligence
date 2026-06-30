@@ -559,7 +559,79 @@ bash performance/k6/run-stress-es-cache-saturation.sh
 
 External runner에서도 search preflight와 cache hit delta preflight는 유지한다. 즉, 서버 env를 직접 읽지 못하더라도 `/jobs/search` warmup 이후 `jobSearch` cache hit가 증가하지 않으면 본 테스트로 들어가지 않는다.
 
-기본값:
+### Cold/mixed/spike follow-up runner
+
+`run-stress-es-cache-capacity-followup.sh`는 hot-cache 성공 수치를 cold/mixed/spike 조건으로 일반화하지 않기 위해 cache 상태를 명시적으로 분리한다.
+
+| scenario | cache 준비 | 목적 |
+| --- | --- | --- |
+| `hot` | Redis reset 후 hot keyword warmup | Redis hot-cache path의 안정 처리량 확인 |
+| `cold` | Redis reset, warmup 없음 | miss burst에서 ES/search path와 WAS 지표가 먼저 흔들리는 지점 확인 |
+| `mixed` | Redis reset 후 hot keyword만 warmup | hot traffic과 long-tail miss traffic이 섞일 때 hit/miss ratio와 tail latency 확인 |
+| `spike` | Redis reset 후 hot keyword warmup | `BASE_RPS -> TARGET_RPS` 급상승 profile에서 dropped iteration과 latency 확인 |
+
+application stack 내부에서 실행할 때는 runner가 Redis `FLUSHDB`, warmup, Prometheus snapshot, cache hit/miss delta 검증을 모두 수행한다.
+
+```bash
+CAPACITY_SCENARIOS=hot,cold,mixed,spike \
+TARGET_RPS_LIST=1000 \
+DURATION=2m \
+BASE_RPS=500 \
+SPIKE_RAMP_DURATION=10s \
+SPIKE_HOLD_DURATION=2m \
+PRE_ALLOCATED_VUS=800 \
+MAX_VUS=4000 \
+RUN_LOCATION=internal \
+RUN_LABEL=capacity_followup \
+bash performance/k6/run-stress-es-cache-capacity-followup.sh
+```
+
+별도 k6 runner에서 실행할 때는 runner가 application host의 Docker Compose/Redis에 접근할 수 없다. 따라서 각 scenario 실행 직전에 application host에서 Redis를 먼저 비우고, 외부 runner에서는 `RESET_REDIS_CACHE_BEFORE_RUN=false`로 실행한다. 이 절차를 생략하면 이전 run의 `jobSearch` cache가 섞여 cold/mixed 결과를 신뢰할 수 없다.
+
+application host:
+
+```bash
+cd ~/jobflow
+docker compose -f docker-compose.yml -f docker-compose.performance.yml exec -T redis redis-cli FLUSHDB
+```
+
+external k6 runner:
+
+```bash
+BASE_URL=http://APP_EC2_PUBLIC_IP:8080 \
+PROMETHEUS_URL=http://APP_EC2_PUBLIC_IP:8080/actuator/prometheus \
+HEALTH_URL=http://APP_EC2_PUBLIC_IP:8080/actuator/health/liveness \
+LOCAL_COMPOSE_PREFLIGHT=false \
+ES_COUNT_PREFLIGHT=false \
+RESET_REDIS_CACHE_BEFORE_RUN=false \
+CACHE_RESET_MODE=skip \
+CAPACITY_SCENARIOS=mixed \
+TARGET_RPS_LIST=1000 \
+HOT_TRAFFIC_PERCENT=70 \
+DURATION=2m \
+PRE_ALLOCATED_VUS=800 \
+MAX_VUS=4000 \
+RUN_LOCATION=k6-runner \
+RUN_LABEL=capacity_followup \
+bash performance/k6/run-stress-es-cache-capacity-followup.sh
+```
+
+`cold`, `mixed`, `spike`를 비교할 때는 scenario를 하나씩 실행하고 매번 Redis reset을 다시 수행한다. 여러 scenario를 한 번에 실행하는 방식은 application host 내부 실행처럼 runner가 reset을 직접 수행할 수 있을 때만 사용한다.
+
+follow-up runner 주요 기본값:
+
+- `CAPACITY_SCENARIOS=hot,cold,mixed,spike`
+- `TARGET_RPS_LIST=1000`
+- `BASE_RPS=500`
+- `DURATION=2m`
+- `SPIKE_RAMP_DURATION=10s`
+- `SPIKE_HOLD_DURATION=2m`
+- `HOT_TRAFFIC_PERCENT=70`
+- `LONG_TAIL_VARIANTS=1000000`
+- `MAX_DROPPED_ITERATIONS=0`
+- `RESET_REDIS_CACHE_BEFORE_RUN=true`
+
+기존 saturation runner 기본값:
 
 - `BASE_URL=http://localhost:8080`
 - `ARTIFACT_DIR=artifacts/performance`
