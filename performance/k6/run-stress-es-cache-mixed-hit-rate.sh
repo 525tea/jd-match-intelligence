@@ -10,7 +10,8 @@ HOST_ELASTICSEARCH_URL="${HOST_ELASTICSEARCH_URL:-http://localhost:9200}"
 HOT_KEYWORDS="${HOT_KEYWORDS:-백엔드,Spring Boot,프론트엔드,React,데이터 엔지니어,DevOps,Kubernetes,Python,Java,TypeScript}"
 HOT_TRAFFIC_PERCENT="${HOT_TRAFFIC_PERCENT:-70}"
 LONG_TAIL_PREFIX="${LONG_TAIL_PREFIX:-mixed-tail}"
-LONG_TAIL_VARIANTS="${LONG_TAIL_VARIANTS:-10000}"
+LONG_TAIL_RUN_ID="${LONG_TAIL_RUN_ID:-$(date +%Y%m%d%H%M%S)}"
+LONG_TAIL_VARIANTS="${LONG_TAIL_VARIANTS:-1000000}"
 SEARCH_LIMIT="${SEARCH_LIMIT:-10}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/performance}"
 SUMMARY_FILE="${SUMMARY_FILE:-$(date +%y%m%d)_k6_es_cache_mixed_${HOT_TRAFFIC_PERCENT}_hot_200k_500vu.json}"
@@ -21,6 +22,7 @@ REQUIRE_BACKEND_CACHE_ENABLED="${REQUIRE_BACKEND_CACHE_ENABLED:-true}"
 WARMUP_ROUNDS="${WARMUP_ROUNDS:-2}"
 WARMUP_LIMIT="${WARMUP_LIMIT:-10}"
 MIN_CACHE_HIT_DELTA="${MIN_CACHE_HIT_DELTA:-1}"
+RESET_REDIS_CACHE_BEFORE_RUN="${RESET_REDIS_CACHE_BEFORE_RUN:-true}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
@@ -37,6 +39,7 @@ echo "TARGET=backend-direct"
 echo "HOT_KEYWORDS=$HOT_KEYWORDS"
 echo "HOT_TRAFFIC_PERCENT=$HOT_TRAFFIC_PERCENT"
 echo "LONG_TAIL_PREFIX=$LONG_TAIL_PREFIX"
+echo "LONG_TAIL_RUN_ID=$LONG_TAIL_RUN_ID"
 echo "LONG_TAIL_VARIANTS=$LONG_TAIL_VARIANTS"
 echo "SEARCH_LIMIT=$SEARCH_LIMIT"
 echo "ARTIFACT_DIR=$ARTIFACT_DIR"
@@ -48,6 +51,7 @@ echo "REQUIRE_BACKEND_CACHE_ENABLED=$REQUIRE_BACKEND_CACHE_ENABLED"
 echo "WARMUP_ROUNDS=$WARMUP_ROUNDS"
 echo "WARMUP_LIMIT=$WARMUP_LIMIT"
 echo "MIN_CACHE_HIT_DELTA=$MIN_CACHE_HIT_DELTA"
+echo "RESET_REDIS_CACHE_BEFORE_RUN=$RESET_REDIS_CACHE_BEFORE_RUN"
 echo "CACHE_ENABLED=true (set on server via env)"
 echo "REINDEX_EXPECTATION=ELASTICSEARCH_REINDEX_ON_STARTUP=false after 200k index preparation"
 
@@ -74,6 +78,24 @@ backend_env_value() {
     local name="$1"
     docker compose -f docker-compose.yml -f docker-compose.performance.yml exec -T backend \
         sh -lc "printenv ${name} || true" 2>/dev/null | tr -d '\r'
+}
+
+reset_redis_cache() {
+    if [[ "$RESET_REDIS_CACHE_BEFORE_RUN" != "true" ]]; then
+        echo "redis_cache_reset=skipped"
+        return
+    fi
+
+    if ! docker compose -f docker-compose.yml -f docker-compose.performance.yml ps --services --filter status=running \
+        | grep -qx redis; then
+        echo "Redis cache reset failed: redis service is not running." >&2
+        exit 1
+    fi
+
+    docker compose -f docker-compose.yml -f docker-compose.performance.yml exec -T redis \
+        redis-cli FLUSHDB >/dev/null
+
+    echo "redis_cache_reset=ok"
 }
 
 if ! health_body="$(curl -fsS "$HEALTH_URL" 2>/dev/null)"; then
@@ -131,6 +153,8 @@ auth_header=()
 if [[ -n "$ACCESS_TOKEN" ]]; then
     auth_header=(-H "Authorization: Bearer ${ACCESS_TOKEN}")
 fi
+
+reset_redis_cache
 
 cache_hits_before="$(cache_metric_total hit)"
 cache_misses_before="$(cache_metric_total miss)"
@@ -198,6 +222,7 @@ if command -v k6 >/dev/null 2>&1; then
     HOT_KEYWORDS="$HOT_KEYWORDS" \
     HOT_TRAFFIC_PERCENT="$HOT_TRAFFIC_PERCENT" \
     LONG_TAIL_PREFIX="$LONG_TAIL_PREFIX" \
+    LONG_TAIL_RUN_ID="$LONG_TAIL_RUN_ID" \
     LONG_TAIL_VARIANTS="$LONG_TAIL_VARIANTS" \
     SEARCH_LIMIT="$SEARCH_LIMIT" \
     ACCESS_TOKEN="$ACCESS_TOKEN" \
@@ -219,6 +244,7 @@ else
         -e HOT_KEYWORDS="$HOT_KEYWORDS" \
         -e HOT_TRAFFIC_PERCENT="$HOT_TRAFFIC_PERCENT" \
         -e LONG_TAIL_PREFIX="$LONG_TAIL_PREFIX" \
+        -e LONG_TAIL_RUN_ID="$LONG_TAIL_RUN_ID" \
         -e LONG_TAIL_VARIANTS="$LONG_TAIL_VARIANTS" \
         -e SEARCH_LIMIT="$SEARCH_LIMIT" \
         -e ACCESS_TOKEN="$ACCESS_TOKEN" \
