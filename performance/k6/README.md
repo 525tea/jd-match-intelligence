@@ -487,6 +487,10 @@ Mixed hit-rate stress test는 각 VU가 1초 pacing으로 반복 요청하므로
 
 이 테스트의 목표는 3000 RPS를 목표로, 1000 → 1500 → 2000 → 2500 → 3000 RPS 단계에서 안정 구간, 경계 구간, 포화 구간을 분리하는 것이다. 각 단계에서 error rate, p95/p99, dropped iterations, k6 VU 사용량, JVM heap, Tomcat/Hikari, Redis/ES 지표를 함께 기록한다.
 
+`/jobs/search`는 public API이므로 saturation runner는 기본적으로 `SEARCH_AUTH_MODE=public`으로 실행한다. Authorization 헤더를 붙이면 `JwtAuthenticationFilter`가 매 요청마다 사용자 조회를 수행해 HikariCP/DB 비용이 검색 cache-hit 경로에 섞인다. 인증 포함 검색 성능은 `SEARCH_AUTH_MODE=login` 또는 `SEARCH_AUTH_MODE=token`으로 별도 측정한다.
+
+안정 처리량으로 인정하려면 k6 threshold 통과뿐 아니라 `dropped_iterations=0`이어야 한다. runner는 기본값 `MAX_DROPPED_ITERATIONS=0`으로 summary JSON을 검증한다. dropped iteration이 발생한 run은 error rate가 0이고 p95 기준을 통과하더라도 경계/포화 증거로만 기록한다.
+
 사전 준비는 Elasticsearch + Redis cache stress test와 동일하다. 3000 RPS 시도 전에는 backend가 cache enabled 상태이고 200k index가 이미 준비되어 있어야 한다.
 
 ```bash
@@ -529,6 +533,7 @@ PRE_ALLOCATED_VUS=800 \
 MAX_VUS=4000 \
 RUN_LOCATION=internal \
 RUN_LABEL=capacity_rework \
+SEARCH_AUTH_MODE=public \
 bash performance/k6/run-stress-es-cache-saturation.sh
 ```
 
@@ -548,6 +553,7 @@ PRE_ALLOCATED_VUS=800 \
 MAX_VUS=4000 \
 RUN_LOCATION=external \
 RUN_LABEL=capacity_rework \
+SEARCH_AUTH_MODE=public \
 bash performance/k6/run-stress-es-cache-saturation.sh
 ```
 
@@ -563,8 +569,10 @@ External runner에서도 search preflight와 cache hit delta preflight는 유지
 - `MAX_VUS=4000`
 - `P95_THRESHOLD_MS=1000`
 - `FAIL_RATE_THRESHOLD=0.01`
+- `MAX_DROPPED_ITERATIONS=0`
 - `RUN_LOCATION=internal`
 - `RUN_LABEL=capacity_rework`
+- `SEARCH_AUTH_MODE=public`
 - `SUMMARY_PREFIX=YYMMDD_k6_es_cache_capacity_${RUN_LABEL}_${RUN_LOCATION}_200k`
 
 각 RPS run은 k6 summary JSON과 함께 Prometheus metric snapshot을 저장한다.

@@ -15,11 +15,13 @@ MAX_VUS="${MAX_VUS:-4000}"
 SEARCH_LIMIT="${SEARCH_LIMIT:-10}"
 P95_THRESHOLD_MS="${P95_THRESHOLD_MS:-1000}"
 FAIL_RATE_THRESHOLD="${FAIL_RATE_THRESHOLD:-0.01}"
+MAX_DROPPED_ITERATIONS="${MAX_DROPPED_ITERATIONS:-0}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-artifacts/performance}"
 RUN_LOCATION="${RUN_LOCATION:-internal}"
 RUN_LABEL="${RUN_LABEL:-capacity_rework}"
 SUMMARY_PREFIX="${SUMMARY_PREFIX:-$(date +%y%m%d)_k6_es_cache_capacity_${RUN_LABEL}_${RUN_LOCATION}_200k}"
 ACCESS_TOKEN="${ACCESS_TOKEN:-}"
+SEARCH_AUTH_MODE="${SEARCH_AUTH_MODE:-public}"
 LOGIN_EMAIL="${LOGIN_EMAIL:-frontend-demo@example.com}"
 LOGIN_PASSWORD="${LOGIN_PASSWORD:-password123}"
 REQUIRE_BACKEND_CACHE_ENABLED="${REQUIRE_BACKEND_CACHE_ENABLED:-true}"
@@ -73,11 +75,13 @@ echo "MAX_VUS=$MAX_VUS"
 echo "SEARCH_LIMIT=$SEARCH_LIMIT"
 echo "P95_THRESHOLD_MS=$P95_THRESHOLD_MS"
 echo "FAIL_RATE_THRESHOLD=$FAIL_RATE_THRESHOLD"
+echo "MAX_DROPPED_ITERATIONS=$MAX_DROPPED_ITERATIONS"
 echo "ARTIFACT_DIR=$ARTIFACT_DIR"
 echo "RUN_LOCATION=$RUN_LOCATION"
 echo "RUN_LABEL=$RUN_LABEL"
 echo "SUMMARY_PREFIX=$SUMMARY_PREFIX"
 echo "ACCESS_TOKEN=$([ -n "$ACCESS_TOKEN" ] && echo provided || echo empty)"
+echo "SEARCH_AUTH_MODE=$SEARCH_AUTH_MODE"
 echo "LOGIN_EMAIL=$([ -n "$LOGIN_EMAIL" ] && echo provided || echo empty)"
 echo "LOGIN_PASSWORD=$([ -n "$LOGIN_PASSWORD" ] && echo provided || echo empty)"
 echo "REQUIRE_BACKEND_CACHE_ENABLED=$REQUIRE_BACKEND_CACHE_ENABLED"
@@ -140,6 +144,37 @@ prometheus_snapshot() {
         echo "prometheus_snapshot=empty_or_failed file=$output_file" >&2
         : >"$output_file"
     fi
+}
+
+validate_k6_summary() {
+    local summary_path="$1"
+    local target_rps="$2"
+
+    if [[ ! -s "$summary_path" ]]; then
+        echo "Saturation summary validation failed: missing summary file ${summary_path}" >&2
+        return 1
+    fi
+
+    local dropped_iterations
+    if ! dropped_iterations="$(jq -r '.metrics.dropped_iterations.count // 0' "$summary_path" 2>/dev/null)"; then
+        echo "Saturation summary validation failed: cannot parse ${summary_path}" >&2
+        return 1
+    fi
+
+    if ! [[ "$dropped_iterations" =~ ^[0-9]+$ ]]; then
+        echo "Saturation summary validation failed: dropped_iterations is not numeric (${dropped_iterations})" >&2
+        return 1
+    fi
+
+    echo "saturation_dropped_iterations target_rps=${target_rps} value=${dropped_iterations} max=${MAX_DROPPED_ITERATIONS}"
+
+    if (( dropped_iterations > MAX_DROPPED_ITERATIONS )); then
+        echo "Saturation stability check failed: target_rps=${target_rps} dropped_iterations=${dropped_iterations} max=${MAX_DROPPED_ITERATIONS}" >&2
+        echo "Treat this run as boundary/saturation evidence, not a stable capacity result." >&2
+        return 1
+    fi
+
+    echo "saturation_stability_check=ok target_rps=${target_rps}"
 }
 
 perf_fixture_count() {
@@ -220,21 +255,44 @@ else
     echo "backend_cache_enabled=skipped"
 fi
 
-if [[ -z "$ACCESS_TOKEN" ]]; then
-    if login_body="$(curl -fsS -X POST "${BASE_URL}/auth/login" \
-        -H 'Content-Type: application/json' \
-        -d "{\"email\":\"${LOGIN_EMAIL}\",\"password\":\"${LOGIN_PASSWORD}\"}" 2>/dev/null)"; then
-        ACCESS_TOKEN="$(jq -r '.data.accessToken // empty' <<<"$login_body")"
-        if [[ -z "$ACCESS_TOKEN" ]]; then
-            echo "Auth preflight: login succeeded but no accessToken in response - continuing unauthenticated" >&2
-            echo "$login_body" >&2
+case "$SEARCH_AUTH_MODE" in
+    public)
+        if [[ -n "$ACCESS_TOKEN" ]]; then
+            echo "SEARCH_AUTH_MODE=public ignores provided ACCESS_TOKEN so public /jobs/search capacity does not include JWT DB lookup cost."
         fi
-    else
-        echo "Auth preflight: login failed - continuing unauthenticated (search preflight will verify reachability)" >&2
-    fi
-fi
-
-echo "auth_preflight=ok"
+        ACCESS_TOKEN=""
+        echo "auth_preflight=skipped mode=public"
+        ;;
+    login)
+        if [[ -z "$ACCESS_TOKEN" ]]; then
+            if login_body="$(curl -fsS -X POST "${BASE_URL}/auth/login" \
+                -H 'Content-Type: application/json' \
+                -d "{\"email\":\"${LOGIN_EMAIL}\",\"password\":\"${LOGIN_PASSWORD}\"}" 2>/dev/null)"; then
+                ACCESS_TOKEN="$(jq -r '.data.accessToken // empty' <<<"$login_body")"
+                if [[ -z "$ACCESS_TOKEN" ]]; then
+                    echo "Auth preflight failed: login succeeded but no accessToken in response." >&2
+                    echo "$login_body" >&2
+                    exit 1
+                fi
+            else
+                echo "Auth preflight failed: login failed for SEARCH_AUTH_MODE=login." >&2
+                exit 1
+            fi
+        fi
+        echo "auth_preflight=ok mode=login"
+        ;;
+    token)
+        if [[ -z "$ACCESS_TOKEN" ]]; then
+            echo "Auth preflight failed: SEARCH_AUTH_MODE=token requires ACCESS_TOKEN." >&2
+            exit 1
+        fi
+        echo "auth_preflight=ok mode=token"
+        ;;
+    *)
+        echo "Invalid SEARCH_AUTH_MODE: $SEARCH_AUTH_MODE (expected public, login, or token)" >&2
+        exit 1
+        ;;
+esac
 
 auth_header=()
 if [[ -n "$ACCESS_TOKEN" ]]; then
@@ -317,6 +375,9 @@ run_k6() {
     echo "prometheus_before_file=${ARTIFACT_DIR}/${prom_before}"
     prometheus_snapshot "${ARTIFACT_DIR}/${prom_before}"
 
+    local k6_status=0
+
+    set +e
     if command -v k6 >/dev/null 2>&1; then
         BASE_URL="$BASE_URL" \
         HOT_KEYWORDS="$HOT_KEYWORDS" \
@@ -331,6 +392,7 @@ run_k6() {
         k6 run \
             --summary-export "$ARTIFACT_DIR/$summary_file" \
             performance/k6/stress-es-cache-saturation-200k.js
+        k6_status=$?
     else
         local docker_base_url="$BASE_URL"
         if [[ "$docker_base_url" == http://localhost:* ]]; then
@@ -357,11 +419,19 @@ run_k6() {
             grafana/k6 run \
                 --summary-export "/k6-output/$summary_file" \
                 /scripts/stress-es-cache-saturation-200k.js
+        k6_status=$?
     fi
+    set -e
 
     echo "prometheus_after_file=${ARTIFACT_DIR}/${prom_after}"
     prometheus_snapshot "${ARTIFACT_DIR}/${prom_after}"
     echo "saturation_summary_export=${ARTIFACT_DIR}/${summary_file}"
+    validate_k6_summary "${ARTIFACT_DIR}/${summary_file}" "$target_rps"
+
+    if (( k6_status != 0 )); then
+        echo "saturation_run_failed target_rps=${target_rps} exit_code=${k6_status}" >&2
+        return "$k6_status"
+    fi
 }
 
 IFS=',' read -r -a target_rps_array <<<"$TARGET_RPS_LIST"
