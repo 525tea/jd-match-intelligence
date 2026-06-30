@@ -30,8 +30,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -406,6 +409,17 @@ class JobServiceTest {
         );
         assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(1);
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("검색 응답 변환은 캐시 hit 경로에서 DB 트랜잭션을 열지 않는다")
+    void searchJobsDoesNotOpenTransaction() throws NoSuchMethodException {
+        Method method = JobService.class.getMethod("searchJobs", String.class, int.class);
+
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.NOT_SUPPORTED);
     }
 
     @Test
