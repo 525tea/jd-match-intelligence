@@ -1,5 +1,7 @@
 package jobflow.domain.notification;
 
+import jobflow.domain.outbox.KafkaConsumerIdempotencyService;
+import jobflow.domain.outbox.OutboxKafkaEnvelope;
 import jobflow.domain.outbox.OutboxKafkaMessageParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +18,7 @@ import tools.jackson.databind.JsonNode;
 public class EmailSendKafkaConsumer {
 
     private final OutboxKafkaMessageParser messageParser;
+    private final KafkaConsumerIdempotencyService idempotencyService;
     private final EmailSender emailSender;
 
     @KafkaListener(
@@ -23,7 +26,12 @@ public class EmailSendKafkaConsumer {
             groupId = "${jobflow.kafka.consumer.group-id:jobflow-backend}"
     )
     public void consume(String message) {
-        JsonNode payload = messageParser.parsePayloadOrRoot(message);
+        OutboxKafkaEnvelope envelope = messageParser.parseEnvelope(message);
+        idempotencyService.runOnce("email-send", envelope.eventId(), () -> send(envelope));
+    }
+
+    private void send(OutboxKafkaEnvelope envelope) {
+        JsonNode payload = envelope.payload();
         EmailSendRequest request = new EmailSendRequest(
                 requiredText(payload, "to"),
                 requiredText(payload, "subject"),
@@ -38,7 +46,8 @@ public class EmailSendKafkaConsumer {
         }
 
         log.info(
-                "Kafka email send event handled. provider={}, providerMessageId={}, kafka_consumer_smoke_run_id={}",
+                "Kafka email send event handled. eventId={}, provider={}, providerMessageId={}, kafka_consumer_smoke_run_id={}",
+                envelope.eventId(),
                 result.provider(),
                 result.providerMessageId(),
                 optionalText(payload, "smokeRunId")

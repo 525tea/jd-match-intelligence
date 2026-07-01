@@ -3,6 +3,7 @@ package jobflow.domain.job.search;
 import java.util.Set;
 import jobflow.domain.job.Job;
 import jobflow.domain.job.JobRepository;
+import jobflow.domain.outbox.KafkaConsumerIdempotencyService;
 import jobflow.domain.outbox.OutboxEventTypes;
 import jobflow.domain.outbox.OutboxKafkaEnvelope;
 import jobflow.domain.outbox.OutboxKafkaMessageParser;
@@ -29,6 +30,7 @@ public class JobSearchIndexKafkaConsumer {
     );
 
     private final OutboxKafkaMessageParser messageParser;
+    private final KafkaConsumerIdempotencyService idempotencyService;
     private final JobRepository jobRepository;
     private final JobSearchIndexingService jobSearchIndexingService;
 
@@ -48,6 +50,10 @@ public class JobSearchIndexKafkaConsumer {
             return;
         }
 
+        idempotencyService.runOnce("job-search-index", envelope.eventId(), () -> handleIndexableEvent(envelope));
+    }
+
+    private void handleIndexableEvent(OutboxKafkaEnvelope envelope) {
         Long jobId = resolveJobId(envelope);
         if (jobId == null) {
             throw new IllegalArgumentException("Kafka job event does not contain job id");
