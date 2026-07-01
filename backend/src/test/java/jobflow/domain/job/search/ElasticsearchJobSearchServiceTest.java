@@ -302,20 +302,27 @@ class ElasticsearchJobSearchServiceTest {
         Query searchQuery = queryCaptor.getValue().getQuery().functionScore().query();
 
         assertThat(searchQuery.isBool()).isTrue();
-        assertThat(searchQuery.bool().must()).hasSize(1);
-        assertThat(searchQuery.bool().must().getFirst().multiMatch().query())
+        assertThat(searchQuery.bool().must()).isEmpty();
+        assertThat(searchQuery.bool().should()).hasSize(4);
+        assertThat(searchQuery.bool().should().getFirst().multiMatch().query())
                 .isEqualTo("backend junior seoul");
-        assertThat(searchQuery.bool().should()).hasSize(3);
-        assertThat(searchQuery.bool().should().get(0).term().field()).isEqualTo("role");
-        assertThat(searchQuery.bool().should().get(0).term().value().stringValue()).isEqualTo("BACKEND");
-        assertThat(searchQuery.bool().should().get(0).term().boost()).isEqualTo(2.8f);
-        assertThat(searchQuery.bool().should().get(1).term().field()).isEqualTo("careerLevel");
-        assertThat(searchQuery.bool().should().get(1).term().value().stringValue()).isEqualTo("JUNIOR");
-        assertThat(searchQuery.bool().should().get(1).term().boost()).isEqualTo(1.8f);
-        assertThat(searchQuery.bool().should().get(2).match().field()).isEqualTo("locationRegion");
-        assertThat(searchQuery.bool().should().get(2).match().query().stringValue()).isEqualTo("Seoul");
-        assertThat(searchQuery.bool().should().get(2).match().boost()).isEqualTo(1.4f);
-        assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
+        assertThat(searchQuery.bool().should().get(1).term().field()).isEqualTo("role");
+        assertThat(searchQuery.bool().should().get(1).term().value().stringValue()).isEqualTo("BACKEND");
+        assertThat(searchQuery.bool().should().get(1).term().boost()).isEqualTo(2.8f);
+        assertThat(searchQuery.bool().should().get(2).term().field()).isEqualTo("careerLevel");
+        assertThat(searchQuery.bool().should().get(2).term().value().stringValue()).isEqualTo("JUNIOR");
+        assertThat(searchQuery.bool().should().get(2).term().boost()).isEqualTo(1.8f);
+        assertThat(searchQuery.bool().should().get(3).match().field()).isEqualTo("locationRegion");
+        assertThat(searchQuery.bool().should().get(3).match().query().stringValue()).isEqualTo("Seoul");
+        assertThat(searchQuery.bool().should().get(3).match().boost()).isEqualTo(1.4f);
+        assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("1");
+
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions()).hasSize(3);
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions().getFirst().filter().term().field())
+                .isEqualTo("role");
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions().getFirst().filter().term().value().stringValue())
+                .isEqualTo("BACKEND");
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions().getFirst().weight()).isEqualTo(24.0);
     }
 
     @Test
@@ -361,8 +368,135 @@ class ElasticsearchJobSearchServiceTest {
                 .isEqualTo("C++");
         assertThat(searchQuery.bool().must().get(1).multiMatch().operator())
                 .isEqualTo(Operator.And);
-        assertThat(searchQuery.bool().should()).isEmpty();
+        assertThat(searchQuery.bool().should()).hasSize(5);
+        assertThat(searchQuery.bool().should())
+                .extracting(query -> query.term().value().stringValue())
+                .containsExactlyInAnyOrder(
+                        "SOFTWARE_ENGINEER",
+                        "EMBEDDED_SOFTWARE",
+                        "ROBOT_SOFTWARE",
+                        "HARDWARE_ENGINEER",
+                        "GAME_CLIENT"
+                );
         assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
+
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions()).hasSize(8);
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions())
+                .filteredOn(function -> function.filter() != null && function.filter().isMultiMatch())
+                .singleElement()
+                .satisfies(function -> {
+                    assertThat(function.filter().multiMatch().query()).isEqualTo("C++");
+                    assertThat(function.weight()).isEqualTo(8.0);
+                });
+    }
+
+    @Test
+    @DisplayName("복수 framework skill 검색어는 skill을 hard must로 과도하게 좁히지 않고 ranking signal로 반영한다")
+    void searchWithCompositeFrameworkSkills() {
+        ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
+                elasticsearchOperations,
+                jobSearchProperties,
+                jobSearchQueryExpansionService,
+                jobSearchIntentParser
+        );
+        JobSearchDocument document = document();
+
+        given(jobSearchQueryExpansionService.expand("Go Fiber"))
+                .willReturn(List.of());
+        given(elasticsearchOperations.search(
+                any(NativeQuery.class),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        )).willReturn(searchHits);
+        given(searchHits.stream()).willReturn(Stream.of(searchHit));
+        given(searchHit.getContent()).willReturn(document);
+        given(searchHit.getScore()).willReturn(4.5f);
+
+        List<JobSearchResult> results = service.search(" Go Fiber ", 10);
+
+        assertThat(results).hasSize(1);
+
+        ArgumentCaptor<NativeQuery> queryCaptor = ArgumentCaptor.forClass(NativeQuery.class);
+        verify(elasticsearchOperations).search(
+                queryCaptor.capture(),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        );
+
+        Query searchQuery = queryCaptor.getValue().getQuery().functionScore().query();
+
+        assertThat(searchQuery.isBool()).isTrue();
+        assertThat(searchQuery.bool().must()).hasSize(1);
+        assertThat(searchQuery.bool().must().getFirst().multiMatch().query()).isEqualTo("Go Fiber");
+        assertThat(searchQuery.bool().should()).hasSize(3);
+        assertThat(searchQuery.bool().should())
+                .filteredOn(Query::isMultiMatch)
+                .extracting(query -> query.multiMatch().query())
+                .containsExactlyInAnyOrder("Go", "Fiber");
+        assertThat(searchQuery.bool().should())
+                .filteredOn(Query::isTerm)
+                .singleElement()
+                .satisfies(query -> {
+                    assertThat(query.term().field()).isEqualTo("role");
+                    assertThat(query.term().value().stringValue()).isEqualTo("BACKEND");
+                });
+        assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("0");
+
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions()).hasSize(5);
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions())
+                .filteredOn(function -> function.filter() != null && function.filter().isMultiMatch())
+                .extracting(function -> function.filter().multiMatch().query())
+                .containsExactlyInAnyOrder("Go", "Fiber");
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions())
+                .filteredOn(function -> function.filter() != null
+                        && function.filter().isMultiMatch()
+                        && function.filter().multiMatch().query().equals("Fiber"))
+                .singleElement()
+                .satisfies(function -> assertThat(function.weight()).isEqualTo(22.0));
+    }
+
+    @Test
+    @DisplayName("role intent만 있는 검색어는 원문 match를 should로 낮춰 역할 기반 후보 생성을 허용한다")
+    void searchWithRoleOnlyIntentRelaxesPrimaryKeywordMust() {
+        ElasticsearchJobSearchService service = new ElasticsearchJobSearchService(
+                elasticsearchOperations,
+                jobSearchProperties,
+                jobSearchQueryExpansionService,
+                jobSearchIntentParser
+        );
+        JobSearchDocument document = document();
+
+        given(jobSearchQueryExpansionService.expand("AI 엔지니어"))
+                .willReturn(List.of());
+        given(elasticsearchOperations.search(
+                any(NativeQuery.class),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        )).willReturn(searchHits);
+        given(searchHits.stream()).willReturn(Stream.of(searchHit));
+        given(searchHit.getContent()).willReturn(document);
+        given(searchHit.getScore()).willReturn(4.5f);
+
+        List<JobSearchResult> results = service.search(" AI 엔지니어 ", 10);
+
+        assertThat(results).hasSize(1);
+
+        ArgumentCaptor<NativeQuery> queryCaptor = ArgumentCaptor.forClass(NativeQuery.class);
+        verify(elasticsearchOperations).search(
+                queryCaptor.capture(),
+                eq(JobSearchDocument.class),
+                eq(IndexCoordinates.of("jobflow-jobs"))
+        );
+
+        Query searchQuery = queryCaptor.getValue().getQuery().functionScore().query();
+
+        assertThat(searchQuery.isBool()).isTrue();
+        assertThat(searchQuery.bool().must()).isEmpty();
+        assertThat(searchQuery.bool().should().getFirst().multiMatch().query()).isEqualTo("AI 엔지니어");
+        assertThat(searchQuery.bool().should())
+                .extracting(query -> query.isTerm() ? query.term().value().stringValue() : "")
+                .contains("AI_ENGINEER", "ML_ENGINEER");
+        assertThat(searchQuery.bool().minimumShouldMatch()).isEqualTo("1");
     }
 
     private JobSearchDocument document() {
