@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -47,6 +48,25 @@ class OutboxEventRepositoryTest {
                         OutboxStatus.PENDING,
                         3
                 );
+
+        assertThat(events)
+                .extracting(OutboxEvent::getAggregateId)
+                .containsExactly(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("relay batch는 설정된 size만큼 생성 순서대로 조회한다")
+    void findRelayBatch() {
+        outboxEventRepository.save(createEvent(1L, OutboxEventTypes.JOB_CREATED));
+        outboxEventRepository.save(createEvent(2L, OutboxEventTypes.JOB_UPDATED));
+        outboxEventRepository.save(createEvent(3L, OutboxEventTypes.JOB_CLOSED));
+        outboxEventRepository.flush();
+
+        List<OutboxEvent> events = outboxEventRepository.findRelayBatch(
+                OutboxStatus.PENDING,
+                3,
+                PageRequest.of(0, 2)
+        );
 
         assertThat(events)
                 .extracting(OutboxEvent::getAggregateId)

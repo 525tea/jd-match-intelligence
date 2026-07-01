@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.PageRequest;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -28,7 +29,9 @@ class OutboxRelayServiceTest {
     void setUp() {
         outboxRelayService = new OutboxRelayService(
                 outboxEventRepository,
-                List.of(outboxEventHandler)
+                List.of(outboxEventHandler),
+                OutboxRelayService.MAX_RETRY_COUNT,
+                OutboxRelayService.DEFAULT_BATCH_SIZE
         );
     }
 
@@ -37,9 +40,10 @@ class OutboxRelayServiceTest {
     void relayPendingEvents() {
         OutboxEvent event = createEvent();
 
-        given(outboxEventRepository.findTop100ByStatusAndRetryCountLessThanOrderByCreatedAtAsc(
+        given(outboxEventRepository.findRelayBatch(
                 OutboxStatus.PENDING,
-                OutboxRelayService.MAX_RETRY_COUNT
+                OutboxRelayService.MAX_RETRY_COUNT,
+                PageRequest.of(0, OutboxRelayService.DEFAULT_BATCH_SIZE)
         )).willReturn(List.of(event));
         given(outboxEventHandler.supports(event)).willReturn(true);
 
@@ -58,9 +62,10 @@ class OutboxRelayServiceTest {
     void relayPendingEventsWithHandlerFailure() {
         OutboxEvent event = createEvent();
 
-        given(outboxEventRepository.findTop100ByStatusAndRetryCountLessThanOrderByCreatedAtAsc(
+        given(outboxEventRepository.findRelayBatch(
                 OutboxStatus.PENDING,
-                OutboxRelayService.MAX_RETRY_COUNT
+                OutboxRelayService.MAX_RETRY_COUNT,
+                PageRequest.of(0, OutboxRelayService.DEFAULT_BATCH_SIZE)
         )).willReturn(List.of(event));
         given(outboxEventHandler.supports(event)).willReturn(true);
         willThrow(new IllegalStateException("handler failed"))
@@ -83,9 +88,10 @@ class OutboxRelayServiceTest {
         event.markFailed("first failure", OutboxRelayService.MAX_RETRY_COUNT);
         event.markFailed("second failure", OutboxRelayService.MAX_RETRY_COUNT);
 
-        given(outboxEventRepository.findTop100ByStatusAndRetryCountLessThanOrderByCreatedAtAsc(
+        given(outboxEventRepository.findRelayBatch(
                 OutboxStatus.PENDING,
-                OutboxRelayService.MAX_RETRY_COUNT
+                OutboxRelayService.MAX_RETRY_COUNT,
+                PageRequest.of(0, OutboxRelayService.DEFAULT_BATCH_SIZE)
         )).willReturn(List.of(event));
         given(outboxEventHandler.supports(event)).willReturn(true);
         willThrow(new IllegalStateException("third failure"))
@@ -104,9 +110,10 @@ class OutboxRelayServiceTest {
     void relayPendingEventsWithoutSupportedHandler() {
         OutboxEvent event = createEvent();
 
-        given(outboxEventRepository.findTop100ByStatusAndRetryCountLessThanOrderByCreatedAtAsc(
+        given(outboxEventRepository.findRelayBatch(
                 OutboxStatus.PENDING,
-                OutboxRelayService.MAX_RETRY_COUNT
+                OutboxRelayService.MAX_RETRY_COUNT,
+                PageRequest.of(0, OutboxRelayService.DEFAULT_BATCH_SIZE)
         )).willReturn(List.of(event));
         given(outboxEventHandler.supports(event)).willReturn(false);
 
@@ -121,14 +128,40 @@ class OutboxRelayServiceTest {
     @Test
     @DisplayName("처리할 PENDING 이벤트가 없으면 0을 반환한다")
     void relayPendingEventsWithEmptyEvents() {
-        given(outboxEventRepository.findTop100ByStatusAndRetryCountLessThanOrderByCreatedAtAsc(
+        given(outboxEventRepository.findRelayBatch(
                 OutboxStatus.PENDING,
-                OutboxRelayService.MAX_RETRY_COUNT
+                OutboxRelayService.MAX_RETRY_COUNT,
+                PageRequest.of(0, OutboxRelayService.DEFAULT_BATCH_SIZE)
         )).willReturn(List.of());
 
         int relayedCount = outboxRelayService.relayPendingEvents();
 
         assertThat(relayedCount).isZero();
+    }
+
+    @Test
+    @DisplayName("설정된 batch size로 relay 대상 이벤트를 조회한다")
+    void relayPendingEventsWithConfiguredBatchSize() {
+        OutboxRelayService service = new OutboxRelayService(
+                outboxEventRepository,
+                List.of(outboxEventHandler),
+                5,
+                25
+        );
+        given(outboxEventRepository.findRelayBatch(
+                OutboxStatus.PENDING,
+                5,
+                PageRequest.of(0, 25)
+        )).willReturn(List.of());
+
+        int relayedCount = service.relayPendingEvents();
+
+        assertThat(relayedCount).isZero();
+        verify(outboxEventRepository).findRelayBatch(
+                OutboxStatus.PENDING,
+                5,
+                PageRequest.of(0, 25)
+        );
     }
 
     private OutboxEvent createEvent() {
