@@ -5,8 +5,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import jobflow.domain.user.User;
-import jobflow.domain.user.UserRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -21,16 +19,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final UserRepository userRepository;
     private final JwtCookieService jwtCookieService;
 
     public JwtAuthenticationFilter(
             JwtTokenProvider jwtTokenProvider,
-            UserRepository userRepository,
             JwtCookieService jwtCookieService
     ) {
         this.jwtTokenProvider = jwtTokenProvider;
-        this.userRepository = userRepository;
         this.jwtCookieService = jwtCookieService;
     }
 
@@ -50,29 +45,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(String token) {
-        if (!jwtTokenProvider.isValidToken(token)) {
-            SecurityContextHolder.clearContext();
-            return;
-        }
-
-        Long userId = jwtTokenProvider.getUserId(token);
-        User user = userRepository.findById(userId)
-                .orElse(null);
-
-        if (user == null) {
-            SecurityContextHolder.clearContext();
-            return;
-        }
-
-        UserPrincipal principal = UserPrincipal.from(user);
-
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                principal,
-                null,
-                principal.authorities()
-        );
-
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+        jwtTokenProvider.getPrincipal(token)
+                .map(principal -> new UsernamePasswordAuthenticationToken(
+                        principal,
+                        null,
+                        principal.authorities()
+                ))
+                .ifPresentOrElse(
+                        authentication -> SecurityContextHolder.getContext().setAuthentication(authentication),
+                        SecurityContextHolder::clearContext
+                );
     }
 
     private String resolveToken(HttpServletRequest request) {
