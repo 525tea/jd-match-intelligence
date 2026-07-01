@@ -171,6 +171,61 @@ Kafka consumer smoke completed.
 - 실제 사용자 이메일, 실제 공고, 실제 외부 식별자는 사용하지 않는다.
 - `staging-performance-up.sh`는 Outbox Kafka publish smoke 이후 이 smoke를 자동 실행한다.
 
+## Kafka consumer latency / lag scenario
+
+`run-kafka-consumer-latency-lag-scenario.sh`는 API 부하가 걸린 동안 Kafka consumer 경로가 이벤트를 따라가는지 확인한다.
+
+검증 포인트는 세 가지다.
+
+- k6 API latency: 500VU, 5분 기준 API p95/p99와 실패율
+- Kafka consumer lag: `kafka-consumer-groups --describe` snapshot과 Prometheus `kafka_consumer_fetch_manager_records_lag`
+- duplicate replay idempotency: 같은 `eventId`의 `email.send` 메시지를 2번 발행했을 때 `processed_kafka_events`가 1건만 남는지
+
+### 1. API-only baseline
+
+이 실행은 Kafka consumer는 켜두되 추가 이벤트 부하는 넣지 않는다. 같은 서버/DB/검색 인덱스에서 API 자체 기준선을 잡기 위한 비교군이다.
+
+```bash
+SCENARIO=api-only-baseline \
+BASE_URL=http://localhost:8081/api \
+LOGIN_EMAIL='frontend-demo@example.com' \
+LOGIN_PASSWORD='password123' \
+VUS=500 \
+DURATION=5m \
+bash performance/events/run-kafka-consumer-latency-lag-scenario.sh
+```
+
+### 2. Kafka consumer active under event load
+
+이 실행은 `outbox_events`에 `email.send` 이벤트를 대량으로 넣고, Outbox Relay가 Kafka로 발행하며, backend consumer가 처리하는 동안 같은 k6 부하를 건다.
+
+```bash
+SCENARIO=kafka-consumer-after \
+BASE_URL=http://localhost:8081/api \
+LOGIN_EMAIL='frontend-demo@example.com' \
+LOGIN_PASSWORD='password123' \
+VUS=500 \
+DURATION=5m \
+KAFKA_EVENT_LOAD_COUNT=60000 \
+bash performance/events/run-kafka-consumer-latency-lag-scenario.sh
+```
+
+기본 산출물 위치:
+
+- k6 JSON: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_k6.json`
+- consumer group lag snapshot: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_consumer_group_lag.txt`
+- Prometheus lag query JSON: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_prometheus_kafka_lag.json`
+- event baseline: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_event_baseline_{before,after}.txt`
+- duplicate replay smoke: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_idempotency_smoke.txt`
+
+주의:
+
+- 이 시나리오는 `PERF_DB_NAME=jobflow`일 때 실행을 거부한다.
+- 이벤트 부하는 `user@example.com`, `Sample`, smoke run id만 사용한다.
+- 실제 이메일, 실제 사용자, 실제 외부 식별자는 사용하지 않는다.
+- `api-only-baseline`과 `kafka-consumer-after`를 같은 서버/같은 fixture 상태에서 연달아 실행해야 API p95 변화와 lag 회복 여부를 비교할 수 있다.
+- Grafana 캡처는 k6 steady-state 중간 1회, 종료 직후 1회 수집한다. 특히 `Kafka Consumer Lag`, `HikariCP Connections`, `P95 / P99 Latency`, `HTTP Request Rate` 패널이 보이게 캡처한다.
+
 ## Security event pipeline smoke
 
 `security-event-pipeline-smoke.sh`는 Gateway가 `security.events` topic으로 발행한 보안 이벤트를 Logstash가 Elasticsearch에 적재하는지 확인한다.
