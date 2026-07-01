@@ -11,16 +11,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProjectSkillSnapshotService {
 
     private final UserProjectRepository userProjectRepository;
-    private final UserProjectAnalysisRepository userProjectAnalysisRepository;
     private final UserProjectSkillRepository userProjectSkillRepository;
 
     public ProjectSkillSnapshotService(
             UserProjectRepository userProjectRepository,
-            UserProjectAnalysisRepository userProjectAnalysisRepository,
             UserProjectSkillRepository userProjectSkillRepository
     ) {
         this.userProjectRepository = userProjectRepository;
-        this.userProjectAnalysisRepository = userProjectAnalysisRepository;
         this.userProjectSkillRepository = userProjectSkillRepository;
     }
 

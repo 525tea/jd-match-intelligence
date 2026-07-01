@@ -27,7 +27,7 @@ const CACHE_MODE = __ENV.CACHE_MODE || 'enabled';
 const WORKLOAD_MODE = __ENV.WORKLOAD_MODE || 'hot';
 const HOT_RATIO = numberEnv('HOT_RATIO', 0.7);
 const HOT_VARIANTS = numberEnv('HOT_VARIANTS', 9);
-const LONG_TAIL_VARIANTS = numberEnv('LONG_TAIL_VARIANTS', 5000);
+const LONG_TAIL_VARIANTS = numberEnv('LONG_TAIL_VARIANTS', 100000);
 const ROLE_COMBINATION_SIZE = numberEnv('ROLE_COMBINATION_SIZE', 1);
 
 const httpStatusCodes = new Counter('jobflow_analysis_cache_http_status_codes');
@@ -194,7 +194,9 @@ function logFailureSample(endpoint, response) {
 }
 
 function iterationIndex() {
-    return exec.scenario.iterationInTest;
+    return exec.scenario && Number.isInteger(exec.scenario.iterationInTest)
+        ? exec.scenario.iterationInTest
+        : 0;
 }
 
 function observeResponse(endpoint, cachePath, response) {

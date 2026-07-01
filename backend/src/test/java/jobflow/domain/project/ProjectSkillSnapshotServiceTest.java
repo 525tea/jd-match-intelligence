@@ -3,6 +3,7 @@ package jobflow.domain.project;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -19,16 +20,12 @@ class ProjectSkillSnapshotServiceTest {
     private final UserProjectRepository userProjectRepository =
             mock(UserProjectRepository.class);
 
-    private final UserProjectAnalysisRepository userProjectAnalysisRepository =
-            mock(UserProjectAnalysisRepository.class);
-
     private final UserProjectSkillRepository userProjectSkillRepository =
             mock(UserProjectSkillRepository.class);
 
     private final ProjectSkillSnapshotService projectSkillSnapshotService =
             new ProjectSkillSnapshotService(
                     userProjectRepository,
-                    userProjectAnalysisRepository,
                     userProjectSkillRepository
             );
 
@@ -43,7 +40,7 @@ class ProjectSkillSnapshotServiceTest {
         List<Long> skillIds = projectSkillSnapshotService.findLatestSkillIds(userId, userProjectId);
 
         assertThat(skillIds).containsExactly(1L, 2L, 3L);
-        verifyNoInteractions(userProjectRepository, userProjectAnalysisRepository);
+        verifyNoInteractions(userProjectRepository);
     }
 
     @Test
@@ -59,7 +56,6 @@ class ProjectSkillSnapshotServiceTest {
         List<Long> skillIds = projectSkillSnapshotService.findLatestSkillIds(userId, userProjectId);
 
         assertThat(skillIds).isEmpty();
-        verifyNoInteractions(userProjectAnalysisRepository);
     }
 
     @Test
@@ -77,7 +73,6 @@ class ProjectSkillSnapshotServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.USER_PROJECT_NOT_FOUND);
 
-        verifyNoInteractions(userProjectAnalysisRepository);
     }
 
     @Test
@@ -86,7 +81,7 @@ class ProjectSkillSnapshotServiceTest {
         assertThat(projectSkillSnapshotService.findLatestSkillIds(null, 10L)).isEmpty();
         assertThat(projectSkillSnapshotService.findLatestSkillIds(1L, null)).isEmpty();
 
-        verify(userProjectSkillRepository, never()).findDistinctSkillIdsByLatestOwnedProjectAnalysis(1L, 10L);
-        verifyNoInteractions(userProjectRepository, userProjectAnalysisRepository);
+        verify(userProjectSkillRepository, never()).findDistinctSkillIdsByLatestOwnedProjectAnalysis(anyLong(), anyLong());
+        verifyNoInteractions(userProjectRepository);
     }
 }

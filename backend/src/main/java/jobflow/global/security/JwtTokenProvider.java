@@ -49,20 +49,6 @@ public class JwtTokenProvider {
                 .getPayload();
     }
 
-    public boolean isValidToken(String token) {
-        try {
-            parseClaims(token);
-            return true;
-        } catch (JwtException | IllegalArgumentException exception) {
-            log.debug("JWT validation failed: {}", exception.getMessage());
-            return false;
-        }
-    }
-
-    public Long getUserId(String token) {
-        return Long.valueOf(parseClaims(token).getSubject());
-    }
-
     public Optional<UserPrincipal> getPrincipal(String token) {
         try {
             Claims claims = parseClaims(token);

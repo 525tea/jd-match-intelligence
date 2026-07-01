@@ -343,6 +343,11 @@ if [[ ! "$WARMUP_VARIANTS" =~ ^[0-9]+$ || "$WARMUP_VARIANTS" -lt 1 ]]; then
     exit 1
 fi
 
+if [[ ("$WORKLOAD_MODE" == "hot" || "$WORKLOAD_MODE" == "mixed") && "$WARMUP_VARIANTS" -lt "$HOT_VARIANTS" ]]; then
+    echo "WARMUP_VARIANTS must be greater than or equal to HOT_VARIANTS for hot/mixed workloads." >&2
+    exit 1
+fi
+
 if ! awk "BEGIN { exit !($MIN_COLD_CACHE_MISS_RATIO >= 0 && $MIN_COLD_CACHE_MISS_RATIO <= 1) }"; then
     echo "MIN_COLD_CACHE_MISS_RATIO must be between 0 and 1." >&2
     exit 1
@@ -513,7 +518,7 @@ analysis_hits_final="$(cache_metric_sum hit)"
 analysis_misses_final="$(cache_metric_sum miss)"
 analysis_hits_run_delta=$((analysis_hits_final - analysis_hits_after))
 analysis_misses_run_delta=$((analysis_misses_final - analysis_misses_after))
-summary_http_reqs="$(jq -r '.metrics.http_reqs.count // .metrics.http_reqs.value // 0' "$summary_path")"
+summary_http_reqs="$(jq -r '.metrics.http_reqs.values.count // .metrics.http_reqs.count // .metrics.http_reqs.value // 0' "$summary_path")"
 summary_http_reqs="${summary_http_reqs%.*}"
 if [[ -z "$summary_http_reqs" || ! "$summary_http_reqs" =~ ^[0-9]+$ ]]; then
     summary_http_reqs=0
