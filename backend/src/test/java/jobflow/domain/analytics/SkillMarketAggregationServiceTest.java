@@ -135,7 +135,7 @@ class SkillMarketAggregationServiceTest {
     @DisplayName("같은 월 스킬 시장 집계 재실행 시 기존 결과를 교체한다")
     void replaceMonthlySkillMarketOnRerun() {
         String suffix = UUID.randomUUID().toString();
-        LocalDate periodStart = LocalDate.of(2026, 6, 1);
+        LocalDate periodStart = currentPeriodStart();
 
         Skill springBoot = skillRepository.save(
                 Skill.create("Rerun Spring Boot " + suffix, "rerun-spring-boot-" + suffix, SkillCategory.FRAMEWORK)
@@ -186,6 +186,10 @@ class SkillMarketAggregationServiceTest {
         assertThat(springExperienceMarkets)
                 .extracting(market -> market.getTagCode().getCode())
                 .containsExactly(traffic.getCode());
+    }
+
+    private LocalDate currentPeriodStart() {
+        return LocalDate.now().withDayOfMonth(1);
     }
 
     private Job createJob(String externalId) {

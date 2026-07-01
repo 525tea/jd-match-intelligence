@@ -62,16 +62,17 @@ class SkillTrendAggregationServiceTest {
         jobSkillRepository.save(JobSkill.create(platformJob, redis, RequirementType.REQUIRED));
         jobSkillRepository.flush();
 
-        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 15));
+        LocalDate periodStart = currentPeriodStart();
+        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(periodStart);
 
         List<SkillTrend> trends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
                         AnalyticsPeriodType.MONTHLY,
-                        LocalDate.of(2026, 6, 1)
+                        periodStart
                 );
 
         assertThat(result.periodType()).isEqualTo(AnalyticsPeriodType.MONTHLY);
-        assertThat(result.periodStart()).isEqualTo(LocalDate.of(2026, 6, 1));
+        assertThat(result.periodStart()).isEqualTo(periodStart);
         assertThat(result.sourceCount()).isEqualTo(2);
         assertThat(result.savedCount()).isEqualTo(2);
         assertThat(trends).hasSize(2);
@@ -108,12 +109,13 @@ class SkillTrendAggregationServiceTest {
         jobSkillRepository.save(JobSkill.create(backendJob, springBoot, RequirementType.REQUIRED));
         jobSkillRepository.flush();
 
-        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 1));
+        LocalDate periodStart = currentPeriodStart();
+        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(periodStart);
 
         List<SkillTrend> trends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
                         AnalyticsPeriodType.MONTHLY,
-                        LocalDate.of(2026, 6, 1)
+                        periodStart
                 );
 
         assertThat(result.sourceCount()).isEqualTo(1);
@@ -141,17 +143,22 @@ class SkillTrendAggregationServiceTest {
         ));
         skillTrendRepository.flush();
 
-        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(LocalDate.of(2026, 6, 1));
+        LocalDate periodStart = currentPeriodStart();
+        SkillTrendAggregationResult result = skillTrendAggregationService.aggregateMonthly(periodStart);
 
         List<SkillTrend> trends = skillTrendRepository
                 .findByPeriodTypeAndPeriodStartOrderByTrendScoreDesc(
                         AnalyticsPeriodType.MONTHLY,
-                        LocalDate.of(2026, 6, 1)
+                        periodStart
                 );
 
         assertThat(result.sourceCount()).isZero();
         assertThat(result.savedCount()).isZero();
         assertThat(trends).isEmpty();
+    }
+
+    private LocalDate currentPeriodStart() {
+        return LocalDate.now().withDayOfMonth(1);
     }
 
     private Job createJob(String externalId) {
