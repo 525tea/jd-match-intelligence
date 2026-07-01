@@ -20,43 +20,66 @@ from typing import Any
 
 @dataclass(frozen=True)
 class QueryCase:
+    category: str
     keyword: str
     expected_roles: tuple[str, ...]
     strong_terms: tuple[str, ...]
     support_terms: tuple[str, ...]
     skill_terms: tuple[str, ...]
+    critical_terms: tuple[str, ...] = ()
 
 
 QUERY_CASES: tuple[QueryCase, ...] = (
     QueryCase(
-        "backend junior seoul",
-        ("BACKEND",),
-        ("백엔드", "backend"),
-        ("java", "spring", "seoul", "서울", "junior", "주니어"),
-        ("java", "spring", "spring boot", "jpa", "mysql", "redis"),
-    ),
-    QueryCase(
-        "백엔드 개발자",
-        ("BACKEND",),
-        ("백엔드", "backend"),
-        ("java", "spring", "api", "server", "서버"),
-        ("java", "spring", "spring boot", "jpa", "mysql", "redis", "kafka"),
-    ),
-    QueryCase(
-        "프론트엔드 React",
-        ("FRONTEND",),
-        ("프론트엔드", "frontend", "react"),
-        ("next", "typescript", "javascript", "ui"),
-        ("react", "next", "typescript", "javascript", "redux"),
-    ),
-    QueryCase(
-        "쿠버네티스 플랫폼",
+        "synonym",
+        "k8s 인프라",
         ("DEVOPS", "SRE", "SYSTEM_NETWORK"),
-        ("kubernetes", "k8s", "쿠버네티스", "플랫폼"),
-        ("devops", "인프라", "sre", "cloud", "클라우드"),
+        ("kubernetes", "k8s", "쿠버네티스", "인프라"),
+        ("platform", "플랫폼", "devops", "sre", "cloud", "클라우드"),
         ("kubernetes", "k8s", "docker", "aws", "terraform", "helm"),
     ),
     QueryCase(
+        "synonym",
+        "js 프론트엔드",
+        ("FRONTEND", "FULLSTACK"),
+        ("javascript", "자바스크립트", "프론트엔드", "frontend"),
+        ("react", "vue", "next", "ui", "web"),
+        ("javascript", "react", "vue", "next", "typescript"),
+    ),
+    QueryCase(
+        "synonym",
+        "ts 프론트엔드",
+        ("FRONTEND", "FULLSTACK"),
+        ("typescript", "타입스크립트", "프론트엔드", "frontend"),
+        ("react", "vue", "next", "ui", "web"),
+        ("typescript", "react", "vue", "next", "javascript"),
+    ),
+    QueryCase(
+        "synonym",
+        "py 데이터",
+        ("DATA_ENGINEER", "DATA_SCIENTIST", "DATA_ANALYST", "ML_ENGINEER", "AI_ENGINEER"),
+        ("python", "파이썬", "데이터"),
+        ("data", "analytics", "분석", "머신러닝", "ml"),
+        ("python", "sql", "spark", "airflow", "pandas"),
+    ),
+    QueryCase(
+        "synonym",
+        "mlops 엔지니어",
+        ("ML_ENGINEER", "AI_ENGINEER", "MLOPS", "DEVOPS", "SRE"),
+        ("mlops", "machine learning", "머신러닝"),
+        ("ai", "ml", "model", "모델", "platform", "플랫폼"),
+        ("mlops", "python", "kubernetes", "docker", "pytorch", "tensorflow"),
+    ),
+    QueryCase(
+        "synonym",
+        "llm 엔지니어",
+        ("LLM", "GENERATIVE_AI", "AI_ENGINEER", "ML_ENGINEER", "AI_RESEARCHER"),
+        ("llm", "생성형", "ai", "인공지능"),
+        ("rag", "chatgpt", "gpt", "머신러닝", "딥러닝"),
+        ("llm", "rag", "python", "pytorch", "tensorflow", "vector"),
+    ),
+    QueryCase(
+        "special_token",
         "C++ 개발자",
         ("SOFTWARE_ENGINEER", "EMBEDDED_SOFTWARE", "ROBOT_SOFTWARE", "GAME_CLIENT", "HARDWARE_ENGINEER"),
         ("c++", "cplusplus"),
@@ -64,6 +87,7 @@ QUERY_CASES: tuple[QueryCase, ...] = (
         ("c++", "cplusplus", "linux", "embedded", "unreal", "robot"),
     ),
     QueryCase(
+        "special_token",
         "Node.js 백엔드",
         ("BACKEND", "FULLSTACK"),
         ("node", "node.js", "nodejs", "백엔드", "backend"),
@@ -71,6 +95,47 @@ QUERY_CASES: tuple[QueryCase, ...] = (
         ("node", "node.js", "nodejs", "typescript", "express", "nestjs"),
     ),
     QueryCase(
+        "special_token",
+        ".NET 개발자",
+        ("BACKEND", "FULLSTACK", "SOFTWARE_ENGINEER"),
+        (".net", "dotnet", "c#"),
+        ("백엔드", "backend", "software", "소프트웨어"),
+        (".net", "dotnet", "c#", "asp.net", "mssql"),
+    ),
+    QueryCase(
+        "special_token",
+        "C# 개발자",
+        ("BACKEND", "FULLSTACK", "SOFTWARE_ENGINEER", "GAME_CLIENT"),
+        ("c#", ".net", "dotnet"),
+        ("백엔드", "backend", "unity", "game", "게임"),
+        ("c#", ".net", "dotnet", "unity", "mssql"),
+    ),
+    QueryCase(
+        "special_token",
+        "Vue.js 프론트엔드",
+        ("FRONTEND", "FULLSTACK"),
+        ("vue", "vue.js", "vuejs", "프론트엔드", "frontend"),
+        ("javascript", "typescript", "ui", "web"),
+        ("vue", "vue.js", "vuejs", "javascript", "typescript", "pinia"),
+    ),
+    QueryCase(
+        "korean_role",
+        "백엔드 개발자",
+        ("BACKEND",),
+        ("백엔드", "backend"),
+        ("java", "spring", "api", "server", "서버"),
+        ("java", "spring", "spring boot", "jpa", "mysql", "redis", "kafka"),
+    ),
+    QueryCase(
+        "korean_role",
+        "프론트엔드 개발자",
+        ("FRONTEND",),
+        ("프론트엔드", "frontend"),
+        ("react", "vue", "next", "typescript", "javascript", "ui"),
+        ("react", "vue", "next", "typescript", "javascript"),
+    ),
+    QueryCase(
+        "korean_role",
         "데이터 엔지니어",
         ("DATA_ENGINEER", "DATA_SCIENTIST", "DATA_ANALYST", "DEVOPS"),
         ("데이터 엔지니어", "data engineer", "데이터 플랫폼"),
@@ -78,18 +143,150 @@ QUERY_CASES: tuple[QueryCase, ...] = (
         ("kafka", "spark", "airflow", "etl", "python", "sql"),
     ),
     QueryCase(
-        "AI 엔지니어",
-        ("AI_ENGINEER", "ML_ENGINEER", "GENERATIVE_AI", "LLM", "COMPUTER_VISION", "AI_RESEARCHER"),
-        ("ai", "ml", "llm", "머신러닝", "인공지능"),
-        ("딥러닝", "생성형", "computer vision", "vision"),
-        ("python", "pytorch", "tensorflow", "llm", "mlops", "opencv"),
-    ),
-    QueryCase(
+        "korean_role",
         "보안 엔지니어",
         ("SECURITY", "SYSTEM_NETWORK"),
         ("보안", "security"),
         ("network", "네트워크", "취약점", "관제"),
         ("security", "network", "siem", "vulnerability", "firewall", "linux"),
+    ),
+    QueryCase(
+        "korean_role",
+        "안드로이드 개발자",
+        ("ANDROID", "MOBILE", "APP"),
+        ("안드로이드", "android"),
+        ("모바일", "mobile", "app", "앱", "kotlin"),
+        ("android", "kotlin", "java", "mobile", "app"),
+    ),
+    QueryCase(
+        "composite",
+        "Java Spring 백엔드",
+        ("BACKEND",),
+        ("java", "spring", "백엔드", "backend"),
+        ("api", "server", "서버", "jpa"),
+        ("java", "spring", "spring boot", "jpa", "mysql", "redis"),
+    ),
+    QueryCase(
+        "composite",
+        "React TypeScript 프론트엔드",
+        ("FRONTEND", "FULLSTACK"),
+        ("react", "typescript", "프론트엔드", "frontend"),
+        ("next", "javascript", "ui", "web"),
+        ("react", "typescript", "next", "javascript", "redux"),
+    ),
+    QueryCase(
+        "composite",
+        "Python 데이터 엔지니어",
+        ("DATA_ENGINEER", "DATA_SCIENTIST", "DATA_ANALYST"),
+        ("python", "데이터 엔지니어", "data engineer"),
+        ("spark", "airflow", "etl", "sql", "analytics"),
+        ("python", "sql", "spark", "airflow", "etl", "kafka"),
+    ),
+    QueryCase(
+        "composite",
+        "AWS DevOps",
+        ("DEVOPS", "SRE", "SYSTEM_NETWORK"),
+        ("aws", "devops", "데브옵스"),
+        ("cloud", "클라우드", "인프라", "platform", "플랫폼"),
+        ("aws", "kubernetes", "docker", "terraform", "helm"),
+    ),
+    QueryCase(
+        "composite",
+        "Kubernetes SRE",
+        ("SRE", "DEVOPS", "SYSTEM_NETWORK"),
+        ("kubernetes", "k8s", "sre"),
+        ("platform", "플랫폼", "인프라", "cloud", "클라우드"),
+        ("kubernetes", "k8s", "docker", "terraform", "prometheus"),
+    ),
+    QueryCase(
+        "composite",
+        "LLM Python 엔지니어",
+        ("LLM", "GENERATIVE_AI", "AI_ENGINEER", "ML_ENGINEER"),
+        ("llm", "python", "생성형", "ai"),
+        ("rag", "gpt", "머신러닝", "딥러닝"),
+        ("llm", "python", "rag", "pytorch", "tensorflow", "vector"),
+    ),
+    QueryCase(
+        "composite",
+        "Spring Boot JPA",
+        ("BACKEND",),
+        ("spring boot", "spring", "jpa"),
+        ("java", "백엔드", "backend", "api", "server"),
+        ("spring boot", "spring", "jpa", "java", "mysql"),
+    ),
+    QueryCase(
+        "framework_combo",
+        "Python Django",
+        ("BACKEND", "FULLSTACK"),
+        ("python", "django", "백엔드", "backend"),
+        ("api", "server", "서버", "fastapi", "flask"),
+        ("python", "django", "drf", "fastapi", "flask"),
+        ("django",),
+    ),
+    QueryCase(
+        "framework_combo",
+        "Go Fiber",
+        ("BACKEND", "FULLSTACK"),
+        ("go", "golang", "fiber", "백엔드", "backend"),
+        ("api", "server", "서버", "gin", "grpc"),
+        ("go", "golang", "fiber", "gin", "grpc"),
+        ("fiber",),
+    ),
+    QueryCase(
+        "composite",
+        "Kafka 데이터 플랫폼",
+        ("DATA_ENGINEER", "DEVOPS", "SRE"),
+        ("kafka", "데이터 플랫폼", "data platform"),
+        ("stream", "스트리밍", "etl", "spark", "airflow"),
+        ("kafka", "spark", "airflow", "python", "sql"),
+    ),
+    QueryCase(
+        "edge_case",
+        "backend junior seoul",
+        ("BACKEND",),
+        ("백엔드", "backend"),
+        ("java", "spring", "seoul", "서울", "junior", "주니어"),
+        ("java", "spring", "spring boot", "jpa", "mysql", "redis"),
+    ),
+    QueryCase(
+        "edge_case",
+        "remote backend",
+        ("BACKEND",),
+        ("backend", "백엔드", "remote", "원격", "재택"),
+        ("server", "서버", "api", "java", "spring"),
+        ("java", "spring", "api", "mysql", "redis"),
+    ),
+    QueryCase(
+        "edge_case",
+        "node 백엔드",
+        ("BACKEND", "FULLSTACK"),
+        ("node", "node.js", "nodejs", "백엔드", "backend"),
+        ("typescript", "api", "server", "서버"),
+        ("node", "node.js", "nodejs", "typescript", "nestjs", "express"),
+    ),
+    QueryCase(
+        "edge_case",
+        "리액트 frontend",
+        ("FRONTEND", "FULLSTACK"),
+        ("react", "리액트", "frontend", "프론트엔드"),
+        ("typescript", "javascript", "next", "ui"),
+        ("react", "next", "typescript", "javascript", "redux"),
+    ),
+    QueryCase(
+        "edge_case",
+        "쿠버네티스 platform",
+        ("DEVOPS", "SRE", "SYSTEM_NETWORK"),
+        ("kubernetes", "k8s", "쿠버네티스", "platform", "플랫폼"),
+        ("devops", "인프라", "sre", "cloud", "클라우드"),
+        ("kubernetes", "k8s", "docker", "aws", "terraform", "helm"),
+    ),
+    QueryCase(
+        "edge_case",
+        "AI 엔지니어",
+        ("AI_ENGINEER", "ML_ENGINEER", "GENERATIVE_AI", "LLM", "COMPUTER_VISION", "AI_RESEARCHER"),
+        ("ai", "ml", "llm", "머신러닝", "인공지능"),
+        ("딥러닝", "생성형", "computer vision", "vision"),
+        ("python", "pytorch", "tensorflow", "llm", "mlops", "opencv"),
     ),
 )
 
@@ -209,11 +406,14 @@ def list_text(value: Any) -> list[str]:
     return []
 
 
-def label_text(job: dict[str, Any]) -> str:
-    return " ".join(
+def label_text(job: dict[str, Any], detail: dict[str, Any] | None = None) -> str:
+    values = [
         normalize(job.get(key))
         for key in ("title", "companyName", "role", "careerLevel", "locationRegion", "locationCity")
-    )
+    ]
+    if detail:
+        values.append(tfidf_text(job, detail))
+    return " ".join(values)
 
 
 def tfidf_text(job: dict[str, Any], detail: dict[str, Any]) -> str:
@@ -233,12 +433,24 @@ def tfidf_text(job: dict[str, Any], detail: dict[str, Any]) -> str:
     return " ".join(normalize(value) for value in base if value)
 
 
-def relevance_grade(query: QueryCase, job: dict[str, Any]) -> int:
+def relevance_grade(query: QueryCase, job: dict[str, Any], detail: dict[str, Any] | None = None) -> int:
     role = str(job.get("role") or "")
-    text = label_text(job)
+    text = label_text(job, detail)
     role_match = role in query.expected_roles
     strong_match = contains_any(text, query.strong_terms)
     support_match = contains_any(text, query.support_terms)
+    critical_match = contains_any(text, query.critical_terms) if query.critical_terms else False
+
+    if query.critical_terms:
+        if role_match and critical_match:
+            return 3
+        if role_match and strong_match:
+            return 2
+        if critical_match:
+            return 2
+        if support_match:
+            return 1
+        return 0
 
     if role_match and strong_match:
         return 3
@@ -291,6 +503,7 @@ def csv_row(run_label: str, ranking: str, query: QueryCase, rank: int, item: dic
     return {
         "run_label": run_label,
         "ranking": ranking,
+        "category": query.category,
         "query": query.keyword,
         "rank": rank,
         "original_rank": item["original_rank"],
@@ -363,7 +576,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
                 {
                     "job": job,
                     "original_rank": index + 1,
-                    "relevance_grade": relevance_grade(query, job),
+                    "relevance_grade": relevance_grade(query, job, details_by_id.get(job.get("id"), {})),
                     "skill_tfidf_score": scores[index] if index < len(scores) else 0.0,
                 }
             )
@@ -380,6 +593,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             csv_rows.append(csv_row(args.run_label, "skill_tfidf_rerank", query, rank, item))
 
         query_summary = {
+            "category": query.category,
             "query": query.keyword,
             "result_count": len(jobs),
             baseline_metric_key: round(baseline_ndcg, 4),
@@ -402,6 +616,20 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
     baseline_average = sum(item[baseline_metric_key] for item in query_summaries) / len(query_summaries)
     reranked_average = sum(item[reranked_metric_key] for item in query_summaries) / len(query_summaries)
+    category_summaries = []
+    for category in sorted({query.category for query in QUERY_CASES}):
+        items = [item for item in query_summaries if item["category"] == category]
+        category_baseline_average = sum(item[baseline_metric_key] for item in items) / len(items)
+        category_reranked_average = sum(item[reranked_metric_key] for item in items) / len(items)
+        category_summaries.append(
+            {
+                "category": category,
+                "query_count": len(items),
+                baseline_mean_metric_key: round(category_baseline_average, 4),
+                reranked_mean_metric_key: round(category_reranked_average, 4),
+                "mean_delta": round(category_reranked_average - category_baseline_average, 4),
+            }
+        )
     summary = {
         "run_label": args.run_label,
         "base_url": args.base_url,
@@ -412,6 +640,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         baseline_mean_metric_key: round(baseline_average, 4),
         reranked_mean_metric_key: round(reranked_average, 4),
         "mean_delta": round(reranked_average - baseline_average, 4),
+        "categories": category_summaries,
         "queries": query_summaries,
     }
 
@@ -424,6 +653,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     print(f"{baseline_mean_metric_key}={summary[baseline_mean_metric_key]:.4f}")
     print(f"{reranked_mean_metric_key}={summary[reranked_mean_metric_key]:.4f}")
     print(f"mean_delta={summary['mean_delta']:+.4f}")
+    print("category_means=" + json.dumps(category_summaries, ensure_ascii=False))
     if args.output_file:
         print(f"csv_output={args.output_file}")
     if args.summary_file:

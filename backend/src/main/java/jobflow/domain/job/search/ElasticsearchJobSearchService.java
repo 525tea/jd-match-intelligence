@@ -1,6 +1,7 @@
 package jobflow.domain.job.search;
 
 import co.elastic.clients.elasticsearch._types.Time;
+import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScore;
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionBoostMode;
 import co.elastic.clients.elasticsearch._types.query_dsl.FunctionScoreMode;
 import co.elastic.clients.elasticsearch._types.query_dsl.Operator;
@@ -24,6 +25,8 @@ public class ElasticsearchJobSearchService {
     private static final float ROLE_INTENT_BOOST = 2.8f;
     private static final float CAREER_INTENT_BOOST = 1.8f;
     private static final float LOCATION_INTENT_BOOST = 1.4f;
+    private static final double ROLE_INTENT_WEIGHT = 18.0;
+    private static final double REQUIRED_SKILL_WEIGHT = 8.0;
     private static final String DEADLINE_AT_FIELD = "deadlineAt";
     private static final String CREATED_AT_FIELD = "createdAt";
 
@@ -44,6 +47,8 @@ public class ElasticsearchJobSearchService {
         NativeQuery query = NativeQuery.builder()
                 .withQuery(q -> q.functionScore(fs -> fs
                         .query(searchQuery(normalizedKeyword, expandedKeywords, intent))
+                        .functions(intentRoleBoosts(intent))
+                        .functions(requiredSkillBoosts(intent))
                         .functions(f -> f
                                 .filter(existsQuery(DEADLINE_AT_FIELD))
                                 .weight(1.4)
@@ -88,16 +93,46 @@ public class ElasticsearchJobSearchService {
                 .toList();
     }
 
+    private List<FunctionScore> intentRoleBoosts(JobSearchIntent intent) {
+        return intent.roles().stream()
+                .map(role -> FunctionScore.of(functionScore -> functionScore
+                        .filter(Query.of(query -> query.term(term -> term
+                                .field("role")
+                                .value(role.name())
+                        )))
+                        .weight(ROLE_INTENT_WEIGHT)
+                ))
+                .toList();
+    }
+
+    private List<FunctionScore> requiredSkillBoosts(JobSearchIntent intent) {
+        return intent.requiredSkillKeywords().stream()
+                .map(skillKeyword -> FunctionScore.of(functionScore -> functionScore
+                        .filter(requiredSkillKeywordQuery(skillKeyword))
+                        .weight(REQUIRED_SKILL_WEIGHT)
+                ))
+                .toList();
+    }
+
     private Query searchQuery(String keyword, List<String> expandedKeywords, JobSearchIntent intent) {
         if (expandedKeywords.isEmpty() && !intent.hasAnySignal()) {
             return primaryKeywordQuery(keyword);
         }
 
         return Query.of(q -> q.bool(b -> {
-            b.must(primaryKeywordQuery(keyword));
-            intent.requiredSkillKeywords().forEach(requiredSkillKeyword ->
-                    b.must(requiredSkillKeywordQuery(requiredSkillKeyword))
-            );
+            boolean structuredIntentSearch = intent.requiredSkillKeywords().isEmpty() && intent.hasAnySignal();
+            if (structuredIntentSearch) {
+                b.should(primaryKeywordQuery(keyword));
+            } else {
+                b.must(primaryKeywordQuery(keyword));
+            }
+            intent.requiredSkillKeywords().forEach(requiredSkillKeyword -> {
+                if (intent.requiredSkillKeywords().size() == 1) {
+                    b.must(requiredSkillKeywordQuery(requiredSkillKeyword));
+                } else {
+                    b.should(requiredSkillKeywordQuery(requiredSkillKeyword));
+                }
+            });
             expandedKeywords.forEach(expandedKeyword ->
                     b.should(expansionKeywordQuery(expandedKeyword))
             );
@@ -110,7 +145,7 @@ public class ElasticsearchJobSearchService {
             intent.locationRegions().forEach(locationRegion ->
                     b.should(textIntentQuery("locationRegion", locationRegion, LOCATION_INTENT_BOOST))
             );
-            return b.minimumShouldMatch("0");
+            return b.minimumShouldMatch(structuredIntentSearch ? "1" : "0");
         }));
     }
 
