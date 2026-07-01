@@ -111,6 +111,12 @@ jobflow:
       enabled: ${JOBFLOW_KAFKA_CONSUMER_ENABLED:false}
       group-id: ${JOBFLOW_KAFKA_CONSUMER_GROUP_ID:jobflow-backend}
       auto-offset-reset: ${JOBFLOW_KAFKA_CONSUMER_AUTO_OFFSET_RESET:latest}
+      retry:
+        max-retries: ${JOBFLOW_KAFKA_CONSUMER_RETRY_MAX_RETRIES:3}
+        backoff-interval-millis: ${JOBFLOW_KAFKA_CONSUMER_RETRY_BACKOFF_INTERVAL_MILLIS:1000}
+      dlq:
+        topic-suffix: ${JOBFLOW_KAFKA_CONSUMER_DLQ_TOPIC_SUFFIX:.dlq}
+        send-timeout-millis: ${JOBFLOW_KAFKA_CONSUMER_DLQ_SEND_TIMEOUT_MILLIS:3000}
       search:
         refresh-after-index: ${JOBFLOW_KAFKA_CONSUMER_SEARCH_REFRESH_AFTER_INDEX:false}
       topics:
@@ -120,6 +126,8 @@ jobflow:
   outbox:
     relay:
       publisher: ${OUTBOX_RELAY_PUBLISHER:noop}
+      max-retry-count: ${OUTBOX_RELAY_MAX_RETRY_COUNT:3}
+      batch-size: ${OUTBOX_RELAY_BATCH_SIZE:100}
       kafka:
         send-timeout-millis: ${OUTBOX_RELAY_KAFKA_SEND_TIMEOUT_MILLIS:3000}
 

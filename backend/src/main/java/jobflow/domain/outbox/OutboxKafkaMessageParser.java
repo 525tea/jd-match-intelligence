@@ -17,6 +17,7 @@ public class OutboxKafkaMessageParser {
         JsonNode payload = payloadOrRoot(root);
 
         return new OutboxKafkaEnvelope(
+                intOrDefault(root, "schemaVersion", 1),
                 longOrNull(root, "eventId"),
                 textOrNull(root, "aggregateType"),
                 longOrNull(root, "aggregateId"),
@@ -55,6 +56,17 @@ public class OutboxKafkaMessageParser {
             throw new IllegalArgumentException("Kafka message field '%s' must be a long".formatted(fieldName));
         }
         return value.longValue();
+    }
+
+    private int intOrDefault(JsonNode node, String fieldName, int defaultValue) {
+        JsonNode value = node.path(fieldName);
+        if (value.isMissingNode() || value.isNull()) {
+            return defaultValue;
+        }
+        if (!value.canConvertToInt()) {
+            throw new IllegalArgumentException("Kafka message field '%s' must be an integer".formatted(fieldName));
+        }
+        return value.intValue();
     }
 
     private String textOrNull(JsonNode node, String fieldName) {

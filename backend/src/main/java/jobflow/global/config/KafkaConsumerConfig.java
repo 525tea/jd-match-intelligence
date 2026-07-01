@@ -1,5 +1,6 @@
 package jobflow.global.config;
 
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -12,6 +13,10 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 @EnableKafka
@@ -35,11 +40,44 @@ public class KafkaConsumerConfig {
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
-            ConsumerFactory<String, String> kafkaConsumerFactory
+            ConsumerFactory<String, String> kafkaConsumerFactory,
+            DefaultErrorHandler kafkaDefaultErrorHandler
     ) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(kafkaConsumerFactory);
+        factory.setCommonErrorHandler(kafkaDefaultErrorHandler);
         return factory;
+    }
+
+    @Bean
+    public DefaultErrorHandler kafkaDefaultErrorHandler(
+            KafkaDlqPublishingRecoverer kafkaDlqPublishingRecoverer,
+            @Value("${jobflow.kafka.consumer.retry.backoff-interval-millis:1000}") long backoffIntervalMillis,
+            @Value("${jobflow.kafka.consumer.retry.max-retries:3}") long maxRetries
+    ) {
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+                kafkaDlqPublishingRecoverer,
+                new FixedBackOff(backoffIntervalMillis, maxRetries)
+        );
+        errorHandler.setCommitRecovered(true);
+        return errorHandler;
+    }
+
+    @Bean
+    public KafkaDlqPublishingRecoverer kafkaDlqPublishingRecoverer(
+            KafkaTemplate<String, String> kafkaTemplate,
+            ObjectMapper objectMapper,
+            Clock clock,
+            @Value("${jobflow.kafka.consumer.dlq.topic-suffix:.dlq}") String topicSuffix,
+            @Value("${jobflow.kafka.consumer.dlq.send-timeout-millis:3000}") long sendTimeoutMillis
+    ) {
+        return new KafkaDlqPublishingRecoverer(
+                kafkaTemplate,
+                objectMapper,
+                clock,
+                topicSuffix,
+                sendTimeoutMillis
+        );
     }
 }

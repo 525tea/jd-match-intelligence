@@ -61,6 +61,7 @@ class KafkaOutboxEventHandlerTest {
 
         JsonNode message = objectMapper.readTree(messageCaptor.getValue());
         assertThat(message.path("eventId").isNull()).isTrue();
+        assertThat(message.path("schemaVersion").asInt()).isEqualTo(1);
         assertThat(message.path("aggregateType").asText()).isEqualTo("JOB");
         assertThat(message.path("aggregateId").asLong()).isEqualTo(1L);
         assertThat(message.path("eventType").asText()).isEqualTo(OutboxEventTypes.JOB_CREATED);

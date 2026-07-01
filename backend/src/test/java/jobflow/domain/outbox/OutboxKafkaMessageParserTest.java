@@ -19,6 +19,7 @@ class OutboxKafkaMessageParserTest {
         String message = """
                 {
                   "eventId": 10,
+                  "schemaVersion": 1,
                   "aggregateType": "JOB",
                   "aggregateId": 20,
                   "eventType": "JOB_CREATED",
@@ -32,6 +33,7 @@ class OutboxKafkaMessageParserTest {
 
         OutboxKafkaEnvelope envelope = parser.parseEnvelope(message);
 
+        assertThat(envelope.schemaVersion()).isEqualTo(1);
         assertThat(envelope.eventId()).isEqualTo(10L);
         assertThat(envelope.aggregateType()).isEqualTo("JOB");
         assertThat(envelope.aggregateId()).isEqualTo(20L);
@@ -39,6 +41,47 @@ class OutboxKafkaMessageParserTest {
         assertThat(envelope.topic()).isEqualTo("job.created");
         assertThat(envelope.payload().path("jobId").asLong()).isEqualTo(20L);
         assertThat(envelope.payload().path("smokeRunId").asText()).isEqualTo("sample-run");
+    }
+
+    @Test
+    @DisplayName("schemaVersion이 없으면 version 1 envelope로 해석한다")
+    void parseEnvelopeWithoutSchemaVersion() {
+        String message = """
+                {
+                  "eventId": 10,
+                  "aggregateType": "JOB",
+                  "aggregateId": 20,
+                  "eventType": "JOB_CREATED",
+                  "topic": "job.created",
+                  "payload": {
+                    "jobId": 20
+                  }
+                }
+                """;
+
+        OutboxKafkaEnvelope envelope = parser.parseEnvelope(message);
+
+        assertThat(envelope.schemaVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("schemaVersion이 정수가 아니면 실패한다")
+    void failWhenSchemaVersionIsInvalid() {
+        assertThatThrownBy(() -> parser.parseEnvelope("""
+                {
+                  "schemaVersion": "v1",
+                  "eventId": 10,
+                  "aggregateType": "JOB",
+                  "aggregateId": 20,
+                  "eventType": "JOB_CREATED",
+                  "topic": "job.created",
+                  "payload": {
+                    "jobId": 20
+                  }
+                }
+                """))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Kafka message field 'schemaVersion' must be an integer");
     }
 
     @Test
