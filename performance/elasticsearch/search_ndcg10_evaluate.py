@@ -291,37 +291,8 @@ QUERY_CASES: tuple[QueryCase, ...] = (
 )
 
 
-MANUAL_RELEVANCE_GRADES: dict[tuple[str, str], int] = {
-    # Python Django: audit top results that are Python/backend adjacent but not Django-specific enough.
-    ("Python Django", "1583"): 1,
-    ("Python Django", "1688"): 2,
-    ("Python Django", "1691"): 2,
-    ("Python Django", "1693"): 2,
-
-    # Go Fiber: current corpus mostly has Go/Gin backend jobs, not explicit Fiber jobs.
-    ("Go Fiber", "2131"): 2,
-    ("Go Fiber", "2180"): 2,
-    ("Go Fiber", "2229"): 2,
-    ("Go Fiber", "2232"): 2,
-    ("Go Fiber", "2283"): 2,
-    ("Go Fiber", "2348"): 2,
-    ("Go Fiber", "412"): 2,
-    ("Go Fiber", "1888"): 2,
-    ("Go Fiber", "1818"): 2,
-    ("Go Fiber", "1685"): 2,
-
-    # MLOps: title-level MLOps platform/data roles are highly relevant even when source role is DATA_ENGINEER.
-    ("mlops 엔지니어", "1647"): 3,
-
-    # LLM Python: Generative AI role alone is weaker when the title is not engineer-oriented.
-    ("LLM Python 엔지니어", "334"): 2,
-
-    # .NET: AI big-data research is only weakly related to .NET developer search despite detail text matches.
-    (".NET 개발자", "2105"): 1,
-}
-
-
 TOKEN_PATTERN = re.compile(r"[a-z0-9+#.]+|[가-힣]+", re.IGNORECASE)
+DEFAULT_MANUAL_LABEL_FILE = Path(__file__).with_name("search_quality_manual_audit_labels.csv")
 
 
 def parse_args() -> argparse.Namespace:
@@ -340,6 +311,11 @@ def parse_args() -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
         help="Fetch /jobs/{id} details for richer TF-IDF skill text.",
     )
+    parser.add_argument(
+        "--manual-label-file",
+        default=os.getenv("MANUAL_LABEL_FILE", str(DEFAULT_MANUAL_LABEL_FILE)),
+        help="CSV qrel file with query,job_id,grade columns for manual audit label overrides.",
+    )
     parser.add_argument("--min-ndcg", type=float, default=float(os.getenv("MIN_NDCG", "0.0")))
     parser.add_argument(
         "--fail-on-threshold",
@@ -347,6 +323,37 @@ def parse_args() -> argparse.Namespace:
         action=argparse.BooleanOptionalAction,
     )
     return parser.parse_args()
+
+
+def load_manual_relevance_grades(path: str) -> dict[tuple[str, str], int]:
+    if not path:
+        return {}
+
+    label_path = Path(path)
+    if not label_path.exists():
+        raise FileNotFoundError(f"manual label file does not exist: {label_path}")
+
+    labels: dict[tuple[str, str], int] = {}
+    with label_path.open(encoding="utf-8", newline="") as file:
+        reader = csv.DictReader(file)
+        required_columns = {"query", "job_id", "grade"}
+        if not reader.fieldnames or not required_columns.issubset(reader.fieldnames):
+            raise ValueError(f"manual label file must include columns: {sorted(required_columns)}")
+
+        for line_number, row in enumerate(reader, start=2):
+            query = (row.get("query") or "").strip()
+            job_id = (row.get("job_id") or "").strip()
+            grade_text = (row.get("grade") or "").strip()
+            if not query or not job_id or not grade_text:
+                raise ValueError(f"manual label row has blank query/job_id/grade at line {line_number}")
+            try:
+                grade = int(grade_text)
+            except ValueError as exc:
+                raise ValueError(f"manual label grade must be integer at line {line_number}: {grade_text}") from exc
+            if grade < 0 or grade > 3:
+                raise ValueError(f"manual label grade must be between 0 and 3 at line {line_number}: {grade}")
+            labels[(query, job_id)] = grade
+    return labels
 
 
 def normalize(value: Any) -> str:
@@ -491,9 +498,13 @@ def relevance_grade(query: QueryCase, job: dict[str, Any], detail: dict[str, Any
     return 0
 
 
-def manual_relevance_grade(query: QueryCase, job: dict[str, Any]) -> int | None:
+def manual_relevance_grade(
+    query: QueryCase,
+    job: dict[str, Any],
+    manual_relevance_grades: dict[tuple[str, str], int],
+) -> int | None:
     job_id = str(job.get("id") or "")
-    return MANUAL_RELEVANCE_GRADES.get((query.keyword, job_id))
+    return manual_relevance_grades.get((query.keyword, job_id))
 
 
 def dcg(grades: list[int]) -> float:
@@ -589,11 +600,14 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     reranked_metric_key = f"skill_tfidf_{metric_suffix}"
     baseline_mean_metric_key = f"baseline_mean_{metric_suffix}"
     reranked_mean_metric_key = f"skill_tfidf_mean_{metric_suffix}"
+    manual_relevance_grades = load_manual_relevance_grades(args.manual_label_file)
 
     print(f"BASE_URL={args.base_url}")
     print(f"LIMIT={args.limit}")
     print(f"FETCH_LIMIT={args.fetch_limit}")
     print(f"FETCH_DETAILS_FOR_TFIDF={str(args.fetch_details).lower()}")
+    print(f"MANUAL_LABEL_FILE={args.manual_label_file}")
+    print(f"MANUAL_LABEL_COUNT={len(manual_relevance_grades)}")
     print()
 
     for query in QUERY_CASES:
@@ -608,7 +622,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
         evaluated = []
         for index, job in enumerate(jobs):
-            manual_grade = manual_relevance_grade(query, job)
+            manual_grade = manual_relevance_grade(query, job, manual_relevance_grades)
             evaluated.append(
                 {
                     "job": job,
@@ -677,6 +691,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "limit": args.limit,
         "fetch_limit": args.fetch_limit,
         "fetch_details_for_tfidf": args.fetch_details,
+        "manual_label_file": args.manual_label_file,
         "query_count": len(query_summaries),
         baseline_mean_metric_key: round(baseline_average, 4),
         reranked_mean_metric_key: round(reranked_average, 4),
