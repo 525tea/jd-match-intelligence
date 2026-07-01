@@ -12,6 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 import jobflow.domain.analytics.AnalyticsTrendService;
 import jobflow.domain.job.JobService;
+import jobflow.domain.outbox.DlqMessageService;
+import jobflow.domain.outbox.DlqRetryRequest;
+import jobflow.domain.outbox.DlqRetryResponse;
+import jobflow.domain.outbox.KafkaDlqRetryService;
 import jobflow.domain.skill.SkillCategory;
 import jobflow.domain.skill.SkillService;
 import jobflow.domain.skill.dto.SkillCreateRequest;
@@ -53,6 +57,12 @@ class ApiAuthorizationMatrixIntegrationTest {
 
     @MockitoBean
     private AnalyticsTrendService analyticsTrendService;
+
+    @MockitoBean
+    private KafkaDlqRetryService kafkaDlqRetryService;
+
+    @MockitoBean
+    private DlqMessageService dlqMessageService;
 
     @Test
     @DisplayName("PUBLIC API는 토큰 없이 호출할 수 있다")
@@ -184,6 +194,52 @@ class ApiAuthorizationMatrixIntegrationTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(adminToken)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    @DisplayName("DLQ 재처리 API도 ADMIN 권한으로 보호된다")
+    void dlqRetryApiRequiresAdminRole() throws Exception {
+        User user = saveUser("matrix-dlq-user@example.com", UserRole.USER);
+        User admin = saveUser("matrix-dlq-admin@example.com", UserRole.ADMIN);
+
+        String userToken = jwtTokenProvider.createAccessToken(user);
+        String adminToken = jwtTokenProvider.createAccessToken(admin);
+        String requestBody = """
+                {
+                  "schemaVersion": 1,
+                  "sourceTopic": "job.created",
+                  "sourceKey": "JOB:1",
+                  "original": {
+                    "payload": {
+                      "jobId": 1
+                    }
+                  }
+                }
+                """;
+
+        mockMvc.perform(post("/admin/dlq/retry")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"));
+
+        mockMvc.perform(post("/admin/dlq/retry")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(userToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("COMMON_FORBIDDEN"));
+
+        given(kafkaDlqRetryService.retry(any(DlqRetryRequest.class)))
+                .willReturn(new DlqRetryResponse(1, "job.created", "JOB:1"));
+
+        mockMvc.perform(post("/admin/dlq/retry")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(adminToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.targetTopic").value("job.created"));
     }
 
     private User saveUser(String email, UserRole role) {

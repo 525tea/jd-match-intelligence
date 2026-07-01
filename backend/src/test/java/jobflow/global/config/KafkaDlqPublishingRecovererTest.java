@@ -11,6 +11,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.concurrent.CompletableFuture;
+import jobflow.domain.outbox.DlqMessageService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +31,9 @@ class KafkaDlqPublishingRecovererTest {
     @Mock
     private KafkaTemplate<String, String> kafkaTemplate;
 
+    @Mock
+    private DlqMessageService dlqMessageService;
+
     private final ObjectMapper objectMapper = JsonMapper.builder().build();
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-02T00:00:00Z"), ZoneOffset.UTC);
 
@@ -40,6 +44,7 @@ class KafkaDlqPublishingRecovererTest {
         recoverer = new KafkaDlqPublishingRecoverer(
                 kafkaTemplate,
                 objectMapper,
+                dlqMessageService,
                 clock,
                 ".dlq",
                 3_000
@@ -65,6 +70,7 @@ class KafkaDlqPublishingRecovererTest {
         ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
         verify(kafkaTemplate).send(topicCaptor.capture(), keyCaptor.capture(), messageCaptor.capture());
+        verify(dlqMessageService).saveIfAbsent(messageCaptor.getValue());
 
         assertThat(topicCaptor.getValue()).isEqualTo("job.created.dlq");
         assertThat(keyCaptor.getValue()).isEqualTo("JOB:1");

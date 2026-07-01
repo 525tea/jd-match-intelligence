@@ -3,6 +3,7 @@ package jobflow.global.config;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.Map;
+import jobflow.domain.outbox.DlqMessageService;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -68,6 +69,7 @@ public class KafkaConsumerConfig {
     public KafkaDlqPublishingRecoverer kafkaDlqPublishingRecoverer(
             KafkaTemplate<String, String> kafkaTemplate,
             ObjectMapper objectMapper,
+            DlqMessageService dlqMessageService,
             Clock clock,
             @Value("${jobflow.kafka.consumer.dlq.topic-suffix:.dlq}") String topicSuffix,
             @Value("${jobflow.kafka.consumer.dlq.send-timeout-millis:3000}") long sendTimeoutMillis
@@ -75,6 +77,7 @@ public class KafkaConsumerConfig {
         return new KafkaDlqPublishingRecoverer(
                 kafkaTemplate,
                 objectMapper,
+                dlqMessageService,
                 clock,
                 topicSuffix,
                 sendTimeoutMillis

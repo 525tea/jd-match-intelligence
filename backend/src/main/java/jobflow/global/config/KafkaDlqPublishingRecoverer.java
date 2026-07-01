@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import jobflow.domain.outbox.DlqMessageService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
@@ -23,6 +24,7 @@ public class KafkaDlqPublishingRecoverer implements ConsumerRecordRecoverer {
 
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
+    private final DlqMessageService dlqMessageService;
     private final Clock clock;
     private final String topicSuffix;
     private final long sendTimeoutMillis;
@@ -30,12 +32,14 @@ public class KafkaDlqPublishingRecoverer implements ConsumerRecordRecoverer {
     public KafkaDlqPublishingRecoverer(
             KafkaTemplate<String, String> kafkaTemplate,
             ObjectMapper objectMapper,
+            DlqMessageService dlqMessageService,
             Clock clock,
             String topicSuffix,
             long sendTimeoutMillis
     ) {
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
+        this.dlqMessageService = dlqMessageService;
         this.clock = clock;
         this.topicSuffix = StringUtils.hasText(topicSuffix) ? topicSuffix : ".dlq";
         this.sendTimeoutMillis = sendTimeoutMillis;
@@ -46,6 +50,7 @@ public class KafkaDlqPublishingRecoverer implements ConsumerRecordRecoverer {
         String dlqTopic = record.topic() + topicSuffix;
         String key = record.key() == null ? null : String.valueOf(record.key());
         String message = buildDlqMessage(record, exception);
+        dlqMessageService.saveIfAbsent(message);
 
         try {
             kafkaTemplate.send(dlqTopic, key, message).get(sendTimeoutMillis, TimeUnit.MILLISECONDS);

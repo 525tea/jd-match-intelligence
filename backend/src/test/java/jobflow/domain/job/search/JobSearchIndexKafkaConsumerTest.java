@@ -1,7 +1,10 @@
 package jobflow.domain.job.search;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -14,7 +17,9 @@ import jobflow.domain.job.Job;
 import jobflow.domain.job.JobRepository;
 import jobflow.domain.job.JobRole;
 import jobflow.domain.job.RemoteType;
+import jobflow.domain.outbox.KafkaConsumerIdempotencyService;
 import jobflow.domain.outbox.OutboxKafkaMessageParser;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,16 +35,29 @@ class JobSearchIndexKafkaConsumerTest {
     );
 
     @Mock
+    private KafkaConsumerIdempotencyService idempotencyService;
+
+    @Mock
     private JobRepository jobRepository;
 
     @Mock
     private JobSearchIndexingService jobSearchIndexingService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().doAnswer(invocation -> {
+            Runnable sideEffect = invocation.getArgument(2);
+            sideEffect.run();
+            return true;
+        }).when(idempotencyService).runOnce(any(), any(), any(Runnable.class));
+    }
 
     @Test
     @DisplayName("색인 대상 Job 이벤트를 받아 Elasticsearch 색인을 요청한다")
     void consumeIndexableJobEvent() {
         JobSearchIndexKafkaConsumer consumer = new JobSearchIndexKafkaConsumer(
                 messageParser,
+                idempotencyService,
                 jobRepository,
                 jobSearchIndexingService
         );
@@ -69,6 +87,7 @@ class JobSearchIndexKafkaConsumerTest {
     void ignoreNonIndexableEvent() {
         JobSearchIndexKafkaConsumer consumer = new JobSearchIndexKafkaConsumer(
                 messageParser,
+                idempotencyService,
                 jobRepository,
                 jobSearchIndexingService
         );
@@ -95,6 +114,7 @@ class JobSearchIndexKafkaConsumerTest {
     void failWithoutJobId() {
         JobSearchIndexKafkaConsumer consumer = new JobSearchIndexKafkaConsumer(
                 messageParser,
+                idempotencyService,
                 jobRepository,
                 jobSearchIndexingService
         );
@@ -119,6 +139,7 @@ class JobSearchIndexKafkaConsumerTest {
     void failWithInvalidJobId() {
         JobSearchIndexKafkaConsumer consumer = new JobSearchIndexKafkaConsumer(
                 messageParser,
+                idempotencyService,
                 jobRepository,
                 jobSearchIndexingService
         );
