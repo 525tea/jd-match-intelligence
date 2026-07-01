@@ -11,6 +11,8 @@ public enum ErrorCode {
     COMMON_NOT_FOUND(HttpStatus.NOT_FOUND, "COMMON_NOT_FOUND", "요청한 리소스를 찾을 수 없습니다."),
     COMMON_CONFLICT(HttpStatus.CONFLICT, "COMMON_CONFLICT", "요청이 현재 리소스 상태와 충돌합니다."),
     COMMON_INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_INTERNAL_ERROR", "서버 내부 오류가 발생했습니다."),
+    KAFKA_DLQ_INVALID_ENVELOPE(HttpStatus.BAD_REQUEST, "KAFKA_DLQ_INVALID_ENVELOPE", "DLQ envelope가 올바르지 않습니다."),
+    KAFKA_DLQ_RETRY_FAILED(HttpStatus.BAD_GATEWAY, "KAFKA_DLQ_RETRY_FAILED", "DLQ 메시지 재처리에 실패했습니다."),
 
     AUTH_INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다."),
     AUTH_INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_TOKEN", "유효하지 않은 인증 토큰입니다."),

@@ -117,6 +117,7 @@ jobflow:
       dlq:
         topic-suffix: ${JOBFLOW_KAFKA_CONSUMER_DLQ_TOPIC_SUFFIX:.dlq}
         send-timeout-millis: ${JOBFLOW_KAFKA_CONSUMER_DLQ_SEND_TIMEOUT_MILLIS:3000}
+        retry-send-timeout-millis: ${JOBFLOW_KAFKA_CONSUMER_DLQ_RETRY_SEND_TIMEOUT_MILLIS:3000}
       search:
         refresh-after-index: ${JOBFLOW_KAFKA_CONSUMER_SEARCH_REFRESH_AFTER_INDEX:false}
       topics:
