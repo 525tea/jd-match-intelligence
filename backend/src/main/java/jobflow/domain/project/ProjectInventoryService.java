@@ -10,6 +10,7 @@ import jobflow.global.error.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -27,6 +28,7 @@ public class ProjectInventoryService {
             key = "T(jobflow.domain.project.ProjectInventoryService).projectInventoryCacheKey(#userId, #userProjectId)",
             sync = true
     )
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<ProjectSkillInventoryResponse> getProjectSkills(Long userId, Long userProjectId) {
         validateOwnedProject(userId, userProjectId);
 
@@ -66,6 +68,7 @@ public class ProjectInventoryService {
             key = "T(jobflow.domain.project.ProjectInventoryService).projectInventoryCacheKey(#userId, #userProjectId)",
             sync = true
     )
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<ProjectExperienceTagInventoryResponse> getProjectExperienceTags(
             Long userId,
             Long userProjectId

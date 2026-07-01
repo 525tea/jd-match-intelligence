@@ -21,6 +21,8 @@ import jobflow.global.error.exception.BusinessException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 class ProjectInventoryServiceTest {
 
@@ -201,6 +203,17 @@ class ProjectInventoryServiceTest {
     }
 
     @Test
+    @DisplayName("프로젝트 스킬 인벤토리 캐시 hit 경로는 DB 트랜잭션을 열지 않는다")
+    void getProjectSkillsDoesNotOpenTransactionOnCacheHit() throws NoSuchMethodException {
+        Transactional transactional = ProjectInventoryService.class
+                .getMethod("getProjectSkills", Long.class, Long.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.NOT_SUPPORTED);
+    }
+
+    @Test
     @DisplayName("프로젝트 경험 태그 인벤토리 조회에 캐시를 적용한다")
     void getProjectExperienceTagsUsesCache() throws NoSuchMethodException {
         Cacheable cacheable = ProjectInventoryService.class
@@ -210,6 +223,17 @@ class ProjectInventoryServiceTest {
         assertThat(cacheable.cacheNames()).containsExactly(CacheNames.PROJECT_EXPERIENCE_TAG_INVENTORY);
         assertThat(cacheable.key()).contains("projectInventoryCacheKey");
         assertThat(cacheable.sync()).isTrue();
+    }
+
+    @Test
+    @DisplayName("프로젝트 경험 태그 인벤토리 캐시 hit 경로는 DB 트랜잭션을 열지 않는다")
+    void getProjectExperienceTagsDoesNotOpenTransactionOnCacheHit() throws NoSuchMethodException {
+        Transactional transactional = ProjectInventoryService.class
+                .getMethod("getProjectExperienceTags", Long.class, Long.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.NOT_SUPPORTED);
     }
 
     @Test

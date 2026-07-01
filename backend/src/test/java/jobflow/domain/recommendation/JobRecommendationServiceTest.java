@@ -31,6 +31,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 @ExtendWith(MockitoExtension.class)
 class JobRecommendationServiceTest {
@@ -170,6 +172,23 @@ class JobRecommendationServiceTest {
         assertThat(cacheable).isNotNull();
         assertThat(cacheable.cacheNames()).containsExactly(CacheNames.JOB_RECOMMENDATION);
         assertThat(cacheable.sync()).isTrue();
+    }
+
+    @Test
+    @DisplayName("추천 캐시 hit 경로는 DB 트랜잭션을 열지 않는다")
+    void recommendJobsDoesNotOpenTransactionOnCacheHit() throws NoSuchMethodException {
+        Method method = JobRecommendationService.class.getMethod(
+                "recommendJobs",
+                Long.class,
+                Long.class,
+                Collection.class,
+                int.class
+        );
+
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.NOT_SUPPORTED);
     }
 
     @Test

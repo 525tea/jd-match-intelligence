@@ -34,6 +34,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 class JdMatchServiceTest {
 
@@ -75,6 +77,24 @@ class JdMatchServiceTest {
         assertThat(cacheable.cacheNames()).containsExactly(CacheNames.JD_MATCH);
         assertThat(cacheable.key()).contains("jdMatchCacheKey");
         assertThat(cacheable.sync()).isTrue();
+    }
+
+    @Test
+    @DisplayName("JD 매칭 캐시 hit 경로는 DB 트랜잭션을 열지 않는다")
+    void findProjectJobMatchesDoesNotOpenTransactionOnCacheHit() throws NoSuchMethodException {
+        Method method = JdMatchService.class.getMethod(
+                "findProjectJobMatches",
+                Long.class,
+                Long.class,
+                java.util.Collection.class,
+                CareerLevel.class,
+                int.class
+        );
+
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.NOT_SUPPORTED);
     }
 
     @Test
