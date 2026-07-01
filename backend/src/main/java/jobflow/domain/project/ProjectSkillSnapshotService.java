@@ -29,14 +29,18 @@ public class ProjectSkillSnapshotService {
             return List.of();
         }
 
+        List<Long> skillIds = userProjectSkillRepository.findDistinctSkillIdsByLatestOwnedProjectAnalysis(
+                userId,
+                userProjectId
+        );
+        if (!skillIds.isEmpty()) {
+            return skillIds;
+        }
+
         if (!userProjectRepository.existsByIdAndUserId(userProjectId, userId)) {
             throw new EntityNotFoundException(ErrorCode.USER_PROJECT_NOT_FOUND);
         }
 
-        return userProjectAnalysisRepository
-                .findFirstByUserProjectIdAndUserProjectUserIdOrderByAnalyzedAtDescIdDesc(userProjectId, userId)
-                .map(UserProjectAnalysis::getId)
-                .map(userProjectSkillRepository::findDistinctSkillIdsByAnalysisId)
-                .orElseGet(List::of);
+        return List.of();
     }
 }

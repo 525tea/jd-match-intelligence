@@ -1,12 +1,14 @@
 import http from 'k6/http';
 import { check, fail, sleep } from 'k6';
 import { Counter } from 'k6/metrics';
+import exec from 'k6/execution';
 
 const BASE_URL = (__ENV.BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
 const ACCESS_TOKEN = __ENV.ACCESS_TOKEN || '';
 const LOGIN_EMAIL = __ENV.LOGIN_EMAIL || '';
 const LOGIN_PASSWORD = __ENV.LOGIN_PASSWORD || '';
 const USER_PROJECT_ID = __ENV.USER_PROJECT_ID || '';
+const USER_PROJECT_IDS = csv(__ENV.USER_PROJECT_IDS || USER_PROJECT_ID);
 const ENDPOINTS = csv(__ENV.ENDPOINTS || 'gap_analysis,jd_match,recommendations_jobs');
 const TARGET_ROLES = csv(__ENV.TARGET_ROLES || 'BACKEND,DATA_ENGINEER,DEVOPS');
 const TARGET_CAREER_LEVELS = csv(__ENV.TARGET_CAREER_LEVELS || 'JUNIOR,MID,SENIOR');
@@ -188,7 +190,11 @@ function logFailureSample(endpoint, response) {
     }
 
     loggedFailureSamples[key] = true;
-    console.error(`[failure-sample] vu=${__VU} iter=${__ITER} endpoint=${endpoint} status=${response.status} body=${truncateBody(response.body)}`);
+    console.error(`[failure-sample] vu=${__VU} iter=${iterationIndex()} endpoint=${endpoint} status=${response.status} body=${truncateBody(response.body)}`);
+}
+
+function iterationIndex() {
+    return exec.scenario.iterationInTest;
 }
 
 function observeResponse(endpoint, cachePath, response) {
@@ -234,8 +240,8 @@ function login() {
 }
 
 function resolveUserProjectId(token) {
-    if (USER_PROJECT_ID) {
-        return String(USER_PROJECT_ID);
+    if (USER_PROJECT_IDS.length > 0) {
+        return String(USER_PROJECT_IDS[0]);
     }
 
     if (!token) {
@@ -297,16 +303,38 @@ function cachePathForIteration() {
         return 'long_tail';
     }
 
-    const bucket = (__ITER * 37) % 10000;
+    const bucket = (iterationIndex() * 37) % 10000;
     return bucket < HOT_RATIO * 10000 ? 'hot' : 'long_tail';
 }
 
 function variantIndex(cachePath) {
     if (cachePath === 'hot') {
-        return __ITER % HOT_VARIANTS;
+        return iterationIndex() % HOT_VARIANTS;
     }
 
-    return HOT_VARIANTS + ((__ITER + (__VU * 1009)) % LONG_TAIL_VARIANTS);
+    return HOT_VARIANTS + (iterationIndex() % LONG_TAIL_VARIANTS);
+}
+
+function longTailSequenceIndex(variant) {
+    return Math.floor(Math.max(0, variant - HOT_VARIANTS) / ENDPOINTS.length);
+}
+
+function roleCombinationSpace() {
+    return TARGET_ROLES.length;
+}
+
+function cacheParameterSpace(endpoint) {
+    const careerLevelFactor = endpoint === 'jd_match' ? TARGET_CAREER_LEVELS.length : 1;
+    return Math.max(1, roleCombinationSpace() * LIMIT_VALUES.length * careerLevelFactor);
+}
+
+function userProjectIdForVariant(endpoint, defaultUserProjectId, parameterVariant) {
+    if (USER_PROJECT_IDS.length === 0) {
+        return defaultUserProjectId;
+    }
+
+    const projectIndex = Math.floor(parameterVariant / cacheParameterSpace(endpoint)) % USER_PROJECT_IDS.length;
+    return String(USER_PROJECT_IDS[projectIndex]);
 }
 
 function rolesForVariant(index) {
@@ -324,16 +352,20 @@ function rolesForVariant(index) {
     return roles;
 }
 
-function paramsForVariant(index) {
+function paramsForVariant(endpoint, index) {
+    const roleSpace = roleCombinationSpace();
+    const careerLevelIndex = endpoint === 'jd_match' ? Math.floor(index / roleSpace) : index;
+    const limitDivisor = endpoint === 'jd_match' ? roleSpace * TARGET_CAREER_LEVELS.length : roleSpace;
+
     return {
         roles: rolesForVariant(index),
-        careerLevel: TARGET_CAREER_LEVELS[index % TARGET_CAREER_LEVELS.length],
-        limit: LIMIT_VALUES[index % LIMIT_VALUES.length],
+        careerLevel: TARGET_CAREER_LEVELS[careerLevelIndex % TARGET_CAREER_LEVELS.length],
+        limit: LIMIT_VALUES[Math.floor(index / limitDivisor) % LIMIT_VALUES.length],
     };
 }
 
 function endpointUrl(endpoint, userProjectId, variant) {
-    const params = paramsForVariant(variant);
+    const params = paramsForVariant(endpoint, variant);
     const commonParams = {
         targetRoles: params.roles,
         limit: params.limit,
@@ -364,8 +396,8 @@ export function setup() {
     const token = ACCESS_TOKEN || login();
     const userProjectId = resolveUserProjectId(token);
 
-    if (!token || !userProjectId) {
-        fail('ACCESS_TOKEN and USER_PROJECT_ID, or LOGIN_EMAIL and LOGIN_PASSWORD, are required for analysis cache stress test.');
+    if (!token || (!userProjectId && USER_PROJECT_IDS.length === 0)) {
+        fail('ACCESS_TOKEN and USER_PROJECT_ID/USER_PROJECT_IDS, or LOGIN_EMAIL and LOGIN_PASSWORD, are required for analysis cache stress test.');
     }
 
     return {
@@ -375,12 +407,15 @@ export function setup() {
 }
 
 export default function (context) {
-    const endpoint = ENDPOINTS[__ITER % ENDPOINTS.length];
+    const endpoint = ENDPOINTS[iterationIndex() % ENDPOINTS.length];
     const cachePath = cachePathForIteration();
     const variant = variantIndex(cachePath);
-    const response = http.get(endpointUrl(endpoint, context.userProjectId, variant), {
+    const parameterVariant = cachePath === 'long_tail' ? longTailSequenceIndex(variant) : variant;
+    const userProjectId = userProjectIdForVariant(endpoint, context.userProjectId, parameterVariant);
+    const response = http.get(endpointUrl(endpoint, userProjectId, parameterVariant), {
         headers: authorizationHeaders(context.token),
         tags: {
+            name: endpoint,
             endpoint,
             cache_mode: CACHE_MODE,
             workload_mode: WORKLOAD_MODE,

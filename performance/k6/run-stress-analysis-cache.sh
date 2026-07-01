@@ -23,7 +23,7 @@ CACHE_MODE="${CACHE_MODE:-enabled}"
 WORKLOAD_MODE="${WORKLOAD_MODE:-hot}"
 HOT_RATIO="${HOT_RATIO:-0.7}"
 HOT_VARIANTS="${HOT_VARIANTS:-9}"
-LONG_TAIL_VARIANTS="${LONG_TAIL_VARIANTS:-5000}"
+LONG_TAIL_VARIANTS="${LONG_TAIL_VARIANTS:-100000}"
 ROLE_COMBINATION_SIZE="${ROLE_COMBINATION_SIZE:-1}"
 RUN_LABEL="${RUN_LABEL:-analysis_cache}"
 RUN_LOCATION="${RUN_LOCATION:-internal}"
@@ -35,6 +35,7 @@ else
 fi
 ACCESS_TOKEN="${ACCESS_TOKEN:-}"
 USER_PROJECT_ID="${USER_PROJECT_ID:-}"
+USER_PROJECT_IDS="${USER_PROJECT_IDS:-$USER_PROJECT_ID}"
 LOGIN_EMAIL="${LOGIN_EMAIL:-frontend-demo@example.com}"
 LOGIN_PASSWORD="${LOGIN_PASSWORD:-password123}"
 REQUIRE_BACKEND_CACHE_ENABLED="${REQUIRE_BACKEND_CACHE_ENABLED:-true}"
@@ -42,6 +43,7 @@ RESET_REDIS_CACHE_BEFORE_RUN="${RESET_REDIS_CACHE_BEFORE_RUN:-true}"
 WARMUP_ROUNDS="${WARMUP_ROUNDS:-2}"
 WARMUP_VARIANTS="${WARMUP_VARIANTS:-$HOT_VARIANTS}"
 MIN_ANALYSIS_CACHE_HIT_DELTA="${MIN_ANALYSIS_CACHE_HIT_DELTA:-3}"
+MIN_COLD_CACHE_MISS_RATIO="${MIN_COLD_CACHE_MISS_RATIO:-0.95}"
 FAILURE_SAMPLE_BODY_LIMIT="${FAILURE_SAMPLE_BODY_LIMIT:-500}"
 K6_SCRIPT="${K6_SCRIPT:-performance/k6/stress-analysis-cache.js}"
 
@@ -85,6 +87,7 @@ echo "RUN_LOCATION=$RUN_LOCATION"
 echo "SUMMARY_FILE=$SUMMARY_FILE"
 echo "ACCESS_TOKEN=$([ -n "$ACCESS_TOKEN" ] && echo provided || echo empty)"
 echo "USER_PROJECT_ID=${USER_PROJECT_ID:-empty}"
+echo "USER_PROJECT_IDS=$([ -n "$USER_PROJECT_IDS" ] && echo provided || echo empty)"
 echo "LOGIN_EMAIL=$([ -n "$LOGIN_EMAIL" ] && echo provided || echo empty)"
 echo "LOGIN_PASSWORD=$([ -n "$LOGIN_PASSWORD" ] && echo provided || echo empty)"
 echo "REQUIRE_BACKEND_CACHE_ENABLED=$REQUIRE_BACKEND_CACHE_ENABLED"
@@ -92,7 +95,18 @@ echo "RESET_REDIS_CACHE_BEFORE_RUN=$RESET_REDIS_CACHE_BEFORE_RUN"
 echo "WARMUP_ROUNDS=$WARMUP_ROUNDS"
 echo "WARMUP_VARIANTS=$WARMUP_VARIANTS"
 echo "MIN_ANALYSIS_CACHE_HIT_DELTA=$MIN_ANALYSIS_CACHE_HIT_DELTA"
+echo "MIN_COLD_CACHE_MISS_RATIO=$MIN_COLD_CACHE_MISS_RATIO"
 echo "FAILURE_SAMPLE_BODY_LIMIT=$FAILURE_SAMPLE_BODY_LIMIT"
+
+csv_count() {
+    local value="$1"
+    if [[ -z "$value" ]]; then
+        printf "0"
+        return
+    fi
+
+    awk -F',' '{ print NF }' <<<"$value"
+}
 
 urlencode() {
     jq -rn --arg value "$1" '$value|@uri'
@@ -178,6 +192,15 @@ login() {
 
 resolve_user_project_id() {
     if [[ -n "$USER_PROJECT_ID" ]]; then
+        if [[ -z "$USER_PROJECT_IDS" ]]; then
+            USER_PROJECT_IDS="$USER_PROJECT_ID"
+        fi
+        return
+    fi
+
+    if [[ -n "$USER_PROJECT_IDS" ]]; then
+        IFS=',' read -r USER_PROJECT_ID _ <<<"$USER_PROJECT_IDS"
+        USER_PROJECT_ID="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' <<<"$USER_PROJECT_ID")"
         return
     fi
 
@@ -194,6 +217,8 @@ resolve_user_project_id() {
         echo "$me_body" >&2
         exit 1
     fi
+
+    USER_PROJECT_IDS="$USER_PROJECT_ID"
 }
 
 target_roles_query() {
@@ -318,6 +343,11 @@ if [[ ! "$WARMUP_VARIANTS" =~ ^[0-9]+$ || "$WARMUP_VARIANTS" -lt 1 ]]; then
     exit 1
 fi
 
+if ! awk "BEGIN { exit !($MIN_COLD_CACHE_MISS_RATIO >= 0 && $MIN_COLD_CACHE_MISS_RATIO <= 1) }"; then
+    echo "MIN_COLD_CACHE_MISS_RATIO must be between 0 and 1." >&2
+    exit 1
+fi
+
 if ! health_body="$(curl -fsS "$HEALTH_URL" 2>/dev/null)"; then
     echo "Backend health preflight failed: $HEALTH_URL" >&2
     echo "Full health response:" >&2
@@ -362,6 +392,7 @@ resolve_user_project_id
 
 echo "auth_preflight=ok"
 echo "resolved_user_project_id=$USER_PROJECT_ID"
+echo "resolved_user_project_ids_count=$(csv_count "$USER_PROJECT_IDS")"
 
 reset_redis_cache
 
@@ -421,6 +452,7 @@ if command -v k6 >/dev/null 2>&1; then
     BASE_URL="$BASE_URL" \
     ACCESS_TOKEN="$ACCESS_TOKEN" \
     USER_PROJECT_ID="$USER_PROJECT_ID" \
+    USER_PROJECT_IDS="$USER_PROJECT_IDS" \
     LOGIN_EMAIL="$LOGIN_EMAIL" \
     LOGIN_PASSWORD="$LOGIN_PASSWORD" \
     ENDPOINTS="$ENDPOINTS" \
@@ -449,6 +481,7 @@ else
         -e BASE_URL="$BASE_URL" \
         -e ACCESS_TOKEN="$ACCESS_TOKEN" \
         -e USER_PROJECT_ID="$USER_PROJECT_ID" \
+        -e USER_PROJECT_IDS="$USER_PROJECT_IDS" \
         -e LOGIN_EMAIL="$LOGIN_EMAIL" \
         -e LOGIN_PASSWORD="$LOGIN_PASSWORD" \
         -e ENDPOINTS="$ENDPOINTS" \
@@ -480,6 +513,11 @@ analysis_hits_final="$(cache_metric_sum hit)"
 analysis_misses_final="$(cache_metric_sum miss)"
 analysis_hits_run_delta=$((analysis_hits_final - analysis_hits_after))
 analysis_misses_run_delta=$((analysis_misses_final - analysis_misses_after))
+summary_http_reqs="$(jq -r '.metrics.http_reqs.count // .metrics.http_reqs.value // 0' "$summary_path")"
+summary_http_reqs="${summary_http_reqs%.*}"
+if [[ -z "$summary_http_reqs" || ! "$summary_http_reqs" =~ ^[0-9]+$ ]]; then
+    summary_http_reqs=0
+fi
 
 echo
 echo "Analysis cache stress test completed."
@@ -488,3 +526,22 @@ echo "analysis_cache_hits_final=$analysis_hits_final"
 echo "analysis_cache_hits_run_delta=$analysis_hits_run_delta"
 echo "analysis_cache_misses_final=$analysis_misses_final"
 echo "analysis_cache_misses_run_delta=$analysis_misses_run_delta"
+echo "summary_http_reqs=$summary_http_reqs"
+
+if [[ "$CACHE_MODE" == "enabled" && "$WORKLOAD_MODE" == "cold" ]]; then
+    if ((summary_http_reqs == 0)); then
+        echo "Cold cache validation failed: summary_http_reqs is 0." >&2
+        exit 1
+    fi
+
+    cold_miss_ratio="$(awk -v misses="$analysis_misses_run_delta" -v requests="$summary_http_reqs" 'BEGIN { printf "%.6f", misses / requests }')"
+    echo "analysis_cache_cold_miss_ratio=$cold_miss_ratio"
+
+    if ! awk -v ratio="$cold_miss_ratio" -v min="$MIN_COLD_CACHE_MISS_RATIO" 'BEGIN { exit !(ratio >= min) }'; then
+        echo "Cold cache validation failed: expected miss ratio >= ${MIN_COLD_CACHE_MISS_RATIO}, got ${cold_miss_ratio}." >&2
+        echo "This run is not a pure miss boundary. Increase USER_PROJECT_IDS, ROLE_COMBINATION_SIZE, TARGET_ROLES, LIMIT_VALUES, or lower TARGET_RPS/DURATION." >&2
+        exit 1
+    fi
+
+    echo "analysis_cache_cold_validation=ok"
+fi
