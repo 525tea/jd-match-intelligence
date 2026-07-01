@@ -40,6 +40,9 @@ class DlqRetryControllerTest {
     @MockitoBean
     private KafkaDlqRetryService kafkaDlqRetryService;
 
+    @MockitoBean
+    private DlqMessageService dlqMessageService;
+
     @Test
     @DisplayName("DLQ 재처리 성공 시 target topic/key를 반환한다")
     void retry() throws Exception {

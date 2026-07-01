@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 import jobflow.domain.analytics.AnalyticsTrendService;
 import jobflow.domain.job.JobService;
+import jobflow.domain.outbox.DlqMessageService;
 import jobflow.domain.outbox.DlqRetryRequest;
 import jobflow.domain.outbox.DlqRetryResponse;
 import jobflow.domain.outbox.KafkaDlqRetryService;
@@ -59,6 +60,9 @@ class ApiAuthorizationMatrixIntegrationTest {
 
     @MockitoBean
     private KafkaDlqRetryService kafkaDlqRetryService;
+
+    @MockitoBean
+    private DlqMessageService dlqMessageService;
 
     @Test
     @DisplayName("PUBLIC API는 토큰 없이 호출할 수 있다")
