@@ -29,6 +29,7 @@ import jobflow.global.error.exception.BusinessException;
 import jobflow.global.error.exception.EntityNotFoundException;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -68,8 +69,10 @@ public class JdMatchService {
     @Cacheable(
             cacheNames = CacheNames.JD_MATCH,
             key = "T(jobflow.domain.matching.JdMatchService).jdMatchCacheKey("
-                    + "#userId, #userProjectId, #targetRoles, #targetCareerLevel, #limit)"
+                    + "#userId, #userProjectId, #targetRoles, #targetCareerLevel, #limit)",
+            sync = true
     )
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<JdJobMatchResponse> findProjectJobMatches(
             Long userId,
             Long userProjectId,

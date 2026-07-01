@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.support.NoOpCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
@@ -27,6 +28,10 @@ public class CacheConfig {
             RedisConnectionFactory redisConnectionFactory,
             JobFlowCacheProperties cacheProperties
     ) {
+        if (!cacheProperties.enabled()) {
+            return new NoOpCacheManager();
+        }
+
         return RedisCacheManager.builder(redisConnectionFactory)
                 .cacheDefaults(cacheConfiguration(DEFAULT_CACHE_TTL))
                 .withInitialCacheConfigurations(cacheConfigurations(cacheProperties))

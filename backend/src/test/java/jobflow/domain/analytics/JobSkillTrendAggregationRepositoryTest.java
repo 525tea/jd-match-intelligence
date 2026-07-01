@@ -2,6 +2,7 @@ package jobflow.domain.analytics;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import jobflow.domain.job.CareerLevel;
@@ -55,9 +56,10 @@ class JobSkillTrendAggregationRepositoryTest {
         jobSkillRepository.save(JobSkill.create(platformJob, redis, RequirementType.REQUIRED));
         jobSkillRepository.flush();
 
+        LocalDate periodStart = currentPeriodStart();
         List<JobSkillTrendAggregate> aggregates = jobSkillRepository.aggregateSkillTrends(
-                LocalDateTime.of(2026, 6, 1, 0, 0),
-                LocalDateTime.of(2026, 7, 1, 0, 0)
+                periodStart.atStartOfDay(),
+                periodStart.plusMonths(1).atStartOfDay()
         );
 
         assertThat(aggregates).hasSize(2);
@@ -70,6 +72,10 @@ class JobSkillTrendAggregationRepositoryTest {
         assertThat(aggregates.get(1).jobCount()).isEqualTo(1);
         assertThat(aggregates.get(1).requiredCount()).isEqualTo(1);
         assertThat(aggregates.get(1).preferredCount()).isEqualTo(0);
+    }
+
+    private LocalDate currentPeriodStart() {
+        return LocalDate.now().withDayOfMonth(1);
     }
 
     private Job createJob(String externalId) {

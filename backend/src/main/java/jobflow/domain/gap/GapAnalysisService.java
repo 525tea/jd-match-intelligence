@@ -14,6 +14,7 @@ import jobflow.domain.project.ProjectSkillSnapshotService;
 import jobflow.global.cache.CacheNames;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -38,8 +39,10 @@ public class GapAnalysisService {
 
     @Cacheable(
             cacheNames = CacheNames.GAP_ANALYSIS,
-            key = "T(jobflow.domain.gap.GapAnalysisService).gapAnalysisCacheKey(#userId, #userProjectId, #targetRoles, #limit)"
+            key = "T(jobflow.domain.gap.GapAnalysisService).gapAnalysisCacheKey(#userId, #userProjectId, #targetRoles, #limit)",
+            sync = true
     )
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public GapAnalysisResponse analyzeProjectSkillGap(
             Long userId,
             Long userProjectId,

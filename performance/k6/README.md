@@ -458,6 +458,87 @@ SUMMARY_FILE=260630_k6_analysis_cache_enabled_200vu.json \
 bash performance/k6/run-stress-analysis-cache.sh
 ```
 
+### Analysis API Cache Capacity / Hit-rate Rework
+
+기존 before/after 200VU 테스트는 캐시 hit 여부는 확인했지만, 요청 pacing이 낮고 cache key cardinality가 작아 latency 개선 스토리로 쓰기 어렵다. 리워크 시나리오는 다음 네 가지를 분리한다.
+
+- `CACHE_MODE=disabled`: 서버 캐시를 끈 no-cache baseline. Redis가 아니라 실제 분석 API cold path 비용을 본다.
+- `WORKLOAD_MODE=hot`: 작은 hot keyspace를 warm-up한 뒤 Redis cache hit 처리량을 본다.
+- `WORKLOAD_MODE=mixed`: hot key와 role/career/limit 조합 기반 long-tail key를 섞어 hit-rate가 흔들릴 때의 p95/p99, HikariCP, error rate를 본다.
+- `WORKLOAD_MODE=cold`: long-tail keyspace 위주로 요청한다. 유효한 API 파라미터 조합 안에서 cold-ish miss burst를 만들기 위한 모드이며, 완전한 no-cache baseline은 `CACHE_MODE=disabled`로 측정한다.
+
+캐시 keyspace는 실제 API가 받는 `targetRoles`, `targetCareerLevel`, `limit` 조합으로만 넓힌다. 테스트용 더미 query parameter를 붙여 cache key를 속이지 않는다.
+
+hot-cache capacity 예시:
+
+```bash
+CACHE_MODE=enabled \
+WORKLOAD_MODE=hot \
+TARGET_RPS=1000 \
+DURATION=2m \
+PRE_ALLOCATED_VUS=800 \
+MAX_VUS=4000 \
+HOT_VARIANTS=9 \
+WARMUP_VARIANTS=9 \
+ROLE_COMBINATION_SIZE=2 \
+LIMIT_VALUES=10,20,30,40,50 \
+SUMMARY_FILE=260701_k6_analysis_cache_hot_1000rps.json \
+bash performance/k6/run-stress-analysis-cache.sh
+```
+
+mixed hit-rate 예시:
+
+```bash
+CACHE_MODE=enabled \
+WORKLOAD_MODE=mixed \
+HOT_RATIO=0.7 \
+TARGET_RPS=1000 \
+DURATION=2m \
+PRE_ALLOCATED_VUS=1200 \
+MAX_VUS=5000 \
+HOT_VARIANTS=9 \
+LONG_TAIL_VARIANTS=5000 \
+WARMUP_VARIANTS=9 \
+ROLE_COMBINATION_SIZE=2 \
+LIMIT_VALUES=10,20,30,40,50 \
+SUMMARY_FILE=260701_k6_analysis_cache_mixed_70_hot_1000rps.json \
+bash performance/k6/run-stress-analysis-cache.sh
+```
+
+no-cache baseline 예시:
+
+```bash
+CACHE_MODE=disabled \
+WORKLOAD_MODE=hot \
+TARGET_RPS=500 \
+DURATION=2m \
+PRE_ALLOCATED_VUS=800 \
+MAX_VUS=4000 \
+HOT_VARIANTS=9 \
+ROLE_COMBINATION_SIZE=2 \
+LIMIT_VALUES=10,20,30,40,50 \
+SUMMARY_FILE=260701_k6_analysis_cache_disabled_500rps.json \
+bash performance/k6/run-stress-analysis-cache.sh
+```
+
+주요 옵션:
+
+- `TARGET_RPS`: 값이 있으면 k6 `constant-arrival-rate`로 실행한다. 비우면 기존 `VUS`/`DURATION` 방식이다.
+- `WORKLOAD_MODE`: `hot`, `mixed`, `cold`
+- `HOT_RATIO`: `mixed`에서 hot key 비율. 예: `0.7`
+- `HOT_VARIANTS`: warm-up하고 반복 조회할 hot key 개수
+- `LONG_TAIL_VARIANTS`: mixed/cold에서 사용할 long-tail variant 범위
+- `ROLE_COMBINATION_SIZE`: cache key를 넓히기 위해 한 요청에 넣을 role 개수
+- `LIMIT_VALUES`: cache key와 응답 payload 크기를 함께 흔들 limit 목록
+- `WARMUP_VARIANTS`: 실행 전 warm-up할 hot variant 개수
+
+확인할 지표:
+
+- k6 `http_reqs.rate`, `http_req_duration p(95)/p(99)`, `dropped_iterations`, `http_req_failed`
+- Grafana `/gap-analysis`, `/projects/{userProjectId}/job-matches`, `/recommendations/jobs` request rate/latency
+- Redis `gapAnalysis`, `jdMatch`, `jobRecommendation` cache hit/miss delta
+- HikariCP active/pending, JVM heap, error rate
+
 기본값:
 
 - `BASE_URL=http://localhost:8080`

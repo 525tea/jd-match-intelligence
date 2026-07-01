@@ -22,6 +22,7 @@ import jobflow.domain.userjob.UserJobStatus;
 import jobflow.global.cache.CacheNames;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -53,8 +54,10 @@ public class JobRecommendationService {
 
     @Cacheable(
             cacheNames = CacheNames.JOB_RECOMMENDATION,
-            key = "T(jobflow.domain.recommendation.JobRecommendationService).recommendationCacheKey(#userId, #userProjectId, #targetRoles, #limit)"
+            key = "T(jobflow.domain.recommendation.JobRecommendationService).recommendationCacheKey(#userId, #userProjectId, #targetRoles, #limit)",
+            sync = true
     )
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<JobRecommendationResponse> recommendJobs(
             Long userId,
             Long userProjectId,

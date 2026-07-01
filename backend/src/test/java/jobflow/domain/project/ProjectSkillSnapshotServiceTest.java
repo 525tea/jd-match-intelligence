@@ -3,12 +3,13 @@ package jobflow.domain.project;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.List;
-import java.util.Optional;
 import jobflow.global.error.ErrorCode;
 import jobflow.global.error.exception.EntityNotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -19,16 +20,12 @@ class ProjectSkillSnapshotServiceTest {
     private final UserProjectRepository userProjectRepository =
             mock(UserProjectRepository.class);
 
-    private final UserProjectAnalysisRepository userProjectAnalysisRepository =
-            mock(UserProjectAnalysisRepository.class);
-
     private final UserProjectSkillRepository userProjectSkillRepository =
             mock(UserProjectSkillRepository.class);
 
     private final ProjectSkillSnapshotService projectSkillSnapshotService =
             new ProjectSkillSnapshotService(
                     userProjectRepository,
-                    userProjectAnalysisRepository,
                     userProjectSkillRepository
             );
 
@@ -37,20 +34,13 @@ class ProjectSkillSnapshotServiceTest {
     void findLatestSkillIds() {
         Long userId = 1L;
         Long userProjectId = 10L;
-        UserProjectAnalysis analysis = mock(UserProjectAnalysis.class);
-        given(analysis.getId()).willReturn(100L);
-        given(userProjectRepository.existsByIdAndUserId(userProjectId, userId))
-                .willReturn(true);
-        given(userProjectAnalysisRepository
-                .findFirstByUserProjectIdAndUserProjectUserIdOrderByAnalyzedAtDescIdDesc(userProjectId, userId)
-        ).willReturn(Optional.of(analysis));
-        given(userProjectSkillRepository.findDistinctSkillIdsByAnalysisId(100L))
+        given(userProjectSkillRepository.findDistinctSkillIdsByLatestOwnedProjectAnalysis(userId, userProjectId))
                 .willReturn(List.of(1L, 2L, 3L));
 
         List<Long> skillIds = projectSkillSnapshotService.findLatestSkillIds(userId, userProjectId);
 
         assertThat(skillIds).containsExactly(1L, 2L, 3L);
-        verify(userProjectSkillRepository).findDistinctSkillIdsByAnalysisId(100L);
+        verifyNoInteractions(userProjectRepository);
     }
 
     @Test
@@ -58,16 +48,14 @@ class ProjectSkillSnapshotServiceTest {
     void findLatestSkillIdsWithoutAnalysis() {
         Long userId = 1L;
         Long userProjectId = 10L;
+        given(userProjectSkillRepository.findDistinctSkillIdsByLatestOwnedProjectAnalysis(userId, userProjectId))
+                .willReturn(List.of());
         given(userProjectRepository.existsByIdAndUserId(userProjectId, userId))
                 .willReturn(true);
-        given(userProjectAnalysisRepository
-                .findFirstByUserProjectIdAndUserProjectUserIdOrderByAnalyzedAtDescIdDesc(userProjectId, userId)
-        ).willReturn(Optional.empty());
 
         List<Long> skillIds = projectSkillSnapshotService.findLatestSkillIds(userId, userProjectId);
 
         assertThat(skillIds).isEmpty();
-        verifyNoInteractions(userProjectSkillRepository);
     }
 
     @Test
@@ -75,6 +63,8 @@ class ProjectSkillSnapshotServiceTest {
     void findLatestSkillIdsWithoutOwnedProject() {
         Long userId = 1L;
         Long userProjectId = 10L;
+        given(userProjectSkillRepository.findDistinctSkillIdsByLatestOwnedProjectAnalysis(userId, userProjectId))
+                .willReturn(List.of());
         given(userProjectRepository.existsByIdAndUserId(userProjectId, userId))
                 .willReturn(false);
 
@@ -83,7 +73,6 @@ class ProjectSkillSnapshotServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.USER_PROJECT_NOT_FOUND);
 
-        verifyNoInteractions(userProjectAnalysisRepository, userProjectSkillRepository);
     }
 
     @Test
@@ -92,6 +81,7 @@ class ProjectSkillSnapshotServiceTest {
         assertThat(projectSkillSnapshotService.findLatestSkillIds(null, 10L)).isEmpty();
         assertThat(projectSkillSnapshotService.findLatestSkillIds(1L, null)).isEmpty();
 
-        verifyNoInteractions(userProjectRepository, userProjectAnalysisRepository, userProjectSkillRepository);
+        verify(userProjectSkillRepository, never()).findDistinctSkillIdsByLatestOwnedProjectAnalysis(anyLong(), anyLong());
+        verifyNoInteractions(userProjectRepository);
     }
 }

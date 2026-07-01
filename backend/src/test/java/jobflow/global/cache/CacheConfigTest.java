@@ -13,6 +13,7 @@ import jobflow.domain.skill.SkillCategory;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.support.NoOpCacheManager;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -41,6 +42,25 @@ class CacheConfigTest {
         CacheManager cacheManager = cacheConfig.cacheManager(redisConnectionFactory, defaultProperties());
 
         assertThat(cacheManager).isInstanceOf(RedisCacheManager.class);
+    }
+
+    @Test
+    @DisplayName("캐시가 비활성화되면 NoOp CacheManager를 생성한다")
+    void createsNoOpCacheManagerWhenDisabled() {
+        RedisConnectionFactory redisConnectionFactory = mock(RedisConnectionFactory.class);
+        JobFlowCacheProperties disabledProperties = new JobFlowCacheProperties(
+                false,
+                Duration.ofMinutes(5),
+                Duration.ofHours(6),
+                Duration.ofMinutes(30),
+                Duration.ofMinutes(30),
+                Duration.ofMinutes(10),
+                Duration.ofHours(1)
+        );
+
+        CacheManager cacheManager = cacheConfig.cacheManager(redisConnectionFactory, disabledProperties);
+
+        assertThat(cacheManager).isInstanceOf(NoOpCacheManager.class);
     }
 
     @Test

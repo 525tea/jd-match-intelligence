@@ -150,8 +150,8 @@ class JwtAuthenticationIntegrationTest {
     }
 
     @Test
-    @DisplayName("삭제된 사용자 id가 담긴 JWT로 보호 API 요청 시 401 공통 ErrorResponse를 반환한다")
-    void requestProtectedApiWithDeletedUserToken() throws Exception {
+    @DisplayName("JWT 인증은 사용자 DB 조회 없이 claim 기반 UserPrincipal을 만든다")
+    void requestProtectedApiWithStatelessJwtClaims() throws Exception {
         User user = saveLocalUser("deleted-user-token@example.com");
         String accessToken = jwtTokenProvider.createAccessToken(user);
 
@@ -160,10 +160,12 @@ class JwtAuthenticationIntegrationTest {
 
         mockMvc.perform(get("/auth/me")
                         .header(HttpHeaders.AUTHORIZATION, bearer(accessToken)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("COMMON_UNAUTHORIZED"))
-                .andExpect(jsonPath("$.error.message").value("인증이 필요합니다."));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(user.getId()))
+                .andExpect(jsonPath("$.data.email").value("deleted-user-token@example.com"))
+                .andExpect(jsonPath("$.data.name").value("테스트"))
+                .andExpect(jsonPath("$.data.role").value("USER"));
     }
 
     @Test

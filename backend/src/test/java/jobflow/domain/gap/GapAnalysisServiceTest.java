@@ -19,6 +19,8 @@ import jobflow.global.cache.CacheNames;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 class GapAnalysisServiceTest {
 
@@ -115,6 +117,18 @@ class GapAnalysisServiceTest {
 
         assertThat(cacheable.cacheNames()).containsExactly(CacheNames.GAP_ANALYSIS);
         assertThat(cacheable.key()).contains("gapAnalysisCacheKey");
+        assertThat(cacheable.sync()).isTrue();
+    }
+
+    @Test
+    @DisplayName("갭 분석 캐시 hit 경로는 DB 트랜잭션을 열지 않는다")
+    void analyzeProjectSkillGapDoesNotOpenTransactionOnCacheHit() throws NoSuchMethodException {
+        Transactional transactional = GapAnalysisService.class
+                .getMethod("analyzeProjectSkillGap", Long.class, Long.class, java.util.Collection.class, int.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.propagation()).isEqualTo(Propagation.NOT_SUPPORTED);
     }
 
     @Test
