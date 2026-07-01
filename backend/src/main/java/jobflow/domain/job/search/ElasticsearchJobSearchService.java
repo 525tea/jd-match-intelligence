@@ -25,8 +25,9 @@ public class ElasticsearchJobSearchService {
     private static final float ROLE_INTENT_BOOST = 2.8f;
     private static final float CAREER_INTENT_BOOST = 1.8f;
     private static final float LOCATION_INTENT_BOOST = 1.4f;
-    private static final double ROLE_INTENT_WEIGHT = 18.0;
+    private static final double ROLE_INTENT_WEIGHT = 24.0;
     private static final double REQUIRED_SKILL_WEIGHT = 8.0;
+    private static final double FRAMEWORK_SKILL_WEIGHT = 22.0;
     private static final String DEADLINE_AT_FIELD = "deadlineAt";
     private static final String CREATED_AT_FIELD = "createdAt";
 
@@ -109,9 +110,17 @@ public class ElasticsearchJobSearchService {
         return intent.requiredSkillKeywords().stream()
                 .map(skillKeyword -> FunctionScore.of(functionScore -> functionScore
                         .filter(requiredSkillKeywordQuery(skillKeyword))
-                        .weight(REQUIRED_SKILL_WEIGHT)
+                        .weight(requiredSkillWeight(skillKeyword))
                 ))
                 .toList();
+    }
+
+    private double requiredSkillWeight(String skillKeyword) {
+        return switch (skillKeyword) {
+            case "Django", "FastAPI", "Flask", "Fiber", "Gin", ".NET", "ASP.NET", "Spring Boot", "MLOps" ->
+                    FRAMEWORK_SKILL_WEIGHT;
+            default -> REQUIRED_SKILL_WEIGHT;
+        };
     }
 
     private Query searchQuery(String keyword, List<String> expandedKeywords, JobSearchIntent intent) {

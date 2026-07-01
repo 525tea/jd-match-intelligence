@@ -291,6 +291,36 @@ QUERY_CASES: tuple[QueryCase, ...] = (
 )
 
 
+MANUAL_RELEVANCE_GRADES: dict[tuple[str, str], int] = {
+    # Python Django: audit top results that are Python/backend adjacent but not Django-specific enough.
+    ("Python Django", "1583"): 1,
+    ("Python Django", "1688"): 2,
+    ("Python Django", "1691"): 2,
+    ("Python Django", "1693"): 2,
+
+    # Go Fiber: current corpus mostly has Go/Gin backend jobs, not explicit Fiber jobs.
+    ("Go Fiber", "2131"): 2,
+    ("Go Fiber", "2180"): 2,
+    ("Go Fiber", "2229"): 2,
+    ("Go Fiber", "2232"): 2,
+    ("Go Fiber", "2283"): 2,
+    ("Go Fiber", "2348"): 2,
+    ("Go Fiber", "412"): 2,
+    ("Go Fiber", "1888"): 2,
+    ("Go Fiber", "1818"): 2,
+    ("Go Fiber", "1685"): 2,
+
+    # MLOps: title-level MLOps platform/data roles are highly relevant even when source role is DATA_ENGINEER.
+    ("mlops 엔지니어", "1647"): 3,
+
+    # LLM Python: Generative AI role alone is weaker when the title is not engineer-oriented.
+    ("LLM Python 엔지니어", "334"): 2,
+
+    # .NET: AI big-data research is only weakly related to .NET developer search despite detail text matches.
+    (".NET 개발자", "2105"): 1,
+}
+
+
 TOKEN_PATTERN = re.compile(r"[a-z0-9+#.]+|[가-힣]+", re.IGNORECASE)
 
 
@@ -461,6 +491,11 @@ def relevance_grade(query: QueryCase, job: dict[str, Any], detail: dict[str, Any
     return 0
 
 
+def manual_relevance_grade(query: QueryCase, job: dict[str, Any]) -> int | None:
+    job_id = str(job.get("id") or "")
+    return MANUAL_RELEVANCE_GRADES.get((query.keyword, job_id))
+
+
 def dcg(grades: list[int]) -> float:
     return sum((2**grade - 1) / math.log2(index + 2) for index, grade in enumerate(grades))
 
@@ -517,6 +552,7 @@ def csv_row(run_label: str, ranking: str, query: QueryCase, rank: int, item: dic
         "location_city": job.get("locationCity", ""),
         "score": job.get("score", ""),
         "relevance_grade": item["relevance_grade"],
+        "label_source": item["label_source"],
         "skill_tfidf_score": f"{item['skill_tfidf_score']:.6f}",
     }
 
@@ -572,11 +608,15 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
         evaluated = []
         for index, job in enumerate(jobs):
+            manual_grade = manual_relevance_grade(query, job)
             evaluated.append(
                 {
                     "job": job,
                     "original_rank": index + 1,
-                    "relevance_grade": relevance_grade(query, job, details_by_id.get(job.get("id"), {})),
+                    "relevance_grade": manual_grade
+                    if manual_grade is not None
+                    else relevance_grade(query, job, details_by_id.get(job.get("id"), {})),
+                    "label_source": "manual_audit" if manual_grade is not None else "rule",
                     "skill_tfidf_score": scores[index] if index < len(scores) else 0.0,
                 }
             )
@@ -599,6 +639,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             baseline_metric_key: round(baseline_ndcg, 4),
             reranked_metric_key: round(reranked_ndcg, 4),
             "delta": round(reranked_ndcg - baseline_ndcg, 4),
+            "manual_label_count": sum(1 for item in evaluated if item["label_source"] == "manual_audit"),
             "top_relevance_grades": baseline_grades[: args.limit],
             "reranked_top_relevance_grades": reranked_grades[: args.limit],
         }
@@ -640,6 +681,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         baseline_mean_metric_key: round(baseline_average, 4),
         reranked_mean_metric_key: round(reranked_average, 4),
         "mean_delta": round(reranked_average - baseline_average, 4),
+        "manual_label_count": sum(item["manual_label_count"] for item in query_summaries),
         "categories": category_summaries,
         "queries": query_summaries,
     }
@@ -653,6 +695,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     print(f"{baseline_mean_metric_key}={summary[baseline_mean_metric_key]:.4f}")
     print(f"{reranked_mean_metric_key}={summary[reranked_mean_metric_key]:.4f}")
     print(f"mean_delta={summary['mean_delta']:+.4f}")
+    print(f"manual_label_count={summary['manual_label_count']}")
     print("category_means=" + json.dumps(category_summaries, ensure_ascii=False))
     if args.output_file:
         print(f"csv_output={args.output_file}")

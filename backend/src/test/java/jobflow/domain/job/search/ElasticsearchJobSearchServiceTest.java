@@ -322,7 +322,7 @@ class ElasticsearchJobSearchServiceTest {
                 .isEqualTo("role");
         assertThat(queryCaptor.getValue().getQuery().functionScore().functions().getFirst().filter().term().value().stringValue())
                 .isEqualTo("BACKEND");
-        assertThat(queryCaptor.getValue().getQuery().functionScore().functions().getFirst().weight()).isEqualTo(18.0);
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions().getFirst().weight()).isEqualTo(24.0);
     }
 
     @Test
@@ -447,6 +447,12 @@ class ElasticsearchJobSearchServiceTest {
                 .filteredOn(function -> function.filter() != null && function.filter().isMultiMatch())
                 .extracting(function -> function.filter().multiMatch().query())
                 .containsExactlyInAnyOrder("Go", "Fiber");
+        assertThat(queryCaptor.getValue().getQuery().functionScore().functions())
+                .filteredOn(function -> function.filter() != null
+                        && function.filter().isMultiMatch()
+                        && function.filter().multiMatch().query().equals("Fiber"))
+                .singleElement()
+                .satisfies(function -> assertThat(function.weight()).isEqualTo(22.0));
     }
 
     @Test

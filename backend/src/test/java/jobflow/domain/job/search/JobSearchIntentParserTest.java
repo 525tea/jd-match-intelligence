@@ -132,6 +132,15 @@ class JobSearchIntentParserTest {
     }
 
     @Test
+    @DisplayName("MLOps 검색어는 MLOps role과 명시 skill로 함께 해석한다")
+    void parseMlopsAsRoleAndRequiredSkill() {
+        JobSearchIntent intent = parser.parse("mlops 엔지니어");
+
+        assertThat(intent.roles()).containsExactlyInAnyOrder(JobRole.ML_ENGINEER, JobRole.MLOPS);
+        assertThat(intent.requiredSkillKeywords()).containsExactly("MLOps");
+    }
+
+    @Test
     @DisplayName("AI 엔지니어 검색어는 AI 계열 role 의도로 확장한다")
     void parseAiEngineerRoles() {
         JobSearchIntent intent = parser.parse("AI 엔지니어");
