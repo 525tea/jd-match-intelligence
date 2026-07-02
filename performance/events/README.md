@@ -225,6 +225,8 @@ Debezium outbox CDC smoke completed.
 검증 포인트:
 
 - API 500VU / 5분 기준 p95, p99, error rate
+- Debezium 비교 run은 기본적으로 `jobs_search,recommendations_jobs,gap_analysis` read workload를 사용한다. `/jobs` 목록 조회는 500VU에서 DB connection pool을 먼저 고갈시키는 별도 endpoint 병목으로 확인되어, CDC publish 경로 비교를 오염시키지 않기 위해 제외한다.
+- Debezium 비교 run은 `K6_SCENARIO_MODE=ramping-vus`, `ENDPOINT_ORDER_MODE=rotated`를 기본값으로 사용한다. 500 VU가 첫 iteration에서 같은 endpoint를 동시에 치면 CDC 비교가 아니라 endpoint stampede 테스트가 되기 때문이다.
 - Outbox 대량 이벤트 처리 수
 - `processed_kafka_events` 처리 수
 - Kafka consumer lag: `kafka-consumer-groups --describe` snapshot과 Prometheus `kafka_consumergroup_lag`
@@ -263,7 +265,13 @@ k6-runner 서버:
 MODE=debezium-cdc-after \
 PHASE=k6-only \
 DEBEZIUM_K6_RUN_ID=<prepare에서 사용한 run id> \
-BASE_URL=http://172.31.63.104:8080/api \
+BASE_URL=http://172.31.63.104:8080 \
+K6_SCENARIO_MODE=ramping-vus \
+RAMP_UP_DURATION=2m \
+STEADY_DURATION=3m \
+RAMP_DOWN_DURATION=30s \
+ENDPOINT_ORDER_MODE=rotated \
+ENDPOINTS=jobs_search,recommendations_jobs,gap_analysis \
 bash performance/debezium/run-debezium-k6-comparison.sh
 ```
 

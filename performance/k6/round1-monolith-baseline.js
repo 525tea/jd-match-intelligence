@@ -20,6 +20,11 @@ const SLEEP_SECONDS = Number(__ENV.SLEEP_SECONDS || 1);
 const EXPECT_PERF_FIXTURE = (__ENV.EXPECT_PERF_FIXTURE || 'true') !== 'false';
 const REQUIRE_AUTH_ENDPOINTS = (__ENV.REQUIRE_AUTH_ENDPOINTS || 'true') !== 'false';
 const FAILURE_SAMPLE_BODY_LIMIT = Number(__ENV.FAILURE_SAMPLE_BODY_LIMIT || 500);
+const ENDPOINT_ORDER_MODE = (__ENV.ENDPOINT_ORDER_MODE || 'fixed').trim();
+const K6_SCENARIO_MODE = (__ENV.K6_SCENARIO_MODE || 'constant-vus').trim();
+const RAMP_UP_DURATION = __ENV.RAMP_UP_DURATION || '2m';
+const STEADY_DURATION = __ENV.STEADY_DURATION || __ENV.DURATION || '3m';
+const RAMP_DOWN_DURATION = __ENV.RAMP_DOWN_DURATION || '30s';
 
 const httpStatusCodes = new Counter('jobflow_http_status_codes');
 const failedResponses = new Counter('jobflow_failed_responses');
@@ -29,19 +34,55 @@ function endpointEnabled(endpoint) {
     return ENDPOINTS.includes(endpoint);
 }
 
-export const options = {
-    vus: Number(__ENV.VUS || 20),
-    duration: __ENV.DURATION || '10m',
-    summaryTrendStats: ['avg', 'min', 'med', 'p(50)', 'p(90)', 'p(95)', 'p(99)', 'max'],
-    thresholds: {
-        checks: ['rate>0.95'],
-        http_req_failed: ['rate<0.02'],
-        'http_req_duration{endpoint:jobs_list}': ['p(95)<1500'],
-        'http_req_duration{endpoint:jobs_search}': ['p(95)<2000'],
-        'http_req_duration{endpoint:recommendations_jobs}': ['p(95)<3000'],
-        'http_req_duration{endpoint:gap_analysis}': ['p(95)<3000'],
-    },
-};
+function orderedEndpoints() {
+    if (ENDPOINTS.length === 0 || ENDPOINT_ORDER_MODE === 'fixed') {
+        return ENDPOINTS;
+    }
+
+    if (ENDPOINT_ORDER_MODE !== 'rotated') {
+        fail(`Unsupported ENDPOINT_ORDER_MODE=${ENDPOINT_ORDER_MODE}. Use fixed or rotated.`);
+    }
+
+    const vuIndex = typeof __VU === 'undefined' ? 0 : __VU - 1;
+    const start = (vuIndex + __ITER) % ENDPOINTS.length;
+    return ENDPOINTS.slice(start).concat(ENDPOINTS.slice(0, start));
+}
+
+function createOptions() {
+    const baseOptions = {
+        vus: Number(__ENV.VUS || 20),
+        duration: __ENV.DURATION || '10m',
+        summaryTrendStats: ['avg', 'min', 'med', 'p(50)', 'p(90)', 'p(95)', 'p(99)', 'max'],
+        thresholds: {
+            checks: ['rate>0.95'],
+            http_req_failed: ['rate<0.02'],
+            'http_req_duration{endpoint:jobs_list}': ['p(95)<1500'],
+            'http_req_duration{endpoint:jobs_search}': ['p(95)<2000'],
+            'http_req_duration{endpoint:recommendations_jobs}': ['p(95)<3000'],
+            'http_req_duration{endpoint:gap_analysis}': ['p(95)<3000'],
+        },
+    };
+
+    if (K6_SCENARIO_MODE === 'constant-vus') {
+        return baseOptions;
+    }
+
+    if (K6_SCENARIO_MODE !== 'ramping-vus') {
+        fail(`Unsupported K6_SCENARIO_MODE=${K6_SCENARIO_MODE}. Use constant-vus or ramping-vus.`);
+    }
+
+    const { vus, duration, ...rampingOptions } = baseOptions;
+    return {
+        ...rampingOptions,
+        stages: [
+            { duration: RAMP_UP_DURATION, target: vus },
+            { duration: STEADY_DURATION, target: vus },
+            { duration: RAMP_DOWN_DURATION, target: 0 },
+        ],
+    };
+}
+
+export const options = createOptions();
 
 function authorizationHeaders(token) {
     if (!token) {
@@ -203,55 +244,59 @@ export default function (context) {
     const page = __ITER % 5;
     const headers = authorizationHeaders(context.token);
 
-    if (endpointEnabled('jobs_list')) {
-        const listResponse = http.get(`${BASE_URL}/jobs?page=${page}&size=${PAGE_SIZE}`, {
-            tags: {
-                endpoint: 'jobs_list',
-            },
-        });
-        observeResponse('jobs_list', listResponse);
-
-        check(listResponse, {
-            'jobs list status is 200': (res) => res.status === 200,
-            'jobs list returns data array': (res) => {
-                try {
-                    return Array.isArray(res.json('data'));
-                } catch {
-                    return false;
-                }
-            },
-            'jobs list uses performance fixture': hasPerformanceFixtureRows,
-        });
-    }
-
-    if (endpointEnabled('jobs_search')) {
-        const searchResponse = http.get(
-            `${BASE_URL}/jobs/search?keyword=${encodeURIComponent(keyword)}&limit=${SEARCH_LIMIT}`,
-            {
+    for (const endpoint of orderedEndpoints()) {
+        if (endpoint === 'jobs_list') {
+            const listResponse = http.get(`${BASE_URL}/jobs?page=${page}&size=${PAGE_SIZE}`, {
                 tags: {
-                    endpoint: 'jobs_search',
-                    keyword,
+                    endpoint: 'jobs_list',
                 },
-            },
-        );
-        observeResponse('jobs_search', searchResponse);
+            });
+            observeResponse('jobs_list', listResponse);
 
-        check(searchResponse, {
-            'jobs search status is 200': (res) => res.status === 200,
-            'jobs search success is true': (res) => res.status === 200 && res.json('success') === true,
-            'jobs search returns data array': (res) => {
-                try {
-                    return Array.isArray(res.json('data'));
-                } catch {
-                    return false;
-                }
-            },
-            'jobs search uses performance fixture': hasPerformanceFixtureRows,
-        });
-    }
+            check(listResponse, {
+                'jobs list status is 200': (res) => res.status === 200,
+                'jobs list returns data array': (res) => {
+                    try {
+                        return Array.isArray(res.json('data'));
+                    } catch {
+                        return false;
+                    }
+                },
+                'jobs list uses performance fixture': hasPerformanceFixtureRows,
+            });
+        }
 
-    if (context.token && context.userProjectId) {
-        if (endpointEnabled('recommendations_jobs')) {
+        if (endpoint === 'jobs_search') {
+            const searchResponse = http.get(
+                `${BASE_URL}/jobs/search?keyword=${encodeURIComponent(keyword)}&limit=${SEARCH_LIMIT}`,
+                {
+                    tags: {
+                        endpoint: 'jobs_search',
+                        keyword,
+                    },
+                },
+            );
+            observeResponse('jobs_search', searchResponse);
+
+            check(searchResponse, {
+                'jobs search status is 200': (res) => res.status === 200,
+                'jobs search success is true': (res) => res.status === 200 && res.json('success') === true,
+                'jobs search returns data array': (res) => {
+                    try {
+                        return Array.isArray(res.json('data'));
+                    } catch {
+                        return false;
+                    }
+                },
+                'jobs search uses performance fixture': hasPerformanceFixtureRows,
+            });
+        }
+
+        if (!context.token || !context.userProjectId) {
+            continue;
+        }
+
+        if (endpoint === 'recommendations_jobs') {
             const recommendationResponse = http.get(
                 `${BASE_URL}/recommendations/jobs?userProjectId=${encodeURIComponent(context.userProjectId)}&limit=${RECOMMENDATION_LIMIT}`,
                 {
@@ -269,7 +314,7 @@ export default function (context) {
             });
         }
 
-        if (endpointEnabled('gap_analysis')) {
+        if (endpoint === 'gap_analysis') {
             const gapAnalysisResponse = http.get(
                 `${BASE_URL}/gap-analysis/projects/${encodeURIComponent(context.userProjectId)}?limit=${GAP_LIMIT}`,
                 {

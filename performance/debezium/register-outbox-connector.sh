@@ -158,7 +158,14 @@ echo
 
 echo "### Wait for connector RUNNING"
 for ((i = 1; i <= DEBEZIUM_WAIT_SECONDS; i++)); do
-  status_json="$(curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/status")"
+  status_json="$(curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/status" 2>/dev/null || true)"
+
+  if [[ -z "${status_json}" ]]; then
+    echo "connector_status_wait_elapsed=${i}s status=not_found_or_not_ready"
+    sleep 1
+    continue
+  fi
+
   echo "connector_status_wait_elapsed=${i}s ${status_json}"
 
   running_state_count="$(echo "${status_json}" | grep -Eo '"state"[[:space:]]*:[[:space:]]*"RUNNING"' | wc -l | tr -d ' ')"
