@@ -18,6 +18,7 @@ public class JobSearchService {
     private final ElasticsearchJobSearchService elasticsearchJobSearchService;
     private final MySqlFullTextJobSearchService mySqlFullTextJobSearchService;
     private final JobFlowCacheProperties cacheProperties;
+    private final JobSearchMetrics jobSearchMetrics;
 
     @Lazy
     @Autowired
@@ -37,6 +38,7 @@ public class JobSearchService {
                     normalizedKeyword,
                     exception.getMessage()
             );
+            jobSearchMetrics.recordElasticsearchFallback();
             return mySqlFullTextJobSearchService.search(normalizedKeyword, limit);
         }
     }

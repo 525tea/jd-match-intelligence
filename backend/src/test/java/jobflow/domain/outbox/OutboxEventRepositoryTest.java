@@ -77,6 +77,26 @@ class OutboxEventRepositoryTest {
     }
 
     @Test
+    @DisplayName("outbox 이벤트 수를 상태별로 집계한다")
+    void countByStatus() {
+        OutboxEvent pendingEvent = createEvent(1L, OutboxEventTypes.JOB_CREATED);
+        OutboxEvent publishedEvent = createEvent(2L, OutboxEventTypes.JOB_UPDATED);
+        OutboxEvent failedEvent = createEvent(3L, OutboxEventTypes.JOB_CLOSED);
+
+        publishedEvent.markPublished();
+        failedEvent.markFailed("publish failed", 1);
+
+        outboxEventRepository.save(pendingEvent);
+        outboxEventRepository.save(publishedEvent);
+        outboxEventRepository.save(failedEvent);
+        outboxEventRepository.flush();
+
+        assertThat(outboxEventRepository.countByStatus(OutboxStatus.PENDING)).isEqualTo(1);
+        assertThat(outboxEventRepository.countByStatus(OutboxStatus.PUBLISHED)).isEqualTo(1);
+        assertThat(outboxEventRepository.countByStatus(OutboxStatus.FAILED)).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("cleanup 후보는 PUBLISHED 이벤트와 consumer 처리 완료된 PENDING 이벤트만 조회한다")
     void findCleanupCandidateIds() {
         OutboxEvent processedPendingEvent = outboxEventRepository.save(createEvent(1L, OutboxEventTypes.JOB_CREATED));
