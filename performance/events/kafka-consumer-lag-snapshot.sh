@@ -44,7 +44,7 @@ fi
 
 lag_text_file="${ARTIFACT_DIR}/${SNAPSHOT_LABEL}_consumer_group_lag.txt"
 prometheus_lag_file="${ARTIFACT_DIR}/${SNAPSHOT_LABEL}_prometheus_kafka_lag.json"
-prometheus_rate_file="${ARTIFACT_DIR}/${SNAPSHOT_LABEL}_prometheus_kafka_records_rate.json"
+prometheus_offset_file="${ARTIFACT_DIR}/${SNAPSHOT_LABEL}_prometheus_kafka_current_offset.json"
 
 echo "ROOT_DIR=${ROOT_DIR}"
 echo "ENV_FILE=${ENV_FILE}"
@@ -88,7 +88,7 @@ echo
 echo "### Prometheus Kafka lag query"
 if curl -fsS \
   --get "${PROMETHEUS_URL}/api/v1/query" \
-  --data-urlencode 'query=sum(kafka_consumer_fetch_manager_records_lag{application="jobflow-backend"}) by (topic)' \
+  --data-urlencode 'query=sum(clamp_min(kafka_consumergroup_lag{consumergroup=~"jobflow-.*"}, 0)) by (consumergroup, topic)' \
   -o "${prometheus_lag_file}"; then
   jq '.' "${prometheus_lag_file}" || cat "${prometheus_lag_file}"
 else
@@ -97,15 +97,15 @@ else
 fi
 
 echo
-echo "### Prometheus Kafka records consumed rate query"
+echo "### Prometheus Kafka current offset query"
 if curl -fsS \
   --get "${PROMETHEUS_URL}/api/v1/query" \
-  --data-urlencode 'query=sum(rate(kafka_consumer_fetch_manager_records_consumed_total{application="jobflow-backend"}[1m])) by (topic)' \
-  -o "${prometheus_rate_file}"; then
-  jq '.' "${prometheus_rate_file}" || cat "${prometheus_rate_file}"
+  --data-urlencode 'query=sum(kafka_consumergroup_current_offset{consumergroup=~"jobflow-.*"}) by (consumergroup, topic)' \
+  -o "${prometheus_offset_file}"; then
+  jq '.' "${prometheus_offset_file}" || cat "${prometheus_offset_file}"
 else
-  echo '{"status":"unavailable","reason":"prometheus kafka records consumed rate query failed"}' > "${prometheus_rate_file}"
-  cat "${prometheus_rate_file}"
+  echo '{"status":"unavailable","reason":"prometheus kafka current offset query failed"}' > "${prometheus_offset_file}"
+  cat "${prometheus_offset_file}"
 fi
 
 echo
@@ -114,4 +114,4 @@ echo "consumer_group=${KAFKA_CONSUMER_GROUP_ID}"
 echo "total_lag=${total_lag}"
 echo "consumer_group_lag_file=${lag_text_file}"
 echo "prometheus_lag_file=${prometheus_lag_file}"
-echo "prometheus_records_rate_file=${prometheus_rate_file}"
+echo "prometheus_current_offset_file=${prometheus_offset_file}"

@@ -10,6 +10,7 @@ if [[ -f "${ENV_FILE}" ]]; then
   source "${ENV_FILE}"
 fi
 
+PHASE="${PHASE:-full}"
 SCENARIO="${SCENARIO:-kafka-consumer-after}"
 BASE_URL="${BASE_URL:-http://localhost:8081/api}"
 LOGIN_EMAIL="${LOGIN_EMAIL:-frontend-demo@example.com}"
@@ -17,9 +18,10 @@ LOGIN_PASSWORD="${LOGIN_PASSWORD:-password123}"
 VUS="${VUS:-500}"
 DURATION="${DURATION:-5m}"
 SLEEP_SECONDS="${SLEEP_SECONDS:-1}"
+ENDPOINTS="${ENDPOINTS:-jobs_list,jobs_search,recommendations_jobs,gap_analysis}"
 EXPECT_PERF_FIXTURE="${EXPECT_PERF_FIXTURE:-false}"
 REQUIRE_AUTH_ENDPOINTS="${REQUIRE_AUTH_ENDPOINTS:-true}"
-KAFKA_EVENT_LOAD_COUNT="${KAFKA_EVENT_LOAD_COUNT:-60000}"
+KAFKA_EVENT_LOAD_COUNT="${KAFKA_EVENT_LOAD_COUNT:-120000}"
 KAFKA_EVENT_LOAD_BATCH_SIZE="${KAFKA_EVENT_LOAD_BATCH_SIZE:-1000}"
 KAFKA_EVENT_LOAD_RUN_ID="${KAFKA_EVENT_LOAD_RUN_ID:-kafka-latency-lag-${SCENARIO}-$(date +%Y%m%d%H%M%S)}"
 KAFKA_CONSUMER_GROUP_ID="${KAFKA_CONSUMER_GROUP_ID:-jobflow-backend-performance}"
@@ -37,6 +39,15 @@ if [[ "${PERF_DB_NAME}" == "jobflow" ]]; then
   echo "Refusing to run Kafka latency/lag scenario against real database: ${PERF_DB_NAME}" >&2
   exit 1
 fi
+
+case "${PHASE}" in
+  full|prepare|k6-only|finish)
+    ;;
+  *)
+    echo "Unsupported PHASE=${PHASE}. Use full, prepare, k6-only, or finish." >&2
+    exit 1
+    ;;
+esac
 
 case "${SCENARIO}" in
   api-only-baseline)
@@ -68,11 +79,13 @@ mkdir -p "${ARTIFACT_DIR}"
 
 echo "ROOT_DIR=${ROOT_DIR}"
 echo "ENV_FILE=${ENV_FILE}"
+echo "PHASE=${PHASE}"
 echo "SCENARIO=${SCENARIO}"
 echo "BASE_URL=${BASE_URL}"
 echo "VUS=${VUS}"
 echo "DURATION=${DURATION}"
 echo "SLEEP_SECONDS=${SLEEP_SECONDS}"
+echo "ENDPOINTS=${ENDPOINTS}"
 echo "EXPECT_PERF_FIXTURE=${EXPECT_PERF_FIXTURE}"
 echo "REQUIRE_AUTH_ENDPOINTS=${REQUIRE_AUTH_ENDPOINTS}"
 echo "ARTIFACT_DIR=${ARTIFACT_DIR}"
@@ -87,6 +100,31 @@ echo "PERF_OUTBOX_RELAY_BATCH_SIZE=${PERF_OUTBOX_RELAY_BATCH_SIZE}"
 echo "PERF_OUTBOX_RELAY_FIXED_DELAY=${PERF_OUTBOX_RELAY_FIXED_DELAY}"
 echo
 
+run_k6() {
+  echo
+  echo "### Run k6 while Kafka consumer path is active"
+  BASE_URL="${BASE_URL}" \
+  LOGIN_EMAIL="${LOGIN_EMAIL}" \
+  LOGIN_PASSWORD="${LOGIN_PASSWORD}" \
+  VUS="${VUS}" \
+  DURATION="${DURATION}" \
+  SLEEP_SECONDS="${SLEEP_SECONDS}" \
+  ENDPOINTS="${ENDPOINTS}" \
+  EXPECT_PERF_FIXTURE="${EXPECT_PERF_FIXTURE}" \
+  REQUIRE_AUTH_ENDPOINTS="${REQUIRE_AUTH_ENDPOINTS}" \
+  K6_SUMMARY_EXPORT="${K6_SUMMARY_EXPORT}" \
+  bash performance/k6/run-round1-baseline.sh
+}
+
+if [[ "${PHASE}" == "k6-only" ]]; then
+  run_k6
+  echo
+  echo "Kafka consumer latency/lag k6-only phase completed."
+  echo "scenario=${SCENARIO}"
+  echo "summary_export=${K6_SUMMARY_EXPORT}"
+  exit 0
+fi
+
 if ! docker compose ps --services --filter status=running | grep -qx "${MYSQL_SERVICE}"; then
   echo "service \"${MYSQL_SERVICE}\" is not running" >&2
   echo "Start the staging performance stack first:" >&2
@@ -94,75 +132,79 @@ if ! docker compose ps --services --filter status=running | grep -qx "${MYSQL_SE
   exit 1
 fi
 
-echo "### Recreate backend/gateway with Kafka scenario settings"
-docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps --force-recreate backend gateway
+if [[ "${PHASE}" == "full" || "${PHASE}" == "prepare" ]]; then
+  echo "### Recreate backend/gateway with Kafka scenario settings"
+  docker compose "${COMPOSE_ARGS[@]}" up -d --no-deps --force-recreate backend gateway
 
-echo
-echo "### Wait for backend/gateway health"
-for i in {1..90}; do
-  backend_health="$(curl -fsS http://localhost:8080/actuator/health/liveness 2>/dev/null | jq -r '.status // "DOWN"' || true)"
-  gateway_health="$(curl -fsS http://localhost:8081/actuator/health 2>/dev/null | jq -r '.status // "DOWN"' || true)"
-  if [[ "${backend_health}" == "UP" && "${gateway_health}" == "UP" ]]; then
-    echo "backend_health=UP"
-    echo "gateway_health=UP"
-    break
-  fi
-  if [[ "${i}" == "90" ]]; then
-    echo "backend_health=${backend_health}"
-    echo "gateway_health=${gateway_health}"
-    echo "Timed out waiting for backend/gateway health." >&2
-    exit 1
-  fi
-  sleep 2
-done
-
-echo
-echo "### Event baseline before scenario"
-bash performance/events/event-processing-baseline-check.sh | tee "${ARTIFACT_DIR}/$(date +%Y%m%d%H%M%S)_${SCENARIO}_event_baseline_before.txt"
-
-echo
-echo "### Kafka lag before scenario"
-SNAPSHOT_LABEL="$(date +%Y%m%d%H%M%S)_${SCENARIO}_before" \
-ARTIFACT_DIR="${ARTIFACT_DIR}" \
-KAFKA_CONSUMER_GROUP_ID="${KAFKA_CONSUMER_GROUP_ID}" \
-bash performance/events/kafka-consumer-lag-snapshot.sh
-
-if [[ "${PREPARE_EVENT_LOAD}" == "true" ]]; then
   echo
-  echo "### Seed Kafka event load through outbox"
-  KAFKA_EVENT_LOAD_RUN_ID="${KAFKA_EVENT_LOAD_RUN_ID}" \
-  KAFKA_EVENT_LOAD_COUNT="${KAFKA_EVENT_LOAD_COUNT}" \
-  KAFKA_EVENT_LOAD_BATCH_SIZE="${KAFKA_EVENT_LOAD_BATCH_SIZE}" \
-  bash performance/events/seed-kafka-email-event-load.sh
+  echo "### Wait for backend/gateway health"
+  for i in {1..90}; do
+    backend_health="$(curl -fsS http://localhost:8080/actuator/health/liveness 2>/dev/null | jq -r '.status // "DOWN"' || true)"
+    gateway_health="$(curl -fsS http://localhost:8081/actuator/health 2>/dev/null | jq -r '.status // "DOWN"' || true)"
+    if [[ "${backend_health}" == "UP" && "${gateway_health}" == "UP" ]]; then
+      echo "backend_health=UP"
+      echo "gateway_health=UP"
+      break
+    fi
+    if [[ "${i}" == "90" ]]; then
+      echo "backend_health=${backend_health}"
+      echo "gateway_health=${gateway_health}"
+      echo "Timed out waiting for backend/gateway health." >&2
+      exit 1
+    fi
+    sleep 2
+  done
+
+  echo
+  echo "### Event baseline before scenario"
+  bash performance/events/event-processing-baseline-check.sh | tee "${ARTIFACT_DIR}/$(date +%Y%m%d%H%M%S)_${SCENARIO}_event_baseline_before.txt"
+
+  echo
+  echo "### Kafka lag before scenario"
+  SNAPSHOT_LABEL="$(date +%Y%m%d%H%M%S)_${SCENARIO}_before" \
+  ARTIFACT_DIR="${ARTIFACT_DIR}" \
+  KAFKA_CONSUMER_GROUP_ID="${KAFKA_CONSUMER_GROUP_ID}" \
+  bash performance/events/kafka-consumer-lag-snapshot.sh
+
+  if [[ "${PREPARE_EVENT_LOAD}" == "true" ]]; then
+    echo
+    echo "### Seed Kafka event load through outbox"
+    KAFKA_EVENT_LOAD_RUN_ID="${KAFKA_EVENT_LOAD_RUN_ID}" \
+    KAFKA_EVENT_LOAD_COUNT="${KAFKA_EVENT_LOAD_COUNT}" \
+    KAFKA_EVENT_LOAD_BATCH_SIZE="${KAFKA_EVENT_LOAD_BATCH_SIZE}" \
+    bash performance/events/seed-kafka-email-event-load.sh
+  fi
 fi
 
-echo
-echo "### Run k6 while Kafka consumer path is active"
-BASE_URL="${BASE_URL}" \
-LOGIN_EMAIL="${LOGIN_EMAIL}" \
-LOGIN_PASSWORD="${LOGIN_PASSWORD}" \
-VUS="${VUS}" \
-DURATION="${DURATION}" \
-SLEEP_SECONDS="${SLEEP_SECONDS}" \
-EXPECT_PERF_FIXTURE="${EXPECT_PERF_FIXTURE}" \
-REQUIRE_AUTH_ENDPOINTS="${REQUIRE_AUTH_ENDPOINTS}" \
-K6_SUMMARY_EXPORT="${K6_SUMMARY_EXPORT}" \
-bash performance/k6/run-round1-baseline.sh
+if [[ "${PHASE}" == "prepare" ]]; then
+  echo
+  echo "Kafka consumer latency/lag prepare phase completed."
+  echo "scenario=${SCENARIO}"
+  echo "artifact_dir=${ARTIFACT_DIR}"
+  echo "Run PHASE=k6-only from the k6 runner immediately, then run PHASE=finish on this staging server."
+  exit 0
+fi
 
-echo
-echo "### Kafka lag after k6"
-SNAPSHOT_LABEL="$(date +%Y%m%d%H%M%S)_${SCENARIO}_after" \
-ARTIFACT_DIR="${ARTIFACT_DIR}" \
-KAFKA_CONSUMER_GROUP_ID="${KAFKA_CONSUMER_GROUP_ID}" \
-bash performance/events/kafka-consumer-lag-snapshot.sh
+if [[ "${PHASE}" == "full" ]]; then
+  run_k6
+fi
 
-echo
-echo "### Event baseline after scenario"
-bash performance/events/event-processing-baseline-check.sh | tee "${ARTIFACT_DIR}/$(date +%Y%m%d%H%M%S)_${SCENARIO}_event_baseline_after.txt"
+if [[ "${PHASE}" == "full" || "${PHASE}" == "finish" ]]; then
+  echo
+  echo "### Kafka lag after k6"
+  SNAPSHOT_LABEL="$(date +%Y%m%d%H%M%S)_${SCENARIO}_after" \
+  ARTIFACT_DIR="${ARTIFACT_DIR}" \
+  KAFKA_CONSUMER_GROUP_ID="${KAFKA_CONSUMER_GROUP_ID}" \
+  bash performance/events/kafka-consumer-lag-snapshot.sh
 
-echo
-echo "### Duplicate replay idempotency smoke"
-bash performance/events/kafka-duplicate-replay-idempotency-smoke.sh | tee "${ARTIFACT_DIR}/$(date +%Y%m%d%H%M%S)_${SCENARIO}_idempotency_smoke.txt"
+  echo
+  echo "### Event baseline after scenario"
+  bash performance/events/event-processing-baseline-check.sh | tee "${ARTIFACT_DIR}/$(date +%Y%m%d%H%M%S)_${SCENARIO}_event_baseline_after.txt"
+
+  echo
+  echo "### Duplicate replay idempotency smoke"
+  bash performance/events/kafka-duplicate-replay-idempotency-smoke.sh | tee "${ARTIFACT_DIR}/$(date +%Y%m%d%H%M%S)_${SCENARIO}_idempotency_smoke.txt"
+fi
 
 echo
 echo "Kafka consumer latency/lag scenario completed."
