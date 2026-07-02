@@ -9,8 +9,10 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.nio.charset.StandardCharsets;
 import jobflow.domain.outbox.KafkaConsumerIdempotencyService;
 import jobflow.domain.outbox.OutboxKafkaMessageParser;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -67,6 +69,36 @@ class EmailSendKafkaConsumerTest {
         assertThat(request.subject()).isEqualTo("Sample subject");
         assertThat(request.text()).isEqualTo("Sample body");
         assertThat(request.html()).isEqualTo("<p>Sample body</p>");
+    }
+
+    @Test
+    @DisplayName("Debezium Event Router 메시지는 Kafka header id를 idempotency eventId로 사용한다")
+    void consumeDebeziumMessageWithEventIdHeader() {
+        EmailSendKafkaConsumer consumer = new EmailSendKafkaConsumer(messageParser, idempotencyService, emailSender);
+        given(emailSender.send(org.mockito.ArgumentMatchers.any()))
+                .willReturn(EmailSendResult.sent("MOCK_EMAIL", "sample-message-id"));
+        ConsumerRecord<String, String> record = new ConsumerRecord<>("email.send", 0, 0, "EMAIL:30", """
+                {
+                  "payload": {
+                    "to": "user@example.com",
+                    "subject": "Debezium subject",
+                    "text": "Debezium body"
+                  },
+                  "schemaVersion": 1,
+                  "aggregateType": "EMAIL",
+                  "aggregateId": 30,
+                  "eventType": "EMAIL_SEND_REQUESTED",
+                  "topic": "email.send"
+                }
+                """);
+        record.headers().add("id", "40".getBytes(StandardCharsets.UTF_8));
+
+        consumer.consume(record);
+
+        ArgumentCaptor<Long> eventIdCaptor = ArgumentCaptor.forClass(Long.class);
+        verify(idempotencyService).runOnce(any(), eventIdCaptor.capture(), any(Runnable.class));
+        assertThat(eventIdCaptor.getValue()).isEqualTo(40L);
+        verify(emailSender).send(any());
     }
 
     @Test

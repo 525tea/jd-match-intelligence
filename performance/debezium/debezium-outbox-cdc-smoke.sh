@@ -83,20 +83,11 @@ if [[ ! "${DEBEZIUM_SMOKE_RUN_ID}" =~ ^[A-Za-z0-9._:-]+$ ]]; then
   fail "DEBEZIUM_SMOKE_RUN_ID contains unsupported characters: ${DEBEZIUM_SMOKE_RUN_ID}"
 fi
 
-for service in "${MYSQL_SERVICE}" "${KAFKA_SERVICE}" "${BACKEND_SERVICE}" "debezium-connect"; do
+for service in "${MYSQL_SERVICE}" "${KAFKA_SERVICE}" "debezium-connect"; do
   if ! compose ps --services --filter status=running | grep -qx "${service}"; then
     fail "service \"${service}\" is not running"
   fi
 done
-
-backend_relay_enabled="$(compose exec -T "${BACKEND_SERVICE}" printenv JOBFLOW_OUTBOX_RELAY_ENABLED 2>/dev/null || true)"
-if [[ "${backend_relay_enabled}" != "false" ]]; then
-  fail "backend must run with JOBFLOW_OUTBOX_RELAY_ENABLED=false for Debezium CDC smoke. current=${backend_relay_enabled:-unset}"
-fi
-
-if ! curl -fsS http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
-  fail "backend health is not UP"
-fi
 
 echo "### Ensure outbox schema_version column exists in performance DB"
 schema_version_column_count="$(
@@ -117,6 +108,19 @@ if [[ "${schema_version_column_count}" == "0" ]]; then
   echo "outbox_schema_version_column_added=true"
 else
   echo "outbox_schema_version_column_added=false"
+fi
+
+if ! compose ps --services --filter status=running | grep -qx "${BACKEND_SERVICE}"; then
+  fail "service \"${BACKEND_SERVICE}\" is not running. Start backend after schema_version is present."
+fi
+
+backend_relay_enabled="$(compose exec -T "${BACKEND_SERVICE}" printenv JOBFLOW_OUTBOX_RELAY_ENABLED 2>/dev/null || true)"
+if [[ "${backend_relay_enabled}" != "false" ]]; then
+  fail "backend must run with JOBFLOW_OUTBOX_RELAY_ENABLED=false for Debezium CDC smoke. current=${backend_relay_enabled:-unset}"
+fi
+
+if ! curl -fsS http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+  fail "backend health is not UP"
 fi
 
 echo
@@ -182,11 +186,12 @@ for ((i = 1; i <= DEBEZIUM_SMOKE_WAIT_SECONDS; i++)); do
       --from-beginning \
       --timeout-ms "${KAFKA_CONSUMER_TIMEOUT_MS}" \
       --property print.key=true \
+      --property print.headers=true \
       --property key.separator='|' \
     > "${consumer_output_file}" 2> "${consumer_error_file}" || true
 
   message_found="$(
-    grep -E "\"eventId\"[[:space:]]*:[[:space:]]*${smoke_event_id}" "${consumer_output_file}" | grep -F "${DEBEZIUM_SMOKE_RUN_ID}" | tail -1 || true
+    grep -F "id:${smoke_event_id}|" "${consumer_output_file}" | grep -F "${DEBEZIUM_SMOKE_RUN_ID}" | tail -1 || true
   )"
 
   echo "debezium_kafka_wait_elapsed=${i}s message_found=$([[ -n "${message_found}" ]] && echo true || echo false)"
@@ -201,6 +206,7 @@ if [[ -z "${message_found}" ]]; then
 fi
 
 echo "kafka_message_found=true"
+echo "kafka_header_event_id_found=true"
 echo "kafka_message=${message_found}"
 echo
 
@@ -242,6 +248,7 @@ echo "### Debezium Outbox CDC Smoke Summary"
 echo "debezium_smoke_event_id=${smoke_event_id}"
 echo "kafka_topic=${DEBEZIUM_SMOKE_TOPIC}"
 echo "kafka_message_found=true"
+echo "kafka_header_event_id_found=true"
 echo "processed_count=${processed_count}"
 echo "outbox_event_status=${outbox_status}"
 echo "outbox_published_at=${published_at_state}"

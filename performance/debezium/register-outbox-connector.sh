@@ -68,6 +68,17 @@ for service in "${MYSQL_SERVICE}" "${KAFKA_SERVICE}" "${CONNECT_SERVICE}"; do
   fi
 done
 
+echo "### Ensure Debezium schema history topic accepts keyless records"
+compose exec -T "${KAFKA_SERVICE}" \
+  kafka-configs \
+    --bootstrap-server "${KAFKA_SERVICE}:29092" \
+    --alter \
+    --entity-type topics \
+    --entity-name "${DEBEZIUM_SCHEMA_HISTORY_TOPIC}" \
+    --add-config cleanup.policy=delete >/dev/null
+echo "schema_history_cleanup_policy=delete"
+echo
+
 echo "### Verify MySQL binlog settings"
 binlog_summary="$(
   compose exec -T -e MYSQL_PWD="${DEBEZIUM_DB_PASSWORD}" "${MYSQL_SERVICE}" mysql \
@@ -125,6 +136,7 @@ cat > "${connector_config_file}" <<JSON
   "transforms.outbox.route.topic.replacement": "\${routedByValue}",
   "transforms.outbox.table.field.event.id": "id",
   "transforms.outbox.table.field.event.key": "aggregate_id",
+  "transforms.outbox.table.field.event.type": "event_type",
   "transforms.outbox.table.field.event.payload": "payload",
   "transforms.outbox.table.field.event.timestamp": "created_at",
   "transforms.outbox.table.expand.json.payload": "true",
@@ -149,7 +161,7 @@ for ((i = 1; i <= DEBEZIUM_WAIT_SECONDS; i++)); do
   status_json="$(curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/status")"
   echo "connector_status_wait_elapsed=${i}s ${status_json}"
 
-  running_state_count="$(echo "${status_json}" | grep -Ec '"state"[[:space:]]*:[[:space:]]*"RUNNING"' || true)"
+  running_state_count="$(echo "${status_json}" | grep -Eo '"state"[[:space:]]*:[[:space:]]*"RUNNING"' | wc -l | tr -d ' ')"
   if [[ "${running_state_count}" -ge 2 ]]; then
     echo
     echo "Debezium outbox connector is RUNNING."

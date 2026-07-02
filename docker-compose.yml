@@ -117,7 +117,7 @@ services:
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic jobflow-connect-configs --partitions 1 --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1} --config cleanup.policy=compact
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic jobflow-connect-offsets --partitions 25 --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1} --config cleanup.policy=compact
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic jobflow-connect-status --partitions 5 --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1} --config cleanup.policy=compact
-        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic schema-changes.jobflow --partitions 1 --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1} --config cleanup.policy=compact
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic schema-changes.jobflow --partitions 1 --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1} --config cleanup.policy=delete
         kafka-topics --bootstrap-server kafka:29092 --list
 
   debezium-connect:
