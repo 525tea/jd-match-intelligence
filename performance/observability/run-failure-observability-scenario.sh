@@ -6,17 +6,33 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env}"
 
-if [[ -f "${ENV_FILE}" ]]; then
+load_env_file_preserving_existing() {
+  local env_file="$1"
+  local key=""
+  local line=""
+  local value=""
+
+  [[ -f "${env_file}" ]] || return 0
+
   while IFS= read -r line || [[ -n "${line}" ]]; do
     [[ "${line}" =~ ^[[:space:]]*# ]] && continue
     [[ -z "${line// }" ]] && continue
     key="${line%%=*}"
     value="${line#*=}"
+
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    [[ -z "${key}" ]] && continue
+    [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    declare -p "${key}" >/dev/null 2>&1 && continue
+
     value="${value%\"}" value="${value#\"}"
     value="${value%\'}" value="${value#\'}"
     export "${key}=${value}"
-  done < "${ENV_FILE}"
-fi
+  done < "${env_file}"
+}
+
+load_env_file_preserving_existing "${ENV_FILE}"
 
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)
 SCENARIO_MODE="${SCENARIO_MODE:-all}"

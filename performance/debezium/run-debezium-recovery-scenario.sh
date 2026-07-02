@@ -6,17 +6,33 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env}"
 
-if [[ -f "${ENV_FILE}" ]]; then
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+load_env_file_preserving_existing() {
+  local env_file="$1"
+  local key=""
+  local line=""
+  local value=""
+
+  [[ -f "${env_file}" ]] || return 0
+
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    [[ "${line}" =~ ^[[:space:]]*# ]] && continue
     [[ -z "${line// }" ]] && continue
     key="${line%%=*}"
     value="${line#*=}"
+
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    [[ -z "${key}" ]] && continue
+    [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    declare -p "${key}" >/dev/null 2>&1 && continue
+
     value="${value%\"}" value="${value#\"}"
     value="${value%\'}" value="${value#\'}"
-    export "$key=$value"
-  done < "${ENV_FILE}"
-fi
+    export "${key}=${value}"
+  done < "${env_file}"
+}
+
+load_env_file_preserving_existing "${ENV_FILE}"
 
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)
 MYSQL_SERVICE="${MYSQL_SERVICE:-mysql}"
@@ -40,6 +56,8 @@ KAFKA_CONSUMER_GROUP_ID="${KAFKA_CONSUMER_GROUP_ID:-jobflow-backend-performance}
 DEBEZIUM_RECOVERY_WAIT_SECONDS="${DEBEZIUM_RECOVERY_WAIT_SECONDS:-240}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-${ROOT_DIR}/artifacts/debezium/$(date +%y%m%d)_debezium_recovery}"
 LAST_FINAL_LAG=""
+CONNECTOR_PAUSED_BY_SCENARIO=false
+BACKEND_CONSUMER_DISABLED_BY_SCENARIO=false
 
 cd "${ROOT_DIR}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -143,7 +161,7 @@ wait_connector_state() {
   local expected_state="$1"
   for ((i = 1; i <= DEBEZIUM_RECOVERY_WAIT_SECONDS; i++)); do
     status_json="$(curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/status" 2>/dev/null || true)"
-    state_count="$(echo "${status_json}" | grep -Eo "\"state\"[[:space:]]*:[[:space:]]*\"${expected_state}\"" | wc -l | tr -d ' ')"
+    state_count="$(printf '%s\n' "${status_json}" | { grep -Eo "\"state\"[[:space:]]*:[[:space:]]*\"${expected_state}\"" || true; } | wc -l | tr -d ' ')"
     echo "connector_state_wait_elapsed=${i}s expected=${expected_state} matching_state_count=${state_count}"
     if [[ "${state_count}" -ge 2 ]]; then
       return
@@ -153,6 +171,75 @@ wait_connector_state() {
   curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/status" >&2 || true
   fail "Debezium connector did not reach ${expected_state}"
 }
+
+wait_connector_running_best_effort() {
+  local state_count=""
+  local status_json=""
+
+  for ((i = 1; i <= 60; i++)); do
+    status_json="$(curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/status" 2>/dev/null || true)"
+    state_count="$(printf '%s\n' "${status_json}" | { grep -Eo '"state"[[:space:]]*:[[:space:]]*"RUNNING"' || true; } | wc -l | tr -d ' ')"
+    if [[ "${state_count}" -ge 2 ]]; then
+      echo "cleanup_connector_state=RUNNING"
+      return
+    fi
+    sleep 1
+  done
+
+  echo "WARNING: Debezium connector did not confirm RUNNING during cleanup" >&2
+}
+
+wait_backend_up_best_effort() {
+  local backend_health=""
+  local label="$1"
+
+  for ((i = 1; i <= 60; i++)); do
+    backend_health="$(curl -fsS http://localhost:8080/actuator/health/liveness 2>/dev/null | jq -r '.status // "DOWN"' || true)"
+    if [[ "${backend_health}" == "UP" ]]; then
+      echo "${label}_backend_health=UP"
+      return
+    fi
+    sleep 2
+  done
+
+  echo "WARNING: backend health did not confirm UP during cleanup" >&2
+}
+
+resume_connector_if_needed() {
+  [[ "${CONNECTOR_PAUSED_BY_SCENARIO}" == "true" ]] || return 0
+
+  echo
+  echo "### Cleanup: resume Debezium connector"
+  curl -fsS -X PUT "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/resume" >/dev/null 2>&1 || true
+  wait_connector_running_best_effort
+  CONNECTOR_PAUSED_BY_SCENARIO=false
+}
+
+restore_backend_consumer_if_needed() {
+  [[ "${BACKEND_CONSUMER_DISABLED_BY_SCENARIO}" == "true" ]] || return 0
+
+  echo
+  echo "### Cleanup: restore backend Kafka consumer"
+  export PERF_OUTBOX_RELAY_ENABLED=false
+  export PERF_OUTBOX_RELAY_PUBLISHER=kafka
+  export PERF_KAFKA_CONSUMER_ENABLED=true
+  export PERF_KAFKA_CONSUMER_GROUP_ID="${KAFKA_CONSUMER_GROUP_ID}"
+  export PERF_NOTIFICATION_EMAIL_PROVIDER="${PERF_NOTIFICATION_EMAIL_PROVIDER:-mock}"
+  export PERF_NOTIFICATION_MOCK_EMAIL_FAIL="${PERF_NOTIFICATION_MOCK_EMAIL_FAIL:-false}"
+
+  compose up -d --no-deps --force-recreate "${BACKEND_SERVICE}" >/dev/null 2>&1 || true
+  wait_backend_up_best_effort "cleanup_backend_consumer_enabled"
+  BACKEND_CONSUMER_DISABLED_BY_SCENARIO=false
+}
+
+cleanup_recovery_scenario() {
+  local exit_code=$?
+  resume_connector_if_needed
+  restore_backend_consumer_if_needed
+  return "${exit_code}"
+}
+
+trap cleanup_recovery_scenario EXIT
 
 prepare_debezium_stack() {
   require_service "${MYSQL_SERVICE}"
@@ -166,6 +253,7 @@ prepare_debezium_stack() {
   export PERF_KAFKA_CONSUMER_GROUP_ID="${KAFKA_CONSUMER_GROUP_ID}"
   export PERF_NOTIFICATION_EMAIL_PROVIDER="${PERF_NOTIFICATION_EMAIL_PROVIDER:-mock}"
   export PERF_NOTIFICATION_MOCK_EMAIL_FAIL="${PERF_NOTIFICATION_MOCK_EMAIL_FAIL:-false}"
+  BACKEND_CONSUMER_DISABLED_BY_SCENARIO=false
 
   compose up -d "${DEBEZIUM_CONNECT_SERVICE}"
   compose up -d --no-deps --force-recreate "${BACKEND_SERVICE}"
@@ -263,6 +351,7 @@ run_connector_paused_recovery() {
   echo
   echo "### Scenario: connector pause -> outbox insert -> connector resume"
   curl -fsS -X PUT "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/pause" >/dev/null
+  CONNECTOR_PAUSED_BY_SCENARIO=true
   wait_connector_state "PAUSED"
 
   seed_events "${run_id}"
@@ -271,6 +360,7 @@ run_connector_paused_recovery() {
 
   curl -fsS -X PUT "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/resume" >/dev/null
   wait_connector_state "RUNNING"
+  CONNECTOR_PAUSED_BY_SCENARIO=false
   wait_processed "${run_id}"
   wait_final_lag_zero "${run_id}"
   write_summary "${run_id}" "connector-paused"
@@ -282,6 +372,7 @@ run_backend_restart_recovery() {
   echo "### Scenario: backend consumer disabled -> Debezium publish -> consumer restart drain"
   export PERF_OUTBOX_RELAY_ENABLED=false
   export PERF_KAFKA_CONSUMER_ENABLED=false
+  BACKEND_CONSUMER_DISABLED_BY_SCENARIO=true
   compose up -d --no-deps --force-recreate "${BACKEND_SERVICE}"
   wait_backend_up "backend_consumer_disabled"
 
@@ -297,6 +388,7 @@ run_backend_restart_recovery() {
   export PERF_KAFKA_CONSUMER_ENABLED=true
   compose up -d --no-deps --force-recreate "${BACKEND_SERVICE}"
   wait_backend_up "backend_consumer_enabled"
+  BACKEND_CONSUMER_DISABLED_BY_SCENARIO=false
   wait_processed "${run_id}"
   wait_final_lag_zero "${run_id}"
   write_summary "${run_id}" "backend-restart"
