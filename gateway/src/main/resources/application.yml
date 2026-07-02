@@ -4,6 +4,8 @@ server:
 
 gateway:
   backend-url: ${BACKEND_URL:http://localhost:8080}
+  backend-circuit-breaker:
+    enabled: ${GATEWAY_BACKEND_CIRCUIT_BREAKER_ENABLED:true}
   rate-limit:
     enabled: ${GATEWAY_RATE_LIMIT_ENABLED:true}
     requests-per-minute: ${GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE:100}
@@ -42,15 +44,15 @@ resilience4j:
     instances:
       backendApiCircuitBreaker:
         sliding-window-type: count_based
-        sliding-window-size: 10
-        minimum-number-of-calls: 5
-        failure-rate-threshold: 50
-        wait-duration-in-open-state: 10s
-        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-size: ${GATEWAY_BACKEND_CIRCUIT_BREAKER_SLIDING_WINDOW_SIZE:10}
+        minimum-number-of-calls: ${GATEWAY_BACKEND_CIRCUIT_BREAKER_MINIMUM_NUMBER_OF_CALLS:5}
+        failure-rate-threshold: ${GATEWAY_BACKEND_CIRCUIT_BREAKER_FAILURE_RATE_THRESHOLD:50}
+        wait-duration-in-open-state: ${GATEWAY_BACKEND_CIRCUIT_BREAKER_WAIT_DURATION_IN_OPEN_STATE:10s}
+        permitted-number-of-calls-in-half-open-state: ${GATEWAY_BACKEND_CIRCUIT_BREAKER_PERMITTED_HALF_OPEN_CALLS:3}
   timelimiter:
     instances:
       backendApiCircuitBreaker:
-        timeout-duration: 30s
+        timeout-duration: ${GATEWAY_BACKEND_TIME_LIMITER_TIMEOUT_DURATION:30s}
 
 management:
   endpoints:
