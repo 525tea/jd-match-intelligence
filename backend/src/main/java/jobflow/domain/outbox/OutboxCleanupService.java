@@ -37,6 +37,8 @@ public class OutboxCleanupService {
     @Transactional
     public int cleanupProcessedEvents() {
         LocalDateTime threshold = LocalDateTime.now(clock).minus(retention);
+        // Keep processed_kafka_events as the idempotency ledger; deleting it with
+        // outbox rows would shorten duplicate-replay protection for old events.
         List<Long> candidateIds = outboxEventRepository.findCleanupCandidateIds(
                 threshold,
                 PageRequest.of(0, batchSize)

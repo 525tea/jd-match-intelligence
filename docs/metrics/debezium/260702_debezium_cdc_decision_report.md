@@ -92,9 +92,9 @@ Kafka consumer
 
 ## 검증 기준
 
-Debezium 구현 작업에서는 다음을 확인한다. 
+Debezium 구현 작업에서는 다음을 확인한다.
 
-현재 단건 CDC path는 확인했고, 대량 부하와 recovery는 다음 비교 작업에서 확인한다.
+단건 CDC path는 `260702_debezium_outbox_cdc_smoke_report.md`에서 정리했고, 대량 부하 비교는 `260703_debezium_cdc_k6_comparison_report.md`에서 정리했다.
 
 | 검증 항목 | 완료 기준 / 현재 상태                                                                       |
 |---|-------------------------------------------------------------------------------------|
@@ -105,23 +105,24 @@ Debezium 구현 작업에서는 다음을 확인한다.
 | Message key | smoke에서 aggregate id key 확인                                                         |
 | Envelope/header compatibility | 완료. Debezium Event Router가 event id를 Kafka header `id`에 실어 parser adapter 보강        |
 | Consumer business logic | 이메일 발송/검색 색인 side effect logic은 유지. Kafka listener/parser adapter는 header 수용을 위해 변경 |
-| Backend restart | backend restart 중 outbox event 유실 0건 검증 예정                                          |
-| Connector recovery | connector stop/restart drain 검증 예정                                                  |
-| Duplicate delivery | 기존 idempotent consumer 유지. Debezium path 대량/retry 조건은 추가 확인 예정                      |
-| Final lag | 단건 smoke 처리 완료. 대량 조건 final lag 0은 검증 예정                                   |
+| Backend restart | 별도 장애 시나리오로 유지. 관측/장애 검증에서 캡처 보강 예정                                      |
+| Connector recovery | 별도 장애 시나리오로 유지. 관측/장애 검증에서 캡처 보강 예정                                     |
+| Duplicate delivery | 기존 idempotent consumer 유지. Debezium header id 수용 후 동일 모델 유지                       |
+| Final lag | 완료. Debezium CDC 대량 조건에서 processed 10,000, final lag 0 확인                         |
 
 ## 측정 기준선
 
-Debezium 전환 전후 비교는 Kafka consumer latency/lag/recovery 검증 수치를 기준으로 한다.
+Debezium 전환 전후 비교는 Kafka consumer latency/lag/recovery 검증 수치를 기준으로 시작했고, 이후 app relay baseline과 Debezium CDC after를 같은 조건으로 재측정했다.
 
-| 지표 | Kafka 기준선 |
-|---|---|
-| API 500VU + Outbox 10,000건 p95 | 8.48ms |
-| API 500VU + Outbox 10,000건 p99 | 137.65ms |
-| API error rate | 0% |
-| processed event | 10,000 |
-| final consumer lag | 0 |
-| duplicate replay | side effect 1회 |
+| 지표 | App relay baseline | Debezium CDC after |
+|---|---:|---:|
+| API 500VU + Outbox 10,000건 p95 | 175.60ms | 128.94ms |
+| API 500VU + Outbox 10,000건 p99 | 341.79ms | 248.48ms |
+| max latency | 8.35s | 1.51s |
+| throughput | 985.97 req/s | 1053.46 req/s |
+| API error rate | 0% | 0% |
+| processed event | 10,000 | 10,000 |
+| final consumer lag | 0 | 0 |
 
 ## 결론
 
@@ -131,4 +132,6 @@ Kafka 단계는 publish 실패를 Outbox로 추적하고, consumer 실패를 DLQ
 
 Debezium MySQL Connector 설정과 단건 Outbox CDC smoke는 완료했다. relay disabled 상태에서 event id `162506`이 Kafka `email.send`로 발행됐고, Debezium header `id`를 backend consumer가 idempotency event id로 읽어 `processed_count=1`을 남겼다. 이 과정에서 “consumer 코드 수정 없음”은 실제 Debezium header contract 때문에 그대로 유지하지 않았다. 대신 side effect business logic과 idempotency 저장 모델은 유지하고, Kafka listener/parser adapter가 header `id`를 수용하도록 보강했다.
 
-따라서 다음 작업은 전환 전후 대량 비교와 recovery 검증이다. 성공 기준은 API 500VU + Outbox 대량 이벤트 조건에서 event delay/API p95/final lag를 비교하고, backend/connector 장애 시에도 이벤트 유실 없이 final lag 0으로 회복되는 것이다.
+전환 전후 대량 비교도 완료했다. 같은 private gateway path, 500VU, 5분, Outbox 10,000건 조건에서 Debezium CDC after는 app relay baseline 대비 p95/p99/max latency가 낮았고, 두 경로 모두 error 0%, processed 10,000, final lag 0을 만족했다. Debezium 경로에서 원본 outbox row가 `PENDING`으로 남는 것은 실패가 아니며, 성공 기준은 Kafka consumer processed count와 final lag다.
+
+다음 보강은 Debezium 자체의 성능 비교가 아니라 운영 장애 관측이다. connector stop/restart, backend restart, Grafana/Kibana 캡처, error spike/recovery는 별도 관측/장애 검증 작업에서 다룬다.

@@ -30,9 +30,13 @@ public class OutboxCleanupScheduler {
             return;
         }
 
-        int deletedCount = outboxCleanupService.cleanupProcessedEvents();
-        if (deletedCount > 0) {
-            log.info("Outbox cleanup scheduler deleted processed events. deletedCount={}", deletedCount);
+        try {
+            int deletedCount = outboxCleanupService.cleanupProcessedEvents();
+            if (deletedCount > 0) {
+                log.info("Outbox cleanup scheduler deleted processed events. deletedCount={}", deletedCount);
+            }
+        } catch (Exception e) {
+            log.error("Outbox cleanup scheduler failed", e);
         }
     }
 }

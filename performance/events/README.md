@@ -320,8 +320,12 @@ bash performance/debezium/run-debezium-k6-comparison.sh
 
 ```text
 Debezium k6 comparison scenario completed.
+mode=debezium-cdc-after
+run_id=<run id>
+summary_export=<artifact path>
 processed_count=10000
-total_lag=0
+final_lag=0
+artifact_dir=<artifact dir>
 ```
 
 `performance/debezium/run-debezium-recovery-scenario.sh`는 Debezium 전환 후 장애 복구를 확인한다.
@@ -340,8 +344,10 @@ bash performance/debezium/run-debezium-recovery-scenario.sh
 
 ```text
 Debezium recovery scenario completed.
-processed_count=10000
-final lag 0
+mode=<connector-paused|backend-restart|all>
+run_id=<run id>
+final_lag=0
+artifact_dir=<artifact dir>
 ```
 
 ### 1. API-only baseline

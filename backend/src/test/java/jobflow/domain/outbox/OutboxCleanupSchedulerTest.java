@@ -1,5 +1,6 @@
 package jobflow.domain.outbox;
 
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -33,5 +34,16 @@ class OutboxCleanupSchedulerTest {
         scheduler.cleanupProcessedEvents();
 
         verifyNoInteractions(outboxCleanupService);
+    }
+
+    @Test
+    @DisplayName("cleanup service 예외가 발생해도 스케줄러 실행을 삼킨다")
+    void containCleanupFailure() {
+        OutboxCleanupScheduler scheduler = new OutboxCleanupScheduler(outboxCleanupService, true);
+        given(outboxCleanupService.cleanupProcessedEvents()).willThrow(new IllegalStateException("db unavailable"));
+
+        scheduler.cleanupProcessedEvents();
+
+        verify(outboxCleanupService).cleanupProcessedEvents();
     }
 }

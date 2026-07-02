@@ -39,6 +39,7 @@ KAFKA_EVENT_LOAD_BATCH_SIZE="${KAFKA_EVENT_LOAD_BATCH_SIZE:-1000}"
 KAFKA_CONSUMER_GROUP_ID="${KAFKA_CONSUMER_GROUP_ID:-jobflow-backend-performance}"
 DEBEZIUM_RECOVERY_WAIT_SECONDS="${DEBEZIUM_RECOVERY_WAIT_SECONDS:-240}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-${ROOT_DIR}/artifacts/debezium/$(date +%y%m%d)_debezium_recovery}"
+LAST_FINAL_LAG=""
 
 cd "${ROOT_DIR}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -103,6 +104,28 @@ ensure_outbox_schema_version_column() {
   fi
 }
 
+ensure_processed_event_id_index() {
+  processed_event_id_index_count="$(
+    mysql_root_exec -Nse "
+      SELECT COUNT(*)
+      FROM information_schema.statistics
+      WHERE table_schema = DATABASE()
+        AND table_name = 'processed_kafka_events'
+        AND index_name = 'idx_processed_kafka_events_event_id';
+    "
+  )"
+
+  if [[ "${processed_event_id_index_count}" == "0" ]]; then
+    mysql_root_exec -e "
+      ALTER TABLE processed_kafka_events
+        ADD KEY idx_processed_kafka_events_event_id (event_id);
+    "
+    echo "processed_event_id_index_added=true"
+  else
+    echo "processed_event_id_index_added=false"
+  fi
+}
+
 wait_backend_up() {
   local label="$1"
   for i in {1..120}; do
@@ -122,10 +145,7 @@ wait_connector_state() {
     status_json="$(curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/status" 2>/dev/null || true)"
     state_count="$(echo "${status_json}" | grep -Eo "\"state\"[[:space:]]*:[[:space:]]*\"${expected_state}\"" | wc -l | tr -d ' ')"
     echo "connector_state_wait_elapsed=${i}s expected=${expected_state} matching_state_count=${state_count}"
-    if [[ "${expected_state}" == "RUNNING" && "${state_count}" -ge 2 ]]; then
-      return
-    fi
-    if [[ "${expected_state}" == "PAUSED" && "${state_count}" -ge 1 ]]; then
+    if [[ "${state_count}" -ge 2 ]]; then
       return
     fi
     sleep 1
@@ -138,6 +158,7 @@ prepare_debezium_stack() {
   require_service "${MYSQL_SERVICE}"
   require_service "${KAFKA_SERVICE}"
   ensure_outbox_schema_version_column
+  ensure_processed_event_id_index
 
   export PERF_OUTBOX_RELAY_ENABLED=false
   export PERF_OUTBOX_RELAY_PUBLISHER=kafka
@@ -228,7 +249,10 @@ wait_final_lag_zero() {
     snapshot_lag "${label}" > "${ARTIFACT_DIR}/${label}_snapshot.log"
     lag="$(read_total_lag "${label}")"
     echo "lag_wait_elapsed=${i}s total_lag=${lag}"
-    [[ "${lag}" == "0" ]] && return
+    if [[ "${lag}" == "0" ]]; then
+      LAST_FINAL_LAG="${lag}"
+      return
+    fi
     sleep 1
   done
   fail "expected final lag 0 for ${label_prefix}, got ${lag}"
@@ -300,6 +324,7 @@ write_summary() {
     echo "outbox_failed=${failed_count}"
     echo "outbox_total=${total_count}"
     echo "processed_count=${current_processed}"
+    echo "final_lag=${LAST_FINAL_LAG}"
     echo "artifact_dir=${ARTIFACT_DIR}"
   } | tee "${summary_file}"
 }
@@ -342,4 +367,5 @@ echo
 echo "Debezium recovery scenario completed."
 echo "mode=${DEBEZIUM_RECOVERY_MODE}"
 echo "run_id=${DEBEZIUM_RECOVERY_RUN_ID}"
+echo "final_lag=${LAST_FINAL_LAG}"
 echo "artifact_dir=${ARTIFACT_DIR}"

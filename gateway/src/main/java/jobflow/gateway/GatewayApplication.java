@@ -37,7 +37,7 @@ public class GatewayApplication {
                                     .stripPrefix(1)
                                     .filter(fixedWindowRateLimitFilter);
                             if (backendCircuitBreakerEnabled) {
-                                spec.circuitBreaker(config -> config
+                                spec = spec.circuitBreaker(config -> config
                                         .setName("backendApiCircuitBreaker")
                                         .setFallbackUri(URI.create("forward:/fallback/backend"))
                                 );

@@ -88,12 +88,16 @@ Debezium CDC 기반 최소 경로는 성공했다.
 
 ## 한계와 후속 검증
 
-이번 smoke는 단건 CDC path 검증이다. 다음 단계에서는 아래 항목을 추가로 검증해야 한다.
+이번 smoke는 단건 CDC path 검증이다. 이후 `260703_debezium_cdc_k6_comparison_report.md`에서 API 500VU + Outbox 10,000건 조건의 전환 전후 비교를 완료했다.
 
-- API 500VU 조건에서 Debezium CDC 전환 전후 p95/p99/error 비교
-- Outbox 10,000건 기준 Debezium CDC publish/consume 처리량
+- App relay baseline: p95 `175.60ms`, p99 `341.79ms`, processed `10,000`, final lag `0`
+- Debezium CDC after: p95 `128.94ms`, p99 `248.48ms`, processed `10,000`, final lag `0`
+- Debezium 경로의 outbox row는 app relay처럼 `PUBLISHED`로 mark되지 않으므로, 성공 기준은 consumer processed count와 final lag다.
+
+남은 항목은 성능 비교가 아니라 운영 장애 관측이다.
+
 - Debezium connector stop 중 event 누적 후 restart recovery
 - backend restart 중 event 유실 0건
-- final consumer lag 0
+- Grafana/Kibana error spike/recovery 캡처
 
 기존 계획의 “consumer 코드 수정 없음”은 그대로 주장하지 않는다. 실제 Debezium Event Router 계약에 맞춰 Kafka listener/parser adapter가 header `id`를 수용하도록 변경했으며, 이메일 발송/검색 색인 side effect business logic과 idempotency 저장 모델은 유지했다.

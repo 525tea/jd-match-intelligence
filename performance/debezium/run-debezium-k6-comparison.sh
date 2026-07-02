@@ -58,6 +58,7 @@ KAFKA_FINAL_LAG_WAIT_SECONDS="${KAFKA_FINAL_LAG_WAIT_SECONDS:-180}"
 K6_EVENT_SEED_DELAY_SECONDS="${K6_EVENT_SEED_DELAY_SECONDS:-20}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-${ROOT_DIR}/artifacts/debezium/$(date +%y%m%d)_debezium_k6_comparison}"
 K6_SUMMARY_EXPORT="${K6_SUMMARY_EXPORT:-${ARTIFACT_DIR}/$(date +%Y%m%d%H%M%S)_${MODE}_k6.json}"
+FINAL_TOTAL_LAG=""
 
 cd "${ROOT_DIR}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -296,7 +297,12 @@ run_k6_with_concurrent_seed() {
   run_k6 &
   local k6_pid=$!
   sleep "${K6_EVENT_SEED_DELAY_SECONDS}"
-  seed_event_load
+  if ! seed_event_load; then
+    echo "seed_event_load failed; stopping k6 pid=${k6_pid}" >&2
+    kill "${k6_pid}" 2>/dev/null || true
+    wait "${k6_pid}" 2>/dev/null || true
+    return 1
+  fi
   wait "${k6_pid}"
 }
 
@@ -311,6 +317,7 @@ wait_final_lag_and_processed() {
     current_processed="$(processed_count)"
     echo "final_wait_elapsed=${i}s total_lag=${final_lag} processed_count=${current_processed}"
     if [[ "${final_lag}" == "0" && "${current_processed}" == "${KAFKA_EVENT_LOAD_COUNT}" ]]; then
+      FINAL_TOTAL_LAG="${final_lag}"
       break
     fi
     sleep 1
@@ -318,6 +325,7 @@ wait_final_lag_and_processed() {
 
   [[ "${final_lag}" == "0" ]] || fail "expected final lag 0, got ${final_lag}"
   [[ "${current_processed}" == "${KAFKA_EVENT_LOAD_COUNT}" ]] || fail "expected processed_count=${KAFKA_EVENT_LOAD_COUNT}, got ${current_processed}"
+  FINAL_TOTAL_LAG="${final_lag}"
 }
 
 write_summary() {
@@ -343,6 +351,7 @@ write_summary() {
     echo "outbox_failed=${failed_count}"
     echo "outbox_total=${total_count}"
     echo "processed_count=${current_processed}"
+    echo "final_lag=${FINAL_TOTAL_LAG}"
     echo "artifact_dir=${ARTIFACT_DIR}"
   } | tee "${summary_file}"
 }
@@ -419,4 +428,8 @@ echo "Debezium k6 comparison scenario completed."
 echo "mode=${MODE}"
 echo "run_id=${DEBEZIUM_K6_RUN_ID}"
 echo "summary_export=${K6_SUMMARY_EXPORT}"
+if [[ "${PHASE}" == "finish" || "${PHASE}" == "full" ]]; then
+  echo "processed_count=$(processed_count)"
+  echo "final_lag=${FINAL_TOTAL_LAG}"
+fi
 echo "artifact_dir=${ARTIFACT_DIR}"

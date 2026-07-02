@@ -30,6 +30,14 @@ const httpStatusCodes = new Counter('jobflow_http_status_codes');
 const failedResponses = new Counter('jobflow_failed_responses');
 const loggedFailureSamples = {};
 
+if (!['fixed', 'rotated'].includes(ENDPOINT_ORDER_MODE)) {
+    fail(`Unsupported ENDPOINT_ORDER_MODE=${ENDPOINT_ORDER_MODE}. Use fixed or rotated.`);
+}
+
+if (!['constant-vus', 'ramping-vus'].includes(K6_SCENARIO_MODE)) {
+    fail(`Unsupported K6_SCENARIO_MODE=${K6_SCENARIO_MODE}. Use constant-vus or ramping-vus.`);
+}
+
 function endpointEnabled(endpoint) {
     return ENDPOINTS.includes(endpoint);
 }
@@ -37,10 +45,6 @@ function endpointEnabled(endpoint) {
 function orderedEndpoints() {
     if (ENDPOINTS.length === 0 || ENDPOINT_ORDER_MODE === 'fixed') {
         return ENDPOINTS;
-    }
-
-    if (ENDPOINT_ORDER_MODE !== 'rotated') {
-        fail(`Unsupported ENDPOINT_ORDER_MODE=${ENDPOINT_ORDER_MODE}. Use fixed or rotated.`);
     }
 
     const vuIndex = typeof __VU === 'undefined' ? 0 : __VU - 1;
@@ -65,10 +69,6 @@ function createOptions() {
 
     if (K6_SCENARIO_MODE === 'constant-vus') {
         return baseOptions;
-    }
-
-    if (K6_SCENARIO_MODE !== 'ramping-vus') {
-        fail(`Unsupported K6_SCENARIO_MODE=${K6_SCENARIO_MODE}. Use constant-vus or ramping-vus.`);
     }
 
     const { vus, duration, ...rampingOptions } = baseOptions;
