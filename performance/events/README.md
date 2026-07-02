@@ -175,10 +175,12 @@ Kafka consumer smoke completed.
 
 `run-kafka-consumer-latency-lag-scenario.sh`는 API 부하가 걸린 동안 Kafka consumer 경로가 이벤트를 따라가는지 확인한다.
 
+두 대의 EC2를 분리해서 사용할 때는 staging-performance 서버에서 `prepare`/`finish` phase를 실행하고, k6-runner 서버에서는 `k6-only` phase만 실행한다. 이렇게 해야 부하를 받는 서버와 부하를 만드는 서버가 분리되어 API latency가 k6 프로세스와 같은 CPU를 공유해 왜곡되는 문제를 줄일 수 있다.
+
 검증 포인트는 세 가지다.
 
 - k6 API latency: 500VU, 5분 기준 API p95/p99와 실패율
-- Kafka consumer lag: `kafka-consumer-groups --describe` snapshot과 Prometheus `kafka_consumer_fetch_manager_records_lag`
+- Kafka consumer lag: `kafka-consumer-groups --describe` snapshot과 Prometheus `kafka_consumergroup_lag`
 - duplicate replay idempotency: 같은 `eventId`의 `email.send` 메시지를 2번 발행했을 때 `processed_kafka_events`가 1건만 남는지
 
 ### 1. API-only baseline
@@ -186,6 +188,7 @@ Kafka consumer smoke completed.
 이 실행은 Kafka consumer는 켜두되 추가 이벤트 부하는 넣지 않는다. 같은 서버/DB/검색 인덱스에서 API 자체 기준선을 잡기 위한 비교군이다.
 
 ```bash
+PHASE=full \
 SCENARIO=api-only-baseline \
 BASE_URL=http://localhost:8081/api \
 LOGIN_EMAIL='frontend-demo@example.com' \
@@ -200,13 +203,68 @@ bash performance/events/run-kafka-consumer-latency-lag-scenario.sh
 이 실행은 `outbox_events`에 `email.send` 이벤트를 대량으로 넣고, Outbox Relay가 Kafka로 발행하며, backend consumer가 처리하는 동안 같은 k6 부하를 건다.
 
 ```bash
+PHASE=full \
 SCENARIO=kafka-consumer-after \
 BASE_URL=http://localhost:8081/api \
 LOGIN_EMAIL='frontend-demo@example.com' \
 LOGIN_PASSWORD='password123' \
 VUS=500 \
 DURATION=5m \
-KAFKA_EVENT_LOAD_COUNT=60000 \
+KAFKA_EVENT_LOAD_COUNT=120000 \
+bash performance/events/run-kafka-consumer-latency-lag-scenario.sh
+```
+
+### 3. Kafka direct topic burst for lag spike/drain
+
+이 실행은 Outbox Relay를 거치지 않고 `email.send` topic에 테스트 메시지를 직접 발행한다. 목적은 API 성능 비교가 아니라 Kafka consumer lag 패널이 실제 backlog를 관측하고, consumer가 backlog를 다시 0까지 drain하는지 확인하는 것이다.
+
+공식 결과를 해석할 때는 다음처럼 구분한다.
+
+- Outbox 경유 시나리오: DB outbox insert -> Outbox Relay -> Kafka publish -> consumer 처리까지 포함한 end-to-end 경로
+- Direct topic burst: Kafka topic -> consumer 처리 구간만 강제로 압축해 lag spike/drain을 관측하는 운영성 검증
+
+```bash
+KAFKA_DIRECT_BURST_COUNT=10000 \
+KAFKA_DIRECT_BURST_RUN_ID=kafka-direct-burst-$(date +%Y%m%d%H%M%S) \
+bash performance/events/seed-kafka-email-topic-burst.sh
+```
+
+실행 직후 Grafana `Kafka Consumer Lag` 패널과 다음 snapshot을 함께 남긴다.
+
+```bash
+SNAPSHOT_LABEL=$(date +%Y%m%d%H%M%S)_direct_burst_after_publish \
+bash performance/events/kafka-consumer-lag-snapshot.sh
+```
+
+### 4. Two-server execution
+
+staging-performance 서버에서 prepare:
+
+```bash
+PHASE=prepare \
+SCENARIO=kafka-consumer-after \
+KAFKA_EVENT_LOAD_COUNT=120000 \
+bash performance/events/run-kafka-consumer-latency-lag-scenario.sh
+```
+
+k6-runner 서버에서 k6-only:
+
+```bash
+PHASE=k6-only \
+SCENARIO=kafka-consumer-after \
+BASE_URL=http://3.39.242.44:8081/api \
+LOGIN_EMAIL='frontend-demo@example.com' \
+LOGIN_PASSWORD='password123' \
+VUS=500 \
+DURATION=5m \
+bash performance/events/run-kafka-consumer-latency-lag-scenario.sh
+```
+
+k6 종료 직후 staging-performance 서버에서 finish:
+
+```bash
+PHASE=finish \
+SCENARIO=kafka-consumer-after \
 bash performance/events/run-kafka-consumer-latency-lag-scenario.sh
 ```
 
@@ -215,6 +273,7 @@ bash performance/events/run-kafka-consumer-latency-lag-scenario.sh
 - k6 JSON: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_k6.json`
 - consumer group lag snapshot: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_consumer_group_lag.txt`
 - Prometheus lag query JSON: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_prometheus_kafka_lag.json`
+- Prometheus current offset query JSON: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_prometheus_kafka_current_offset.json`
 - event baseline: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_event_baseline_{before,after}.txt`
 - duplicate replay smoke: `artifacts/kafka/날짜_kafka_consumer_latency_lag/*_idempotency_smoke.txt`
 
@@ -225,6 +284,93 @@ bash performance/events/run-kafka-consumer-latency-lag-scenario.sh
 - 실제 이메일, 실제 사용자, 실제 외부 식별자는 사용하지 않는다.
 - `api-only-baseline`과 `kafka-consumer-after`를 같은 서버/같은 fixture 상태에서 연달아 실행해야 API p95 변화와 lag 회복 여부를 비교할 수 있다.
 - Grafana 캡처는 k6 steady-state 중간 1회, 종료 직후 1회 수집한다. 특히 `Kafka Consumer Lag`, `HikariCP Connections`, `P95 / P99 Latency`, `HTTP Request Rate` 패널이 보이게 캡처한다.
+
+## Kafka failure / recovery scenarios
+
+| 질문 | 검증 스크립트 | 확인하는 것 |
+|---|---|---|
+| consumer가 멈추면 메시지는 유실되나? | `run-kafka-consumer-recovery-scenario.sh` | consumer disabled 상태에서 lag 누적, consumer 재기동 후 lag 0 drain |
+| consumer 처리 실패는 어디에 남나? | `kafka-dlq-poison-retry-smoke.sh` | poison message DLQ topic 발행, `dlq_messages` 저장, admin retry-by-id |
+| 같은 메시지가 두 번 오면 side effect가 중복되나? | `kafka-duplicate-replay-idempotency-smoke.sh` | 같은 `eventId` 2회 발행 후 `processed_kafka_events` 1건 유지 |
+| 같은 aggregate의 순서는 어떻게 지키나? | `kafka-partition-key-order-smoke.sh` | 같은 key가 같은 partition에 기록되고 publish 순서가 유지됨 |
+
+### 1. Consumer down -> lag accumulation -> recovery
+
+이 시나리오는 backend를 `JOBFLOW_KAFKA_CONSUMER_ENABLED=false`로 재기동해 consumer만 끈다. Outbox Relay는 계속 Kafka로 발행하므로 topic lag가 쌓여야 한다. 이후 consumer를 다시 켜서 lag가 0까지 drain 되는지 확인한다.
+
+```bash
+KAFKA_RECOVERY_EVENT_COUNT=10000 \
+KAFKA_RECOVERY_RUN_ID=kafka-consumer-recovery-$(date +%Y%m%d%H%M%S) \
+bash performance/events/run-kafka-consumer-recovery-scenario.sh
+```
+
+기대 결과:
+
+- consumer disabled 구간에서 `lag_accumulated > 0`
+- consumer enabled 재기동 후 `final_lag=0`
+- `processed_count`가 주입한 outbox event 수와 일치
+- Grafana `Kafka Consumer Lag` 패널에서 lag 누적과 drain이 보임
+
+캡처 타이밍:
+
+- consumer disabled 후 lag가 쌓인 시점
+- consumer enabled 재기동 직후 drain 중인 시점
+- lag가 0으로 복구된 시점
+
+### 2. Poison message -> DLQ persistence -> retry-by-id
+
+이 시나리오는 `email.send` topic에 필수 필드가 빠진 poison message를 발행한다. consumer retry가 끝나면 recoverer가 원본 메시지를 DLQ envelope로 감싸고, DLQ topic 발행과 `dlq_messages` 저장을 수행한다. 이후 admin retry-by-id API가 저장된 envelope를 원본 topic으로 재발행하고 기존 DLQ row를 `RETRIED`로 바꾸는지 검증한다.
+
+```bash
+ADMIN_ACCESS_TOKEN='...' \
+KAFKA_DLQ_SMOKE_RUN_ID=kafka-dlq-poison-$(date +%Y%m%d%H%M%S) \
+bash performance/events/kafka-dlq-poison-retry-smoke.sh
+```
+
+기대 결과:
+
+- 최초 poison message가 `dlq_messages.status=PENDING`으로 저장됨
+- `GET /admin/dlq/messages/{id}`가 저장된 envelope를 반환함
+- `POST /admin/dlq/messages/{id}/retry`가 `202 Accepted`로 응답함
+- 원본 DLQ row가 `RETRIED`, `retry_count=1`로 바뀜
+- poison payload를 그대로 재발행하므로 재시도된 메시지는 다시 실패할 수 있다. 이 smoke의 목적은 retry API가 원본 topic으로 재발행하고 운영 상태를 남기는지 확인하는 것이다. payload 수정/보정 후 재처리는 별도 운영 정책 범위다.
+
+주의:
+
+- `ADMIN_ACCESS_TOKEN`은 admin 권한 JWT다. 스크립트 출력에 token 값을 남기지 않는다.
+- 이 스크립트는 `PERF_DB_NAME=jobflow`이면 실행을 거부한다.
+
+### 3. Duplicate replay idempotency
+
+같은 `eventId`의 `email.send` 메시지를 2번 발행해, consumer side effect가 한 번만 실행되는지 확인한다. Kafka exactly-once transaction을 쓴 것이 아니라 at-least-once delivery 위에서 `processed_kafka_events` unique key로 effectively-once 처리를 만든다는 근거다.
+
+```bash
+KAFKA_IDEMPOTENCY_SMOKE_RUN_ID=kafka-idempotency-$(date +%Y%m%d%H%M%S) \
+bash performance/events/kafka-duplicate-replay-idempotency-smoke.sh
+```
+
+기대 결과:
+
+- `processed_count=1`
+- backend log에 duplicate skip이 남음
+
+### 4. Partition key / order smoke
+
+Kafka는 partition 내부 순서만 보장한다. 따라서 같은 aggregate에 대한 이벤트 순서가 필요하면 같은 partition으로 가도록 key를 고정해야 한다. 이 smoke는 동일 key로 여러 메시지를 발행하고, consumer formatter의 partition 출력과 sequence 값을 확인한다.
+
+```bash
+KAFKA_PARTITION_SMOKE_COUNT=5 \
+KAFKA_PARTITION_SMOKE_RUN_ID=kafka-partition-key-$(date +%Y%m%d%H%M%S) \
+bash performance/events/kafka-partition-key-order-smoke.sh
+```
+
+기대 결과:
+
+- `matched_count=5`
+- `partition_count=1`
+- `sequence_list=1,2,3,4,5`
+
+이 결과는 “같은 key는 같은 partition으로 간다”는 smoke다. 전체 Kafka topic 순서를 보장한다는 뜻은 아니다.
 
 ## Security event pipeline smoke
 
