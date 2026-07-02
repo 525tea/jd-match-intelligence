@@ -711,6 +711,62 @@
           "sort": "desc"
         }
       }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Redis Cache Error Rate",
+      "description": "Redis cache get/put/evict/clear 실패율입니다. cache 장애가 API 500으로 전파되지 않더라도 degraded 상태를 관측하기 위한 패널입니다.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation, cache) (rate(jobflow_cache_redis_error_total[1m]))",
+          "legendFormat": "{{operation}} {{cache}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
     }
   ]
 }

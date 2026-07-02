@@ -13,6 +13,11 @@ spring:
       idle-timeout: ${HIKARI_IDLE_TIMEOUT:600000}
       max-lifetime: ${HIKARI_MAX_LIFETIME:1800000}
 
+  data:
+    redis:
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:1s}
+      timeout: ${REDIS_TIMEOUT:1s}
+
   batch:
     job:
       enabled: false

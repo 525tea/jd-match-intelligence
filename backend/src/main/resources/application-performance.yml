@@ -9,6 +9,11 @@ spring:
     connection-timeout: ${PERF_ELASTICSEARCH_CONNECTION_TIMEOUT:5s}
     socket-timeout: ${PERF_ELASTICSEARCH_SOCKET_TIMEOUT:30s}
 
+  data:
+    redis:
+      connect-timeout: ${PERF_REDIS_CONNECT_TIMEOUT:${REDIS_CONNECT_TIMEOUT:500ms}}
+      timeout: ${PERF_REDIS_TIMEOUT:${REDIS_TIMEOUT:500ms}}
+
   flyway:
     enabled: false
     locations: classpath:db/migration
