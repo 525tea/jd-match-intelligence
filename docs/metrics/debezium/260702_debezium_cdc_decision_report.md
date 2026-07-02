@@ -92,21 +92,23 @@ Kafka consumer
 
 ## 검증 기준
 
-Debezium 구현 작업에서는 다음을 확인한다.
+Debezium 구현 작업에서는 다음을 확인한다. 
 
-| 검증 항목 | 완료 기준 |
-|---|---|
-| Connector readiness | connector status RUNNING, task status RUNNING |
-| MySQL binlog | outbox row 변경이 connector에 감지됨 |
-| Outbox insert -> Kafka publish | Outbox Relay를 끈 상태에서도 Kafka topic에 event가 발행됨 |
-| Topic routing | 기존 consumer가 읽는 topic과 호환됨 |
-| Message key | 기존 aggregate key 전략과 호환됨 |
-| Envelope compatibility | consumer parser가 기존 계약으로 message를 처리함 |
-| Consumer code unchanged | consumer side effect business logic 수정 없음 |
-| Backend restart | backend 재시작 중 outbox event 유실 0건 |
-| Connector recovery | connector stop 중 쌓인 event가 restart 후 drain됨 |
-| Duplicate delivery | idempotent consumer로 side effect 1회 유지 |
-| Final lag | 최종 consumer lag 0 |
+현재 단건 CDC path는 확인했고, 대량 부하와 recovery는 다음 비교 작업에서 확인한다.
+
+| 검증 항목 | 완료 기준 / 현재 상태                                                                       |
+|---|-------------------------------------------------------------------------------------|
+| Connector readiness | 완료. connector status RUNNING, task status RUNNING                                   |
+| MySQL binlog | 완료. `outbox_events.id=162506` 변경 감지됨                                                |
+| Outbox insert -> Kafka publish | 완료. Outbox Relay disabled 상태에서 Kafka `email.send` 발행                                |
+| Topic routing | 완료. `outbox_events.topic` -> `email.send`                                           |
+| Message key | smoke에서 aggregate id key 확인                                                         |
+| Envelope/header compatibility | 완료. Debezium Event Router가 event id를 Kafka header `id`에 실어 parser adapter 보강        |
+| Consumer business logic | 이메일 발송/검색 색인 side effect logic은 유지. Kafka listener/parser adapter는 header 수용을 위해 변경 |
+| Backend restart | backend restart 중 outbox event 유실 0건 검증 예정                                          |
+| Connector recovery | connector stop/restart drain 검증 예정                                                  |
+| Duplicate delivery | 기존 idempotent consumer 유지. Debezium path 대량/retry 조건은 추가 확인 예정                      |
+| Final lag | 단건 smoke 처리 완료. 대량 조건 final lag 0은 검증 예정                                   |
 
 ## 측정 기준선
 
@@ -127,4 +129,6 @@ Kafka 단계는 publish 실패를 Outbox로 추적하고, consumer 실패를 DLQ
 
 다음 개선 지점은 consumer가 아니라 producer side의 app-level relay 책임이다. Debezium CDC는 이 책임을 MySQL binlog 기반 CDC로 이전하기 위한 선택이다.
 
-따라서 다음 작업은 Debezium MySQL Connector 설정과 전환 전후 검증이다. 성공 기준은 consumer 코드 수정 없이 Outbox insert가 Kafka publish로 이어지고, backend/connector 장애 시에도 이벤트 유실 없이 final lag 0으로 회복되는 것이다.
+Debezium MySQL Connector 설정과 단건 Outbox CDC smoke는 완료했다. relay disabled 상태에서 event id `162506`이 Kafka `email.send`로 발행됐고, Debezium header `id`를 backend consumer가 idempotency event id로 읽어 `processed_count=1`을 남겼다. 이 과정에서 “consumer 코드 수정 없음”은 실제 Debezium header contract 때문에 그대로 유지하지 않았다. 대신 side effect business logic과 idempotency 저장 모델은 유지하고, Kafka listener/parser adapter가 header `id`를 수용하도록 보강했다.
+
+따라서 다음 작업은 전환 전후 대량 비교와 recovery 검증이다. 성공 기준은 API 500VU + Outbox 대량 이벤트 조건에서 event delay/API p95/final lag를 비교하고, backend/connector 장애 시에도 이벤트 유실 없이 final lag 0으로 회복되는 것이다.
