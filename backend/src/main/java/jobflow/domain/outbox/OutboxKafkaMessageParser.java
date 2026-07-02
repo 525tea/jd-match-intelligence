@@ -1,6 +1,9 @@
 package jobflow.domain.outbox;
 
+import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
+import org.apache.kafka.common.header.Header;
+import org.apache.kafka.common.header.Headers;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -13,12 +16,16 @@ public class OutboxKafkaMessageParser {
     private final ObjectMapper objectMapper;
 
     public OutboxKafkaEnvelope parseEnvelope(String message) {
+        return parseEnvelope(message, null);
+    }
+
+    public OutboxKafkaEnvelope parseEnvelope(String message, Headers headers) {
         JsonNode root = parseRoot(message);
         JsonNode payload = payloadOrRoot(root);
 
         return new OutboxKafkaEnvelope(
                 intOrDefault(root, "schemaVersion", 1),
-                longOrNull(root, "eventId"),
+                eventId(root, headers),
                 textOrNull(root, "aggregateType"),
                 longOrNull(root, "aggregateId"),
                 textOrNull(root, "eventType"),
@@ -56,6 +63,34 @@ public class OutboxKafkaMessageParser {
             throw new IllegalArgumentException("Kafka message field '%s' must be a long".formatted(fieldName));
         }
         return value.longValue();
+    }
+
+    private Long eventId(JsonNode root, Headers headers) {
+        Long valueEventId = longOrNull(root, "eventId");
+        if (valueEventId != null) {
+            return valueEventId;
+        }
+        return longHeaderOrNull(headers, "id");
+    }
+
+    private Long longHeaderOrNull(Headers headers, String headerName) {
+        if (headers == null) {
+            return null;
+        }
+        Header header = headers.lastHeader(headerName);
+        if (header == null || header.value() == null) {
+            return null;
+        }
+
+        String value = new String(header.value(), StandardCharsets.UTF_8).trim();
+        if (value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Kafka message header '%s' must be a long".formatted(headerName), e);
+        }
     }
 
     private int intOrDefault(JsonNode node, String fieldName, int defaultValue) {

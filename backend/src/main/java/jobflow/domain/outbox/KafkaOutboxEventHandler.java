@@ -17,7 +17,6 @@ import tools.jackson.databind.node.ObjectNode;
 @ConditionalOnProperty(name = "jobflow.outbox.relay.publisher", havingValue = "kafka")
 public class KafkaOutboxEventHandler implements OutboxEventHandler {
 
-    static final int OUTBOX_ENVELOPE_SCHEMA_VERSION = 1;
     private static final String LEGACY_JOB_EVENTS_TOPIC = "job.events";
 
     private final KafkaTemplate<String, String> kafkaTemplate;
@@ -78,7 +77,7 @@ public class KafkaOutboxEventHandler implements OutboxEventHandler {
         } else {
             root.putNull("eventId");
         }
-        root.put("schemaVersion", OUTBOX_ENVELOPE_SCHEMA_VERSION);
+        root.put("schemaVersion", event.getSchemaVersion());
         root.put("aggregateType", event.getAggregateType());
         root.put("aggregateId", event.getAggregateId());
         root.put("eventType", event.getEventType());

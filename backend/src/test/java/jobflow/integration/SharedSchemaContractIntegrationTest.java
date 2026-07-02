@@ -110,6 +110,7 @@ class SharedSchemaContractIntegrationTest extends MySqlTestContainerSupport {
         assertColumn("job_experience_tags", "source_phrase", "varchar", true);
 
         assertColumn("outbox_events", "id", "bigint", false);
+        assertColumn("outbox_events", "schema_version", "int", false);
         assertColumn("outbox_events", "aggregate_type", "varchar", false);
         assertColumn("outbox_events", "aggregate_id", "bigint", false);
         assertColumn("outbox_events", "event_type", "varchar", false);

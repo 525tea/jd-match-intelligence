@@ -5,6 +5,7 @@ import jobflow.domain.outbox.OutboxKafkaEnvelope;
 import jobflow.domain.outbox.OutboxKafkaMessageParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -25,8 +26,17 @@ public class EmailSendKafkaConsumer {
             topics = "${jobflow.kafka.consumer.topics.email-send:email.send}",
             groupId = "${jobflow.kafka.consumer.group-id:jobflow-backend}"
     )
-    public void consume(String message) {
+    public void consume(ConsumerRecord<String, String> record) {
+        OutboxKafkaEnvelope envelope = messageParser.parseEnvelope(record.value(), record.headers());
+        handle(envelope);
+    }
+
+    void consume(String message) {
         OutboxKafkaEnvelope envelope = messageParser.parseEnvelope(message);
+        handle(envelope);
+    }
+
+    private void handle(OutboxKafkaEnvelope envelope) {
         idempotencyService.runOnce("email-send", envelope.eventId(), () -> send(envelope));
     }
 

@@ -23,6 +23,14 @@ class OutboxEventTest {
     }
 
     @Test
+    @DisplayName("새 outbox event는 v1 envelope schemaVersion을 가진다")
+    void createWithSchemaVersion() {
+        OutboxEvent event = createEvent();
+
+        assertThat(event.getSchemaVersion()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("이벤트 처리 실패 시 retryCount를 증가시키고 lastError를 기록한다")
     void markFailed() {
         OutboxEvent event = createEvent();

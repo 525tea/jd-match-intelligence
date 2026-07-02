@@ -179,6 +179,40 @@ Kafka consumer smoke completed.
 
 검증 포인트는 세 가지다.
 
+## Debezium Outbox CDC smoke
+
+`performance/debezium/register-outbox-connector.sh`는 Debezium MySQL Connector를 등록한다. Connector는 `outbox_events` table의 insert를 MySQL binlog에서 읽고, Debezium Outbox Event Router SMT로 `topic` column 값에 해당하는 Kafka topic에 메시지를 발행한다.
+
+`performance/debezium/debezium-outbox-cdc-smoke.sh`는 app-level Outbox Relay를 끈 상태에서 다음 경로를 확인한다.
+
+- MySQL `outbox_events` insert
+- Debezium MySQL Connector CDC capture
+- Kafka `email.send` topic publish
+- 기존 backend Kafka consumer 처리
+- `processed_kafka_events` idempotency record 생성
+- app-level relay가 꺼져 있으므로 outbox row `status=PENDING`, `published_at=NULL` 유지
+
+실행 전 backend는 반드시 `PERF_OUTBOX_RELAY_ENABLED=false`로 재기동해야 한다. 이 조건이 아니면 기존 app-level relay가 같은 outbox row를 publish할 수 있으므로 smoke가 실패한다.
+
+```bash
+PERF_OUTBOX_RELAY_ENABLED=false \
+docker compose -f docker-compose.yml -f docker-compose.performance.yml up -d --force-recreate backend debezium-connect
+
+bash performance/debezium/debezium-outbox-cdc-smoke.sh
+```
+
+기대 결과:
+
+```text
+Debezium outbox CDC smoke completed.
+```
+
+주의:
+
+- 이 smoke는 `PERF_DB_NAME=jobflow`일 때 실행 불가능한다.
+- 기존 performance DB에 `schema_version` column이 없으면 smoke가 performance DB에 한해 column을 추가한다.
+- Debezium은 outbox row를 Kafka로 발행하지만 app DB row의 publish status를 직접 바꾸지 않는다. Debezium 전환 이후 `PENDING`은 app relay의 publish 대기 상태가 아니라 cleanup/retention 정책의 대상이 된다.
+
 - k6 API latency: 500VU, 5분 기준 API p95/p99와 실패율
 - Kafka consumer lag: `kafka-consumer-groups --describe` snapshot과 Prometheus `kafka_consumergroup_lag`
 - duplicate replay idempotency: 같은 `eventId`의 `email.send` 메시지를 2번 발행했을 때 `processed_kafka_events`가 1건만 남는지

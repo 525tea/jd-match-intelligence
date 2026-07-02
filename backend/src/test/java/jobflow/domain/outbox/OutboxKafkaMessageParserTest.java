@@ -3,6 +3,9 @@ package jobflow.domain.outbox;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.nio.charset.StandardCharsets;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -62,6 +65,108 @@ class OutboxKafkaMessageParserTest {
         OutboxKafkaEnvelope envelope = parser.parseEnvelope(message);
 
         assertThat(envelope.schemaVersion()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Debezium Outbox Event Router value envelope도 기존 consumer 계약으로 해석한다")
+    void parseDebeziumOutboxEventRouterEnvelope() {
+        String message = """
+                {
+                  "payload": {
+                    "to": "user@example.com",
+                    "subject": "Debezium outbox smoke sample-run",
+                    "text": "Sample body",
+                    "html": null,
+                    "smokeRunId": "sample-run"
+                  },
+                  "schemaVersion": 1,
+                  "aggregateType": "EMAIL",
+                  "aggregateId": 30,
+                  "eventType": "EMAIL_SEND_REQUESTED",
+                  "topic": "email.send",
+                  "eventId": 40
+                }
+                """;
+
+        OutboxKafkaEnvelope envelope = parser.parseEnvelope(message);
+
+        assertThat(envelope.schemaVersion()).isEqualTo(1);
+        assertThat(envelope.eventId()).isEqualTo(40L);
+        assertThat(envelope.aggregateType()).isEqualTo("EMAIL");
+        assertThat(envelope.aggregateId()).isEqualTo(30L);
+        assertThat(envelope.eventType()).isEqualTo("EMAIL_SEND_REQUESTED");
+        assertThat(envelope.topic()).isEqualTo("email.send");
+        assertThat(envelope.payload().path("to").asText()).isEqualTo("user@example.com");
+        assertThat(envelope.payload().path("smokeRunId").asText()).isEqualTo("sample-run");
+    }
+
+    @Test
+    @DisplayName("Debezium Event Router가 event id를 Kafka header에 둘 때도 envelope eventId로 해석한다")
+    void parseDebeziumOutboxEventIdHeader() {
+        String message = """
+                {
+                  "payload": {
+                    "to": "user@example.com",
+                    "subject": "Debezium outbox smoke sample-run",
+                    "text": "Sample body",
+                    "smokeRunId": "sample-run"
+                  },
+                  "schemaVersion": 1,
+                  "aggregateType": "EMAIL",
+                  "aggregateId": 30,
+                  "eventType": "EMAIL_SEND_REQUESTED",
+                  "topic": "email.send"
+                }
+                """;
+        Headers headers = new RecordHeaders()
+                .add("id", "40".getBytes(StandardCharsets.UTF_8));
+
+        OutboxKafkaEnvelope envelope = parser.parseEnvelope(message, headers);
+
+        assertThat(envelope.eventId()).isEqualTo(40L);
+        assertThat(envelope.aggregateId()).isEqualTo(30L);
+        assertThat(envelope.payload().path("smokeRunId").asText()).isEqualTo("sample-run");
+    }
+
+    @Test
+    @DisplayName("value와 header에 eventId가 모두 있으면 value eventId를 우선한다")
+    void preferValueEventIdOverDebeziumHeader() {
+        String message = """
+                {
+                  "eventId": 50,
+                  "payload": {
+                    "to": "user@example.com",
+                    "subject": "Sample subject",
+                    "text": "Sample body"
+                  }
+                }
+                """;
+        Headers headers = new RecordHeaders()
+                .add("id", "40".getBytes(StandardCharsets.UTF_8));
+
+        OutboxKafkaEnvelope envelope = parser.parseEnvelope(message, headers);
+
+        assertThat(envelope.eventId()).isEqualTo(50L);
+    }
+
+    @Test
+    @DisplayName("Debezium event id header가 숫자가 아니면 실패한다")
+    void failWhenDebeziumEventIdHeaderIsInvalid() {
+        String message = """
+                {
+                  "payload": {
+                    "to": "user@example.com",
+                    "subject": "Sample subject",
+                    "text": "Sample body"
+                  }
+                }
+                """;
+        Headers headers = new RecordHeaders()
+                .add("id", "oops".getBytes(StandardCharsets.UTF_8));
+
+        assertThatThrownBy(() -> parser.parseEnvelope(message, headers))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Kafka message header 'id' must be a long");
     }
 
     @Test
