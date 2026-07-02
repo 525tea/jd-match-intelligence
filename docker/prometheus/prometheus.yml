@@ -22,3 +22,13 @@ scrape_configs:
       - source_labels: [__address__]
         target_label: instance
         replacement: jobflow-gateway
+
+  - job_name: jobflow-kafka-exporter
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - kafka-exporter:9308
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: jobflow-kafka-exporter

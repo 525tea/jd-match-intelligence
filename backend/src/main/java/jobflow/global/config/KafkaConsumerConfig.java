@@ -42,11 +42,13 @@ public class KafkaConsumerConfig {
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
             ConsumerFactory<String, String> kafkaConsumerFactory,
-            DefaultErrorHandler kafkaDefaultErrorHandler
+            DefaultErrorHandler kafkaDefaultErrorHandler,
+            @Value("${jobflow.kafka.consumer.concurrency:1}") int concurrency
     ) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(kafkaConsumerFactory);
+        factory.setConcurrency(concurrency);
         factory.setCommonErrorHandler(kafkaDefaultErrorHandler);
         return factory;
     }

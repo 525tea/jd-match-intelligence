@@ -7,6 +7,10 @@ const KEYWORDS = (__ENV.KEYWORDS || 'performance,backend,data,devops,security')
     .split(',')
     .map((keyword) => keyword.trim())
     .filter((keyword) => keyword.length > 0);
+const ENDPOINTS = (__ENV.ENDPOINTS || 'jobs_list,jobs_search,recommendations_jobs,gap_analysis')
+    .split(',')
+    .map((endpoint) => endpoint.trim())
+    .filter((endpoint) => endpoint.length > 0);
 
 const PAGE_SIZE = Number(__ENV.PAGE_SIZE || 20);
 const SEARCH_LIMIT = Number(__ENV.SEARCH_LIMIT || 10);
@@ -20,6 +24,10 @@ const FAILURE_SAMPLE_BODY_LIMIT = Number(__ENV.FAILURE_SAMPLE_BODY_LIMIT || 500)
 const httpStatusCodes = new Counter('jobflow_http_status_codes');
 const failedResponses = new Counter('jobflow_failed_responses');
 const loggedFailureSamples = {};
+
+function endpointEnabled(endpoint) {
+    return ENDPOINTS.includes(endpoint);
+}
 
 export const options = {
     vus: Number(__ENV.VUS || 20),
@@ -78,7 +86,9 @@ function logFailureSample(endpoint, response) {
     }
 
     loggedFailureSamples[key] = true;
-    console.error(`[failure-sample] vu=${__VU} iter=${__ITER} endpoint=${endpoint} status=${response.status} body=${truncateBody(response.body)}`);
+    const vu = typeof __VU === 'undefined' ? 'setup' : __VU;
+    const iteration = typeof __ITER === 'undefined' ? 'setup' : __ITER;
+    console.error(`[failure-sample] vu=${vu} iter=${iteration} endpoint=${endpoint} status=${response.status} body=${truncateBody(response.body)}`);
 }
 
 function observeResponse(endpoint, response) {
@@ -193,81 +203,89 @@ export default function (context) {
     const page = __ITER % 5;
     const headers = authorizationHeaders(context.token);
 
-    const listResponse = http.get(`${BASE_URL}/jobs?page=${page}&size=${PAGE_SIZE}`, {
-        tags: {
-            endpoint: 'jobs_list',
-        },
-    });
-    observeResponse('jobs_list', listResponse);
-
-    check(listResponse, {
-        'jobs list status is 200': (res) => res.status === 200,
-        'jobs list returns data array': (res) => {
-            try {
-                return Array.isArray(res.json('data'));
-            } catch {
-                return false;
-            }
-        },
-        'jobs list uses performance fixture': hasPerformanceFixtureRows,
-    });
-
-    const searchResponse = http.get(
-        `${BASE_URL}/jobs/search?keyword=${encodeURIComponent(keyword)}&limit=${SEARCH_LIMIT}`,
-        {
+    if (endpointEnabled('jobs_list')) {
+        const listResponse = http.get(`${BASE_URL}/jobs?page=${page}&size=${PAGE_SIZE}`, {
             tags: {
-                endpoint: 'jobs_search',
-                keyword,
+                endpoint: 'jobs_list',
             },
-        },
-    );
-    observeResponse('jobs_search', searchResponse);
+        });
+        observeResponse('jobs_list', listResponse);
 
-    check(searchResponse, {
-        'jobs search status is 200': (res) => res.status === 200,
-        'jobs search success is true': (res) => res.status === 200 && res.json('success') === true,
-        'jobs search returns data array': (res) => {
-            try {
-                return Array.isArray(res.json('data'));
-            } catch {
-                return false;
-            }
-        },
-        'jobs search uses performance fixture': hasPerformanceFixtureRows,
-    });
+        check(listResponse, {
+            'jobs list status is 200': (res) => res.status === 200,
+            'jobs list returns data array': (res) => {
+                try {
+                    return Array.isArray(res.json('data'));
+                } catch {
+                    return false;
+                }
+            },
+            'jobs list uses performance fixture': hasPerformanceFixtureRows,
+        });
+    }
+
+    if (endpointEnabled('jobs_search')) {
+        const searchResponse = http.get(
+            `${BASE_URL}/jobs/search?keyword=${encodeURIComponent(keyword)}&limit=${SEARCH_LIMIT}`,
+            {
+                tags: {
+                    endpoint: 'jobs_search',
+                    keyword,
+                },
+            },
+        );
+        observeResponse('jobs_search', searchResponse);
+
+        check(searchResponse, {
+            'jobs search status is 200': (res) => res.status === 200,
+            'jobs search success is true': (res) => res.status === 200 && res.json('success') === true,
+            'jobs search returns data array': (res) => {
+                try {
+                    return Array.isArray(res.json('data'));
+                } catch {
+                    return false;
+                }
+            },
+            'jobs search uses performance fixture': hasPerformanceFixtureRows,
+        });
+    }
 
     if (context.token && context.userProjectId) {
-        const recommendationResponse = http.get(
-            `${BASE_URL}/recommendations/jobs?userProjectId=${encodeURIComponent(context.userProjectId)}&limit=${RECOMMENDATION_LIMIT}`,
-            {
-                headers,
-                tags: {
-                    endpoint: 'recommendations_jobs',
+        if (endpointEnabled('recommendations_jobs')) {
+            const recommendationResponse = http.get(
+                `${BASE_URL}/recommendations/jobs?userProjectId=${encodeURIComponent(context.userProjectId)}&limit=${RECOMMENDATION_LIMIT}`,
+                {
+                    headers,
+                    tags: {
+                        endpoint: 'recommendations_jobs',
+                    },
                 },
-            },
-        );
-        observeResponse('recommendations_jobs', recommendationResponse);
+            );
+            observeResponse('recommendations_jobs', recommendationResponse);
 
-        check(recommendationResponse, {
-            'recommendations jobs status is 200': (res) => res.status === 200,
-            'recommendations jobs returns success data': hasSuccessData,
-        });
+            check(recommendationResponse, {
+                'recommendations jobs status is 200': (res) => res.status === 200,
+                'recommendations jobs returns success data': hasSuccessData,
+            });
+        }
 
-        const gapAnalysisResponse = http.get(
-            `${BASE_URL}/gap-analysis/projects/${encodeURIComponent(context.userProjectId)}?limit=${GAP_LIMIT}`,
-            {
-                headers,
-                tags: {
-                    endpoint: 'gap_analysis',
+        if (endpointEnabled('gap_analysis')) {
+            const gapAnalysisResponse = http.get(
+                `${BASE_URL}/gap-analysis/projects/${encodeURIComponent(context.userProjectId)}?limit=${GAP_LIMIT}`,
+                {
+                    headers,
+                    tags: {
+                        endpoint: 'gap_analysis',
+                    },
                 },
-            },
-        );
-        observeResponse('gap_analysis', gapAnalysisResponse);
+            );
+            observeResponse('gap_analysis', gapAnalysisResponse);
 
-        check(gapAnalysisResponse, {
-            'gap analysis status is 200': (res) => res.status === 200,
-            'gap analysis returns success data': hasSuccessData,
-        });
+            check(gapAnalysisResponse, {
+                'gap analysis status is 200': (res) => res.status === 200,
+                'gap analysis returns success data': hasSuccessData,
+            });
+        }
     }
 
     sleep(SLEEP_SECONDS);

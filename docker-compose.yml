@@ -112,6 +112,18 @@ services:
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic security.events --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
         kafka-topics --bootstrap-server kafka:29092 --list
 
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.7.0
+    container_name: jobflow-kafka-exporter
+    mem_limit: ${KAFKA_EXPORTER_MEMORY_LIMIT:-128m}
+    command:
+      - "--kafka.server=kafka:29092"
+    ports:
+      - "9308:9308"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
   backend:
     build:
       context: ./backend
@@ -264,6 +276,8 @@ services:
         condition: service_healthy
       gateway:
         condition: service_healthy
+      kafka-exporter:
+        condition: service_started
 
   grafana:
     image: grafana/grafana:10.4.2

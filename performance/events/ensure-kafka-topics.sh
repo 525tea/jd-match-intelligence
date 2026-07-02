@@ -7,7 +7,7 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 KAFKA_SERVICE="${KAFKA_SERVICE:-kafka}"
 KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}"
-KAFKA_EXPECTED_TOPICS="${KAFKA_EXPECTED_TOPICS:-job.created application.events email.send es.index security.events}"
+KAFKA_EXPECTED_TOPICS="${KAFKA_EXPECTED_TOPICS:-job.created job.created.dlq application.events application.events.dlq email.send email.send.dlq es.index es.index.dlq security.events}"
 KAFKA_EXPECTED_PARTITIONS="${KAFKA_EXPECTED_PARTITIONS:-3}"
 KAFKA_EXPECTED_REPLICATION_FACTOR="${KAFKA_EXPECTED_REPLICATION_FACTOR:-1}"
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)

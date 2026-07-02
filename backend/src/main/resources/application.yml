@@ -110,6 +110,7 @@ jobflow:
     consumer:
       enabled: ${JOBFLOW_KAFKA_CONSUMER_ENABLED:false}
       group-id: ${JOBFLOW_KAFKA_CONSUMER_GROUP_ID:jobflow-backend}
+      concurrency: ${JOBFLOW_KAFKA_CONSUMER_CONCURRENCY:1}
       auto-offset-reset: ${JOBFLOW_KAFKA_CONSUMER_AUTO_OFFSET_RESET:latest}
       retry:
         max-retries: ${JOBFLOW_KAFKA_CONSUMER_RETRY_MAX_RETRIES:3}
