@@ -231,6 +231,7 @@ Debezium outbox CDC smoke completed.
 - `processed_kafka_events` 처리 수
 - Kafka consumer lag: `kafka-consumer-groups --describe` snapshot과 Prometheus `kafka_consumergroup_lag`
 - Kafka consumer final lag 0
+- Debezium 모드의 outbox cleanup: Debezium은 binlog insert를 Kafka로 publish할 뿐 `outbox_events.status`를 `PUBLISHED`로 바꾸지 않는다. 장기 누적을 막으려면 consumer 처리 완료 이력이 있는 outbox row를 retention 이후 cleanup한다.
 - duplicate replay idempotency: 같은 `eventId`의 `email.send` 메시지를 2번 발행했을 때 `processed_kafka_events`가 1건만 남는지
 - Debezium 전환 후에도 기존 side effect business logic과 idempotency 모델 유지
 
@@ -274,6 +275,26 @@ ENDPOINT_ORDER_MODE=rotated \
 ENDPOINTS=jobs_search,recommendations_jobs,gap_analysis \
 bash performance/debezium/run-debezium-k6-comparison.sh
 ```
+
+Debezium cleanup까지 포함해 측정할 때는 staging-performance 서버의 `prepare` 전에 다음 값을 함께 둔다.
+
+```bash
+PERF_OUTBOX_CLEANUP_SCHEDULER_ENABLED=true \
+PERF_OUTBOX_CLEANUP_RETENTION=PT30S \
+PERF_OUTBOX_CLEANUP_BATCH_SIZE=1000 \
+PERF_OUTBOX_CLEANUP_FIXED_DELAY=10000 \
+PERF_OUTBOX_CLEANUP_INITIAL_DELAY=10000 \
+MODE=debezium-cdc-after \
+PHASE=prepare \
+DEBEZIUM_K6_RUN_ID=debezium-k6-after-cleanup-$(date +%Y%m%d%H%M%S) \
+bash performance/debezium/run-debezium-k6-comparison.sh
+```
+
+주의:
+
+- Cleanup은 `processed_kafka_events`에 처리 이력이 있는 `PENDING` outbox row와 기존 relay가 `PUBLISHED`로 마킹한 row만 삭제한다.
+- Debezium connector는 `skipped.operations=u,d`로 등록한다. cleanup delete나 status update가 Kafka business event로 다시 흘러가지 않게 하기 위해서다.
+- Cleanup을 켠 run에서는 Debezium 최종 summary의 `outbox_pending/outbox_total`이 10,000보다 작아질 수 있다. 이때 완료 기준은 `processed_count=10000`과 Kafka final lag 0이다.
 
 k6 실행 중 staging-performance 서버:
 

@@ -17,6 +17,9 @@ class OutboxEventRepositoryTest {
     @Autowired
     private OutboxEventRepository outboxEventRepository;
 
+    @Autowired
+    private ProcessedKafkaEventRepository processedKafkaEventRepository;
+
     @Test
     @DisplayName("PENDING 상태이고 최대 재시도 횟수 미만인 이벤트를 생성 순서대로 조회한다")
     void findPendingEvents() {
@@ -71,6 +74,49 @@ class OutboxEventRepositoryTest {
         assertThat(events)
                 .extracting(OutboxEvent::getAggregateId)
                 .containsExactly(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("cleanup 후보는 PUBLISHED 이벤트와 consumer 처리 완료된 PENDING 이벤트만 조회한다")
+    void findCleanupCandidateIds() {
+        OutboxEvent processedPendingEvent = outboxEventRepository.save(createEvent(1L, OutboxEventTypes.JOB_CREATED));
+        OutboxEvent unprocessedPendingEvent = outboxEventRepository.save(createEvent(2L, OutboxEventTypes.JOB_UPDATED));
+        OutboxEvent publishedEvent = createEvent(3L, OutboxEventTypes.JOB_CLOSED);
+        publishedEvent.markPublished();
+        outboxEventRepository.save(publishedEvent);
+        OutboxEvent failedEvent = createEvent(4L, OutboxEventTypes.JOB_EXPIRED);
+        failedEvent.markFailed("first failure", 1);
+        outboxEventRepository.save(failedEvent);
+        outboxEventRepository.flush();
+        processedKafkaEventRepository.save(ProcessedKafkaEvent.create("job-search-index", processedPendingEvent.getId()));
+        processedKafkaEventRepository.flush();
+
+        List<Long> candidateIds = outboxEventRepository.findCleanupCandidateIds(
+                processedPendingEvent.getCreatedAt().plusSeconds(1),
+                PageRequest.of(0, 10)
+        );
+
+        assertThat(candidateIds)
+                .containsExactlyInAnyOrder(processedPendingEvent.getId(), publishedEvent.getId());
+        assertThat(candidateIds)
+                .doesNotContain(unprocessedPendingEvent.getId(), failedEvent.getId());
+    }
+
+    @Test
+    @DisplayName("cleanup 후보 id 목록을 bulk delete한다")
+    void deleteByIdIn() {
+        OutboxEvent firstEvent = outboxEventRepository.save(createEvent(1L, OutboxEventTypes.JOB_CREATED));
+        OutboxEvent secondEvent = outboxEventRepository.save(createEvent(2L, OutboxEventTypes.JOB_UPDATED));
+        OutboxEvent remainingEvent = outboxEventRepository.save(createEvent(3L, OutboxEventTypes.JOB_CLOSED));
+        outboxEventRepository.flush();
+
+        int deletedCount = outboxEventRepository.deleteByIdIn(List.of(firstEvent.getId(), secondEvent.getId()));
+        outboxEventRepository.flush();
+
+        assertThat(deletedCount).isEqualTo(2);
+        assertThat(outboxEventRepository.findAll())
+                .extracting(OutboxEvent::getId)
+                .containsExactly(remainingEvent.getId());
     }
 
     private OutboxEvent createEvent(Long aggregateId, String eventType) {

@@ -123,6 +123,7 @@ cat > "${connector_config_file}" <<JSON
   "table.include.list": "${PERF_DB_NAME}.outbox_events",
   "include.schema.changes": "false",
   "snapshot.mode": "schema_only",
+  "skipped.operations": "u,d",
   "tombstones.on.delete": "false",
   "schema.history.internal.kafka.bootstrap.servers": "kafka:29092",
   "schema.history.internal.kafka.topic": "${DEBEZIUM_SCHEMA_HISTORY_TOPIC}",
