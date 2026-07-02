@@ -46,7 +46,12 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> 
                   )
                 )
               )
-            ORDER BY event.createdAt ASC
+            ORDER BY
+              CASE
+                WHEN event.status = jobflow.domain.outbox.OutboxStatus.PENDING THEN 0
+                ELSE 1
+              END,
+              event.createdAt ASC
             """)
     List<Long> findCleanupCandidateIds(
             @Param("threshold") LocalDateTime threshold,

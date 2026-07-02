@@ -103,6 +103,26 @@ class OutboxEventRepositoryTest {
     }
 
     @Test
+    @DisplayName("cleanup 후보는 오래된 PUBLISHED보다 consumer 처리 완료된 PENDING을 먼저 조회한다")
+    void findCleanupCandidateIdsPrioritizesProcessedPendingEvents() {
+        OutboxEvent publishedEvent = createEvent(1L, OutboxEventTypes.JOB_CLOSED);
+        publishedEvent.markPublished();
+        outboxEventRepository.save(publishedEvent);
+        OutboxEvent processedPendingEvent = outboxEventRepository.save(createEvent(2L, OutboxEventTypes.JOB_CREATED));
+        outboxEventRepository.flush();
+        processedKafkaEventRepository.save(ProcessedKafkaEvent.create("email-send", processedPendingEvent.getId()));
+        processedKafkaEventRepository.flush();
+
+        List<Long> candidateIds = outboxEventRepository.findCleanupCandidateIds(
+                processedPendingEvent.getCreatedAt().plusSeconds(1),
+                PageRequest.of(0, 1)
+        );
+
+        assertThat(candidateIds)
+                .containsExactly(processedPendingEvent.getId());
+    }
+
+    @Test
     @DisplayName("cleanup 후보 id 목록을 bulk delete한다")
     void deleteByIdIn() {
         OutboxEvent firstEvent = outboxEventRepository.save(createEvent(1L, OutboxEventTypes.JOB_CREATED));

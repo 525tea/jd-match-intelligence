@@ -138,6 +138,29 @@ ensure_outbox_schema_version_column() {
   fi
 }
 
+ensure_processed_event_id_index() {
+  echo "### Ensure processed_kafka_events event_id index exists"
+  processed_event_id_index_count="$(
+    mysql_root_exec -Nse "
+      SELECT COUNT(*)
+      FROM information_schema.statistics
+      WHERE table_schema = DATABASE()
+        AND table_name = 'processed_kafka_events'
+        AND index_name = 'idx_processed_kafka_events_event_id';
+    "
+  )"
+
+  if [[ "${processed_event_id_index_count}" == "0" ]]; then
+    mysql_root_exec -e "
+      ALTER TABLE processed_kafka_events
+        ADD KEY idx_processed_kafka_events_event_id (event_id);
+    "
+    echo "processed_event_id_index_added=true"
+  else
+    echo "processed_event_id_index_added=false"
+  fi
+}
+
 delete_debezium_connector_if_exists() {
   if curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}" >/dev/null 2>&1; then
     curl -fsS -X DELETE "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}" >/dev/null
@@ -177,6 +200,7 @@ prepare_stack() {
   require_service "${MYSQL_SERVICE}"
   require_service "${KAFKA_SERVICE}"
   ensure_outbox_schema_version_column
+  ensure_processed_event_id_index
 
   if [[ "${MODE}" == "debezium-cdc-after" ]]; then
     compose up -d "${DEBEZIUM_CONNECT_SERVICE}"
