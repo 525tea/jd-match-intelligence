@@ -12,6 +12,15 @@ import org.springframework.data.repository.query.Param;
 
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> {
 
+    long countByStatus(OutboxStatus status);
+
+    @Query("""
+            SELECT event.status AS status, COUNT(event) AS count
+            FROM OutboxEvent event
+            GROUP BY event.status
+            """)
+    List<OutboxStatusCount> countGroupByStatus();
+
     List<OutboxEvent> findTop100ByStatusAndRetryCountLessThanOrderByCreatedAtAsc(
             OutboxStatus status,
             int retryCount

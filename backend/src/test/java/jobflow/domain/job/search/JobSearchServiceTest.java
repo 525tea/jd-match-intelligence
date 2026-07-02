@@ -30,11 +30,15 @@ class JobSearchServiceTest {
     @Mock
     private MySqlFullTextJobSearchService mySqlFullTextJobSearchService;
 
+    @Mock
+    private JobSearchMetrics jobSearchMetrics;
+
     private JobSearchService service(boolean cacheEnabled) {
         JobSearchService svc = new JobSearchService(
                 elasticsearchJobSearchService,
                 mySqlFullTextJobSearchService,
-                cacheProperties(cacheEnabled)
+                cacheProperties(cacheEnabled),
+                jobSearchMetrics
         );
         svc.self = spy(svc);
         return svc;
@@ -54,6 +58,7 @@ class JobSearchServiceTest {
         assertThat(results).containsExactly(result);
         verify(elasticsearchJobSearchService).search("백엔드", 20);
         verify(mySqlFullTextJobSearchService, never()).search("백엔드", 20);
+        verify(jobSearchMetrics, never()).recordElasticsearchFallback();
     }
 
     @Test
@@ -72,6 +77,7 @@ class JobSearchServiceTest {
         assertThat(results).containsExactly(fallbackResult);
         verify(elasticsearchJobSearchService).search("백엔드", 20);
         verify(mySqlFullTextJobSearchService).search("백엔드", 20);
+        verify(jobSearchMetrics).recordElasticsearchFallback();
     }
 
     @Test
@@ -84,6 +90,7 @@ class JobSearchServiceTest {
         assertThat(results).isEmpty();
         verify(elasticsearchJobSearchService, never()).search(" ", 20);
         verify(mySqlFullTextJobSearchService, never()).search(" ", 20);
+        verify(jobSearchMetrics, never()).recordElasticsearchFallback();
     }
 
     private JobFlowCacheProperties cacheProperties(boolean enabled) {
@@ -97,9 +104,9 @@ class JobSearchServiceTest {
                 1L,
                 "WANTED",
                 "367438",
-                "jobflow|backend developer|seoul",
+                "sample-source|backend developer|seoul",
                 "백엔드 개발자",
-                "JobFlow",
+                "SampleCorp",
                 JobRole.BACKEND,
                 CareerLevel.JUNIOR,
                 EmploymentType.FULL_TIME,

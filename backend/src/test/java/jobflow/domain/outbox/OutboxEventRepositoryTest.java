@@ -1,6 +1,7 @@
 package jobflow.domain.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -74,6 +75,33 @@ class OutboxEventRepositoryTest {
         assertThat(events)
                 .extracting(OutboxEvent::getAggregateId)
                 .containsExactly(1L, 2L);
+    }
+
+    @Test
+    @DisplayName("outbox 이벤트 수를 상태별로 집계한다")
+    void countByStatus() {
+        OutboxEvent pendingEvent = createEvent(1L, OutboxEventTypes.JOB_CREATED);
+        OutboxEvent publishedEvent = createEvent(2L, OutboxEventTypes.JOB_UPDATED);
+        OutboxEvent failedEvent = createEvent(3L, OutboxEventTypes.JOB_CLOSED);
+
+        publishedEvent.markPublished();
+        failedEvent.markFailed("publish failed", 1);
+
+        outboxEventRepository.save(pendingEvent);
+        outboxEventRepository.save(publishedEvent);
+        outboxEventRepository.save(failedEvent);
+        outboxEventRepository.flush();
+
+        assertThat(outboxEventRepository.countByStatus(OutboxStatus.PENDING)).isEqualTo(1);
+        assertThat(outboxEventRepository.countByStatus(OutboxStatus.PUBLISHED)).isEqualTo(1);
+        assertThat(outboxEventRepository.countByStatus(OutboxStatus.FAILED)).isEqualTo(1);
+        assertThat(outboxEventRepository.countGroupByStatus())
+                .extracting(OutboxStatusCount::getStatus, OutboxStatusCount::getCount)
+                .containsExactlyInAnyOrder(
+                        tuple(OutboxStatus.PENDING, 1L),
+                        tuple(OutboxStatus.PUBLISHED, 1L),
+                        tuple(OutboxStatus.FAILED, 1L)
+                );
     }
 
     @Test
