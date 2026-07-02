@@ -65,6 +65,39 @@ class OutboxKafkaMessageParserTest {
     }
 
     @Test
+    @DisplayName("Debezium Outbox Event Router value envelope도 기존 consumer 계약으로 해석한다")
+    void parseDebeziumOutboxEventRouterEnvelope() {
+        String message = """
+                {
+                  "payload": {
+                    "to": "user@example.com",
+                    "subject": "Debezium outbox smoke sample-run",
+                    "text": "Sample body",
+                    "html": null,
+                    "smokeRunId": "sample-run"
+                  },
+                  "schemaVersion": 1,
+                  "aggregateType": "EMAIL",
+                  "aggregateId": 30,
+                  "eventType": "EMAIL_SEND_REQUESTED",
+                  "topic": "email.send",
+                  "eventId": 40
+                }
+                """;
+
+        OutboxKafkaEnvelope envelope = parser.parseEnvelope(message);
+
+        assertThat(envelope.schemaVersion()).isEqualTo(1);
+        assertThat(envelope.eventId()).isEqualTo(40L);
+        assertThat(envelope.aggregateType()).isEqualTo("EMAIL");
+        assertThat(envelope.aggregateId()).isEqualTo(30L);
+        assertThat(envelope.eventType()).isEqualTo("EMAIL_SEND_REQUESTED");
+        assertThat(envelope.topic()).isEqualTo("email.send");
+        assertThat(envelope.payload().path("to").asText()).isEqualTo("user@example.com");
+        assertThat(envelope.payload().path("smokeRunId").asText()).isEqualTo("sample-run");
+    }
+
+    @Test
     @DisplayName("schemaVersion이 정수가 아니면 실패한다")
     void failWhenSchemaVersionIsInvalid() {
         assertThatThrownBy(() -> parser.parseEnvelope("""

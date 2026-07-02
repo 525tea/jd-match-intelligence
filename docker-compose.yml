@@ -15,6 +15,10 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+      - --server-id=${MYSQL_SERVER_ID:-223344}
+      - --log-bin=${MYSQL_BINLOG_BASENAME:-mysql-bin}
+      - --binlog-format=ROW
+      - --binlog-row-image=FULL
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u jobflow -pjobflow --silent"]
       interval: 10s
@@ -110,7 +114,43 @@ services:
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic email.send --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic es.index --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
         kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic security.events --partitions ${KAFKA_TOPIC_PARTITIONS:-3} --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic jobflow-connect-configs --partitions 1 --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1} --config cleanup.policy=compact
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic jobflow-connect-offsets --partitions 25 --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1} --config cleanup.policy=compact
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic jobflow-connect-status --partitions 5 --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1} --config cleanup.policy=compact
+        kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic schema-changes.jobflow --partitions 1 --replication-factor ${KAFKA_TOPIC_REPLICATION_FACTOR:-1} --config cleanup.policy=compact
         kafka-topics --bootstrap-server kafka:29092 --list
+
+  debezium-connect:
+    image: ${DEBEZIUM_CONNECT_IMAGE:-quay.io/debezium/connect:3.0}
+    container_name: jobflow-debezium-connect
+    mem_limit: ${DEBEZIUM_CONNECT_MEMORY_LIMIT:-1g}
+    ports:
+      - "${DEBEZIUM_CONNECT_PORT:-8083}:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:29092
+      GROUP_ID: ${DEBEZIUM_CONNECT_GROUP_ID:-jobflow-connect}
+      CONFIG_STORAGE_TOPIC: ${DEBEZIUM_CONNECT_CONFIG_TOPIC:-jobflow-connect-configs}
+      OFFSET_STORAGE_TOPIC: ${DEBEZIUM_CONNECT_OFFSET_TOPIC:-jobflow-connect-offsets}
+      STATUS_STORAGE_TOPIC: ${DEBEZIUM_CONNECT_STATUS_TOPIC:-jobflow-connect-status}
+      CONFIG_STORAGE_REPLICATION_FACTOR: ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+      OFFSET_STORAGE_REPLICATION_FACTOR: ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+      STATUS_STORAGE_REPLICATION_FACTOR: ${KAFKA_TOPIC_REPLICATION_FACTOR:-1}
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_REST_ADVERTISED_HOST_NAME: debezium-connect
+    depends_on:
+      mysql:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail http://localhost:8083/connectors >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
 
   kafka-exporter:
     image: danielqsj/kafka-exporter:v1.7.0
