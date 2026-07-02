@@ -484,8 +484,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(kafka_consumer_fetch_manager_records_lag{application=\"jobflow-backend\"}) by (topic)",
-          "legendFormat": "lag {{topic}}"
+          "expr": "sum(clamp_min(kafka_consumergroup_lag{consumergroup=~\"jobflow-.*\"}, 0)) by (consumergroup, topic)",
+          "legendFormat": "{{consumergroup}} {{topic}}"
         }
       ],
       "fieldConfig": {

@@ -67,6 +67,7 @@ services:
       GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE: ${PERF_GATEWAY_RATE_LIMIT_REQUESTS_PER_MINUTE:-100000}
 
   kafka:
+    mem_limit: ${PERF_KAFKA_MEMORY_LIMIT:-2g}
     ports: !override
       - "${PERF_KAFKA_HOST_PORT:-19092}:9092"
     environment:
