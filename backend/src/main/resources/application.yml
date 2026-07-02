@@ -132,6 +132,13 @@ jobflow:
       batch-size: ${OUTBOX_RELAY_BATCH_SIZE:100}
       kafka:
         send-timeout-millis: ${OUTBOX_RELAY_KAFKA_SEND_TIMEOUT_MILLIS:3000}
+    cleanup:
+      retention: ${OUTBOX_CLEANUP_RETENTION:PT6H}
+      batch-size: ${OUTBOX_CLEANUP_BATCH_SIZE:500}
+      scheduler:
+        enabled: ${OUTBOX_CLEANUP_SCHEDULER_ENABLED:false}
+        fixed-delay: ${OUTBOX_CLEANUP_FIXED_DELAY:60000}
+        initial-delay: ${OUTBOX_CLEANUP_INITIAL_DELAY:60000}
 
   notification:
     deadline-reminder:

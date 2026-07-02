@@ -209,13 +209,146 @@ Debezium outbox CDC smoke completed.
 
 주의:
 
-- 이 smoke는 `PERF_DB_NAME=jobflow`일 때 실행 불가능한다.
+- 이 smoke는 `PERF_DB_NAME=jobflow`일 때 실행 불가능하다.
 - 기존 performance DB에 `schema_version` column이 없으면 smoke가 performance DB에 한해 column을 추가한다.
 - Debezium은 outbox row를 Kafka로 발행하지만 app DB row의 publish status를 직접 바꾸지 않는다. Debezium 전환 이후 `PENDING`은 app relay의 publish 대기 상태가 아니라 cleanup/retention 정책의 대상이 된다.
 
-- k6 API latency: 500VU, 5분 기준 API p95/p99와 실패율
+## Debezium k6 comparison / recovery
+
+`performance/debezium/run-debezium-k6-comparison.sh`는 app-level Outbox Relay와 Debezium CDC를 같은 k6 조건에서 비교하기 위한 runner다.
+
+비교군은 두 가지다.
+
+- `MODE=app-relay-baseline`: 기존 app-level Outbox Relay가 `outbox_events`를 polling해 Kafka로 publish한다.
+- `MODE=debezium-cdc-after`: app-level Outbox Relay를 끄고 Debezium MySQL Connector가 binlog 기반으로 Kafka에 publish한다.
+
+검증 포인트:
+
+- API 500VU / 5분 기준 p95, p99, error rate
+- Debezium 비교 run은 기본적으로 `jobs_search,recommendations_jobs,gap_analysis` read workload를 사용한다. `/jobs` 목록 조회는 500VU에서 DB connection pool을 먼저 고갈시키는 별도 endpoint 병목으로 확인되어, CDC publish 경로 비교를 오염시키지 않기 위해 제외한다.
+- Debezium 비교 run은 `K6_SCENARIO_MODE=ramping-vus`, `ENDPOINT_ORDER_MODE=rotated`를 기본값으로 사용한다. 500 VU가 첫 iteration에서 같은 endpoint를 동시에 치면 CDC 비교가 아니라 endpoint stampede 테스트가 되기 때문이다.
+- Outbox 대량 이벤트 처리 수
+- `processed_kafka_events` 처리 수
 - Kafka consumer lag: `kafka-consumer-groups --describe` snapshot과 Prometheus `kafka_consumergroup_lag`
+- Kafka consumer final lag 0
+- Debezium 모드의 outbox cleanup: Debezium은 binlog insert를 Kafka로 publish할 뿐 `outbox_events.status`를 `PUBLISHED`로 바꾸지 않는다. 장기 누적을 막으려면 consumer 처리 완료 이력이 있는 outbox row를 retention 이후 cleanup한다.
 - duplicate replay idempotency: 같은 `eventId`의 `email.send` 메시지를 2번 발행했을 때 `processed_kafka_events`가 1건만 남는지
+- Debezium 전환 후에도 기존 side effect business logic과 idempotency 모델 유지
+
+단일 서버에서 빠르게 실행할 때:
+
+```bash
+MODE=app-relay-baseline \
+PHASE=full \
+KAFKA_EVENT_LOAD_COUNT=10000 \
+bash performance/debezium/run-debezium-k6-comparison.sh
+
+MODE=debezium-cdc-after \
+PHASE=full \
+KAFKA_EVENT_LOAD_COUNT=10000 \
+bash performance/debezium/run-debezium-k6-comparison.sh
+```
+
+두 대의 EC2를 분리해서 측정할 때는 staging-performance 서버에서 `prepare`와 `seed`/`finish`를 실행하고, k6-runner 서버에서는 같은 branch/script 기준으로 `k6-only`를 실행한다. 이 방식이 포트폴리오 대표 수치에는 더 적합하다.
+
+staging-performance 서버:
+
+```bash
+MODE=debezium-cdc-after \
+PHASE=prepare \
+DEBEZIUM_K6_RUN_ID=debezium-k6-after-$(date +%Y%m%d%H%M%S) \
+bash performance/debezium/run-debezium-k6-comparison.sh
+```
+
+k6-runner 서버:
+
+```bash
+MODE=debezium-cdc-after \
+PHASE=k6-only \
+DEBEZIUM_K6_RUN_ID=<prepare에서 사용한 run id> \
+BASE_URL=http://172.31.63.104:8080 \
+K6_SCENARIO_MODE=ramping-vus \
+RAMP_UP_DURATION=2m \
+STEADY_DURATION=3m \
+RAMP_DOWN_DURATION=30s \
+ENDPOINT_ORDER_MODE=rotated \
+ENDPOINTS=jobs_search,recommendations_jobs,gap_analysis \
+bash performance/debezium/run-debezium-k6-comparison.sh
+```
+
+Debezium cleanup까지 포함해 측정할 때는 staging-performance 서버의 `prepare` 전에 다음 값을 함께 둔다.
+
+```bash
+PERF_OUTBOX_CLEANUP_SCHEDULER_ENABLED=true \
+PERF_OUTBOX_CLEANUP_RETENTION=PT30S \
+PERF_OUTBOX_CLEANUP_BATCH_SIZE=1000 \
+PERF_OUTBOX_CLEANUP_FIXED_DELAY=10000 \
+PERF_OUTBOX_CLEANUP_INITIAL_DELAY=10000 \
+MODE=debezium-cdc-after \
+PHASE=prepare \
+DEBEZIUM_K6_RUN_ID=debezium-k6-after-cleanup-$(date +%Y%m%d%H%M%S) \
+bash performance/debezium/run-debezium-k6-comparison.sh
+```
+
+주의:
+
+- Cleanup은 `processed_kafka_events`에 처리 이력이 있는 `PENDING` outbox row와 기존 relay가 `PUBLISHED`로 마킹한 row만 삭제한다.
+- Debezium connector는 `skipped.operations=u,d`로 등록한다. cleanup delete나 status update가 Kafka business event로 다시 흘러가지 않게 하기 위해서다.
+- Cleanup을 켠 run에서는 Debezium 최종 summary의 `outbox_pending/outbox_total`이 10,000보다 작아질 수 있다. 이때 완료 기준은 `processed_count=10000`과 Kafka final lag 0이다.
+
+k6 실행 중 staging-performance 서버:
+
+```bash
+MODE=debezium-cdc-after \
+PHASE=seed \
+DEBEZIUM_K6_RUN_ID=<prepare에서 사용한 run id> \
+KAFKA_EVENT_LOAD_COUNT=10000 \
+bash performance/debezium/run-debezium-k6-comparison.sh
+```
+
+k6 종료 후 staging-performance 서버:
+
+```bash
+MODE=debezium-cdc-after \
+PHASE=finish \
+DEBEZIUM_K6_RUN_ID=<prepare에서 사용한 run id> \
+KAFKA_EVENT_LOAD_COUNT=10000 \
+bash performance/debezium/run-debezium-k6-comparison.sh
+```
+
+기대 결과:
+
+```text
+Debezium k6 comparison scenario completed.
+mode=debezium-cdc-after
+run_id=<run id>
+summary_export=<artifact path>
+processed_count=10000
+final_lag=0
+artifact_dir=<artifact dir>
+```
+
+`performance/debezium/run-debezium-recovery-scenario.sh`는 Debezium 전환 후 장애 복구를 확인한다.
+
+- `DEBEZIUM_RECOVERY_MODE=connector-paused`: connector pause 중 outbox insert 후 resume drain 확인
+- `DEBEZIUM_RECOVERY_MODE=backend-restart`: backend consumer disabled 중 Kafka lag 누적 후 consumer enabled drain 확인
+- `DEBEZIUM_RECOVERY_MODE=all`: 두 시나리오를 연속 실행
+
+```bash
+DEBEZIUM_RECOVERY_MODE=all \
+DEBEZIUM_RECOVERY_EVENT_COUNT=10000 \
+bash performance/debezium/run-debezium-recovery-scenario.sh
+```
+
+기대 결과:
+
+```text
+Debezium recovery scenario completed.
+mode=<connector-paused|backend-restart|all>
+run_id=<run id>
+final_lag=0
+artifact_dir=<artifact dir>
+```
 
 ### 1. API-only baseline
 

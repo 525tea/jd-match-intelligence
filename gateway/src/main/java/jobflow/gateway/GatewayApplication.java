@@ -21,7 +21,8 @@ public class GatewayApplication {
     RouteLocator backendRoutes(
             RouteLocatorBuilder builder,
             FixedWindowRateLimitFilter fixedWindowRateLimitFilter,
-            @Value("${gateway.backend-url:http://localhost:8080}") String backendUrl
+            @Value("${gateway.backend-url:http://localhost:8080}") String backendUrl,
+            @Value("${gateway.backend-circuit-breaker.enabled:true}") boolean backendCircuitBreakerEnabled
     ) {
         return builder.routes()
                 .route("blocked-backend-actuator", route -> route
@@ -31,14 +32,18 @@ public class GatewayApplication {
                 )
                 .route("backend-api", route -> route
                         .path("/api/**")
-                        .filters(filters -> filters
-                                .stripPrefix(1)
-                                .filter(fixedWindowRateLimitFilter)
-                                .circuitBreaker(config -> config
+                        .filters(filters -> {
+                            var spec = filters
+                                    .stripPrefix(1)
+                                    .filter(fixedWindowRateLimitFilter);
+                            if (backendCircuitBreakerEnabled) {
+                                spec = spec.circuitBreaker(config -> config
                                         .setName("backendApiCircuitBreaker")
                                         .setFallbackUri(URI.create("forward:/fallback/backend"))
-                                )
-                        )
+                                );
+                            }
+                            return spec;
+                        })
                         .uri(backendUrl)
                 )
                 .build();

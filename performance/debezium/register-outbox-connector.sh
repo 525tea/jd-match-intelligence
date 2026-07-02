@@ -31,6 +31,7 @@ DEBEZIUM_DB_PASSWORD="${DEBEZIUM_DB_PASSWORD:-${MYSQL_ROOT_PASSWORD:-root}}"
 DEBEZIUM_CONNECTOR_DATABASE_SERVER_ID="${DEBEZIUM_CONNECTOR_DATABASE_SERVER_ID:-223345}"
 DEBEZIUM_TOPIC_PREFIX="${DEBEZIUM_TOPIC_PREFIX:-jobflow-cdc}"
 DEBEZIUM_SCHEMA_HISTORY_TOPIC="${DEBEZIUM_SCHEMA_HISTORY_TOPIC:-schema-changes.jobflow}"
+DEBEZIUM_SNAPSHOT_MODE="${DEBEZIUM_SNAPSHOT_MODE:-no_data}"
 PERF_DB_NAME="${PERF_DB_NAME:-jobflow_perf}"
 DEBEZIUM_WAIT_SECONDS="${DEBEZIUM_WAIT_SECONDS:-60}"
 
@@ -56,6 +57,7 @@ echo "DEBEZIUM_CONNECTOR_NAME=${DEBEZIUM_CONNECTOR_NAME}"
 echo "PERF_DB_NAME=${PERF_DB_NAME}"
 echo "DEBEZIUM_TOPIC_PREFIX=${DEBEZIUM_TOPIC_PREFIX}"
 echo "DEBEZIUM_SCHEMA_HISTORY_TOPIC=${DEBEZIUM_SCHEMA_HISTORY_TOPIC}"
+echo "DEBEZIUM_SNAPSHOT_MODE=${DEBEZIUM_SNAPSHOT_MODE}"
 echo
 
 if [[ "${PERF_DB_NAME}" == "jobflow" ]]; then
@@ -122,7 +124,8 @@ cat > "${connector_config_file}" <<JSON
   "database.include.list": "${PERF_DB_NAME}",
   "table.include.list": "${PERF_DB_NAME}.outbox_events",
   "include.schema.changes": "false",
-  "snapshot.mode": "schema_only",
+  "snapshot.mode": "${DEBEZIUM_SNAPSHOT_MODE}",
+  "skipped.operations": "u,d",
   "tombstones.on.delete": "false",
   "schema.history.internal.kafka.bootstrap.servers": "kafka:29092",
   "schema.history.internal.kafka.topic": "${DEBEZIUM_SCHEMA_HISTORY_TOPIC}",
@@ -158,7 +161,14 @@ echo
 
 echo "### Wait for connector RUNNING"
 for ((i = 1; i <= DEBEZIUM_WAIT_SECONDS; i++)); do
-  status_json="$(curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/status")"
+  status_json="$(curl -fsS "${DEBEZIUM_CONNECT_URL}/connectors/${DEBEZIUM_CONNECTOR_NAME}/status" 2>/dev/null || true)"
+
+  if [[ -z "${status_json}" ]]; then
+    echo "connector_status_wait_elapsed=${i}s status=not_found_or_not_ready"
+    sleep 1
+    continue
+  fi
+
   echo "connector_status_wait_elapsed=${i}s ${status_json}"
 
   running_state_count="$(echo "${status_json}" | grep -Eo '"state"[[:space:]]*:[[:space:]]*"RUNNING"' | wc -l | tr -d ' ')"
