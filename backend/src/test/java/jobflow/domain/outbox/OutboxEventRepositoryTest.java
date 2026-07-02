@@ -1,6 +1,7 @@
 package jobflow.domain.outbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -94,6 +95,13 @@ class OutboxEventRepositoryTest {
         assertThat(outboxEventRepository.countByStatus(OutboxStatus.PENDING)).isEqualTo(1);
         assertThat(outboxEventRepository.countByStatus(OutboxStatus.PUBLISHED)).isEqualTo(1);
         assertThat(outboxEventRepository.countByStatus(OutboxStatus.FAILED)).isEqualTo(1);
+        assertThat(outboxEventRepository.countGroupByStatus())
+                .extracting(OutboxStatusCount::getStatus, OutboxStatusCount::getCount)
+                .containsExactlyInAnyOrder(
+                        tuple(OutboxStatus.PENDING, 1L),
+                        tuple(OutboxStatus.PUBLISHED, 1L),
+                        tuple(OutboxStatus.FAILED, 1L)
+                );
     }
 
     @Test

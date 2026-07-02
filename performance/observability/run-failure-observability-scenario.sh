@@ -6,32 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env}"
 
-load_env_file_preserving_existing() {
-  local env_file="$1"
-  local key=""
-  local line=""
-  local value=""
-
-  [[ -f "${env_file}" ]] || return 0
-
-  while IFS= read -r line || [[ -n "${line}" ]]; do
-    [[ "${line}" =~ ^[[:space:]]*# ]] && continue
-    [[ -z "${line// }" ]] && continue
-    key="${line%%=*}"
-    value="${line#*=}"
-
-    key="${key#"${key%%[![:space:]]*}"}"
-    key="${key%"${key##*[![:space:]]}"}"
-    [[ -z "${key}" ]] && continue
-    [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-    declare -p "${key}" >/dev/null 2>&1 && continue
-
-    value="${value%\"}" value="${value#\"}"
-    value="${value%\'}" value="${value#\'}"
-    export "${key}=${value}"
-  done < "${env_file}"
-}
-
+source "${ROOT_DIR}/performance/lib/env.sh"
 load_env_file_preserving_existing "${ENV_FILE}"
 
 COMPOSE_FILES=(-f docker-compose.yml -f docker-compose.performance.yml)
@@ -44,6 +19,8 @@ GATEWAY_URL="${GATEWAY_URL:-http://localhost:8081}"
 PROMETHEUS_URL="${PROMETHEUS_URL:-http://localhost:9090}"
 ELASTICSEARCH_URL="${ELASTICSEARCH_URL:-http://localhost:9200}"
 DEBEZIUM_CONNECT_URL="${DEBEZIUM_CONNECT_URL:-http://localhost:18083}"
+GRAFANA_BACKEND_URL="${GRAFANA_BACKEND_URL:-http://3.39.242.44:3001/d/jobflow-backend/jobflow-backend-observability?orgId=1&refresh=5s&from=now-15m&to=now}"
+KIBANA_URL="${KIBANA_URL:-http://3.39.242.44:5601}"
 
 MYSQL_SERVICE="${MYSQL_SERVICE:-mysql}"
 REDIS_SERVICE="${REDIS_SERVICE:-redis}"
@@ -153,9 +130,12 @@ prometheus_query() {
   local label="$1"
   local query="$2"
   local output_file="${ARTIFACT_DIR}/$(timestamp)_${RUN_ID}_${label}.json"
-  curl -sS --get --data-urlencode "query=${query}" \
+  if ! curl -sS --get --data-urlencode "query=${query}" \
     "${PROMETHEUS_URL}/api/v1/query" \
-    | tee "${output_file}" >/dev/null
+    | tee "${output_file}" >/dev/null; then
+    echo "prometheus_query_failed label=${label}" >&2
+    printf '{"status":"error","error":"prometheus_query_failed","label":"%s"}\n' "${label}" > "${output_file}"
+  fi
   echo "${output_file}"
 }
 
@@ -165,8 +145,8 @@ print_capture_marker() {
   echo
   echo "CAPTURE_NOW name=${name}"
   echo "CAPTURE_REASON=${reason}"
-  echo "GRAFANA_BACKEND_URL=http://3.39.242.44:3001/d/jobflow-backend/jobflow-backend-observability?orgId=1&refresh=5s&from=now-15m&to=now"
-  echo "KIBANA_URL=http://3.39.242.44:5601"
+  echo "GRAFANA_BACKEND_URL=${GRAFANA_BACKEND_URL}"
+  echo "KIBANA_URL=${KIBANA_URL}"
   echo
 }
 
@@ -242,11 +222,14 @@ JSON
 
   local total_hits="0"
   for ((i = 1; i <= SECURITY_EVENT_WAIT_SECONDS; i++)); do
-    curl -sS -H "Content-Type: application/json" \
+    if ! curl -sS -H "Content-Type: application/json" \
       -X POST "${ELASTICSEARCH_URL}/${SECURITY_EVENTS_INDEX}/_search" \
       --data-binary "@${query_file}" \
-      | tee "${result_file}" >/dev/null
-    total_hits="$(jq -r '.hits.total.value // 0' "${result_file}")"
+      | tee "${result_file}" >/dev/null; then
+      echo "security_event_query_failed elapsed=${i}s" >&2
+      printf '{}\n' > "${result_file}"
+    fi
+    total_hits="$(jq -r '.hits.total.value // 0' "${result_file}" 2>/dev/null || echo 0)"
     echo "security_event_wait_elapsed=${i}s total_hits=${total_hits}"
     [[ "${total_hits}" -ge 3 ]] && break
     sleep 1
@@ -372,7 +355,7 @@ run_kafka_consumer_recovery_scenario() {
   KAFKA_RECOVERY_EVENT_COUNT="${KAFKA_RECOVERY_EVENT_COUNT}" \
   KAFKA_RECOVERY_RUN_ID="${RUN_ID}-kafka-consumer-recovery" \
   ARTIFACT_DIR="${ARTIFACT_DIR}" \
-  bash performance/events/run-kafka-consumer-recovery-scenario.sh \
+  bash performance/events/run-kafka-consumer-recovery-scenario.sh 2>&1 \
     | tee "${ARTIFACT_DIR}/$(timestamp)_${RUN_ID}_kafka_consumer_recovery.log"
 
   prometheus_query "kafka_recovery_outbox_status" \
@@ -393,7 +376,7 @@ run_debezium_recovery_scenario() {
   DEBEZIUM_RECOVERY_EVENT_COUNT="${DEBEZIUM_RECOVERY_EVENT_COUNT}" \
   DEBEZIUM_RECOVERY_RUN_ID="${RUN_ID}-debezium-recovery" \
   ARTIFACT_DIR="${ARTIFACT_DIR}" \
-  bash performance/debezium/run-debezium-recovery-scenario.sh \
+  bash performance/debezium/run-debezium-recovery-scenario.sh 2>&1 \
     | tee "${ARTIFACT_DIR}/$(timestamp)_${RUN_ID}_debezium_recovery.log"
 
   prometheus_query "debezium_recovery_outbox_status" \

@@ -58,7 +58,8 @@ bash performance/observability/run-failure-observability-scenario.sh
 
 ### Grafana
 
-기본 URL:
+스크립트는 `CAPTURE_NOW` marker와 함께 `GRAFANA_BACKEND_URL`을 출력한다.
+별도로 지정하지 않으면 아래 기본 URL을 사용한다.
 
 ```text
 http://3.39.242.44:3001/d/jobflow-backend/jobflow-backend-observability?orgId=1&refresh=5s&from=now-15m&to=now
@@ -93,7 +94,8 @@ http://3.39.242.44:3001/d/jobflow-backend/jobflow-backend-observability?orgId=1&
 
 ### Kibana
 
-기본 URL:
+스크립트는 `CAPTURE_NOW` marker와 함께 `KIBANA_URL`을 출력한다.
+별도로 지정하지 않으면 아래 기본 URL을 사용한다.
 
 ```text
 http://3.39.242.44:5601
